@@ -1,0 +1,1 @@
+// Component removed to clean up project structure as requested.

@@ -1,0 +1,1 @@
+// SupportHub removed. Sections are now top-level tabs: Contact, FAQ, and Shipping.

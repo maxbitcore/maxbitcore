@@ -1,0 +1,1 @@
+// LegalView removed. Sections are now top-level tabs: Privacy, Terms, and Returns.
