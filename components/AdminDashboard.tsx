@@ -406,38 +406,41 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
       <div className="max-w-7xl mx-auto space-y-12">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-slate-800 pb-12">
-          <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer" onClick={() => logoUploadRef.current?.click()}>
-              <img src={currentLogo} className="w-16 h-16 object-contain group-hover:opacity-50 transition-opacity" alt="Logo" />
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
+        
+        {isAuthenticated && (
+          <>
+            <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-slate-800 pb-12">
+              <div className="flex items-center gap-6">
+                <div className="relative group cursor-pointer" onClick={() => logoUploadRef.current?.click()}>
+                  <img src={currentLogo} className="w-16 h-16 object-contain group-hover:opacity-50 transition-opacity" alt="Logo" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
+                  </div>
+                  <input type="file" ref={logoUploadRef} onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const dataUrl = ev.target?.result as string;
+                        setCurrentLogo(dataUrl);
+                        localStorage.setItem('maxbit_logo', dataUrl);
+                        window.dispatchEvent(new CustomEvent('logo-updated'));
+                      };
+                      reader.readAsDataURL(e.target.files[0]);
+                    }
+                  }} className="hidden" accept="image/*" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500">System Administrator</span>
+                  <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase leading-none">Command Center</h1>
+                </div>
               </div>
-              <input type="file" ref={logoUploadRef} onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    const dataUrl = ev.target?.result as string;
-                    setCurrentLogo(dataUrl);
-                    localStorage.setItem('maxbit_logo', dataUrl);
-                    window.dispatchEvent(new CustomEvent('logo-updated'));
-                  };
-                  reader.readAsDataURL(e.target.files[0]);
-                }
-              }} className="hidden" accept="image/*" />
+              <div className="flex flex-wrap gap-3">
+                {(['submissions', 'orders', 'catalog', 'analytics', 'comments'] as const).map(tab => (
+                  <button key={tab} onClick={() => setActiveAdminTab(tab)} className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all ${activeAdminTab === tab ? 'bg-cyan-500 text-slate-950' : 'bg-slate-900 text-slate-500 border border-slate-800 hover:border-slate-600'}`}>{tab === 'comments' ? 'Reports' : tab}</button>
+                ))}
+                <button onClick={() => { logoutUser(); window.location.reload(); }} className="text-[10px] font-black text-rose-500 uppercase px-4 py-2 hover:bg-rose-950/30 rounded-lg">Logout</button>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500">System Administrator</span>
-              <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase leading-none">Command Center</h1>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {(['submissions', 'orders', 'catalog', 'analytics', 'comments'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveAdminTab(tab)} className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all ${activeAdminTab === tab ? 'bg-cyan-500 text-slate-950' : 'bg-slate-900 text-slate-500 border border-slate-800 hover:border-slate-600'}`}>{tab === 'comments' ? 'Reports' : tab}</button>
-            ))}
-            <button onClick={() => { logoutUser(); window.location.reload(); }} className="text-[10px] font-black text-rose-500 uppercase px-4 py-2 hover:bg-rose-950/30 rounded-lg">Logout</button>
-          </div>
-        </div>
 
         {/* CATALOG TAB */}
         {activeAdminTab === 'catalog' && (
@@ -730,6 +733,9 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
         
+      </>
+    )}
+
         {/* SECTION: NEW CUSTOMER REGISTRATION SURVEY */}
         <div className="mt-12 bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl mx-auto">
           <div className="text-center mb-8">
