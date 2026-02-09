@@ -5,7 +5,7 @@ import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 
-const DEFAULT_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAw0lEQVR4AYzMQQvBYBgH8P9WlMsuUpOVXBCHXVx8BB/AlJIPICVfYFyX4qA4uDhaKS057wNIHFacpK1wkeROe2tvW++Up97ep///18N//hweP2Zm7AINA9WBgURljOHSwuF4ozgA44UOpqYNjovAmjcg58VwGM3KuK9b0CciJCVNkbvQi0JSQaykIdMvQjNVOPrF7emj8HXV8dy+cVYtbJp7CryFQCFVh1TL4bGyvZz5CeyNynAWJ6b0BwR2q21/Frp/AQAA///WbkgzAAAABklEQVQDABO8Uu1uvDV4AAAAAElFTkSuQmCC==";
+const DEFAULT_LOGO = ""; 
 
 const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
@@ -402,15 +402,6 @@ const AdminDashboard: React.FC = () => {
       reader.readAsDataURL(e.target.files[0]);
     }
   };
-
-  if (!isAuthenticated) return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#0b0f1a]">
-        <div className="max-w-md w-full bg-slate-950 border border-rose-900/50 p-10 rounded-3xl text-center">
-            <h2 className="text-3xl font-black text-white uppercase mb-8 italic">Admin Access Required</h2>
-            <button onClick={() => window.location.reload()} className="w-full py-4 bg-rose-600 text-white font-black uppercase tracking-widest rounded-xl">Refresh Neural Link</button>
-        </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
