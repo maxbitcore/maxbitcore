@@ -246,7 +246,7 @@ const AdminDashboard: React.FC = () => {
       price: parseFloat(newProductPrice),
       category: newProductCategory,
       status: newProductStatus,
-      imageUrl: newProductImage,
+      imageUrl: newProductImage || (newProductGallery.length > 0 ? newProductGallery[0] : ''),
       gallery: newProductGallery,
       components: newProductComponents,
       description: newProductDesc,
@@ -265,8 +265,50 @@ const AdminDashboard: React.FC = () => {
 
     resetProductForm();
     notifyUpdate();
+    alert("Unit Deployed Successfully to MaxBit Armory!");
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsProcessing(true);
+    
+    const processed: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(files[i]);
+        });
+        processed.push(dataUrl);
+      } catch (err) {
+        console.error("Error reading file", err);
+      }
+    }
+
+    if (processed.length > 0) {
+      if (!newProductImage) {
+        setNewProductImage(processed[0]);
+        setNewProductGallery(prev => [...prev, ...processed.slice(1)]);
+      } else {
+        setNewProductGallery(prev => [...prev, ...processed]);
+      }
+    }
+    
+    setIsProcessing(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const setAsMain = (index: number) => {
+    const currentMain = newProductImage;
+    const selected = newProductGallery[index];
+    setNewProductImage(selected);
+    const updatedGallery = [...newProductGallery];
+    updatedGallery[index] = currentMain;
+    setNewProductGallery(updatedGallery);
+  };
   const togglePublish = (productId: string) => {
     const updatedList = publishedProducts.map(p => {
       if (p.id === productId) {
@@ -281,12 +323,10 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteProduct = (productId: string) => {
-    setPublishedProducts(prev => {
-      const updatedList = prev.filter(p => p.id !== productId);
-      localStorage.setItem('maxbit_published_products', JSON.stringify(updatedList));
-      return updatedList;
-    });
-
+    if (!window.confirm("Delete this unit from inventory?")) return;
+    const updatedList = publishedProducts.filter(p => p.id !== productId);
+    setPublishedProducts(updatedList);
+    localStorage.setItem('maxbit_published_products', JSON.stringify(updatedList));
     if (editingId === productId) resetProductForm();
     notifyUpdate();
   };
@@ -304,42 +344,7 @@ const AdminDashboard: React.FC = () => {
     setCatalogMode('products');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setIsProcessing(true);
-    
-    const processed: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve) => {
-        reader.onload = (ev) => resolve(ev.target?.result as string);
-        reader.readAsDataURL(files[i]);
-      });
-      processed.push(dataUrl);
-    }
-
-    if (!newProductImage && processed.length > 0) {
-      setNewProductImage(processed[0]);
-      setNewProductGallery(prev => [...prev, ...processed.slice(1)]);
-    } else {
-      setNewProductGallery(prev => [...prev, ...processed]);
-    }
-    
-    setIsProcessing(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const setAsMain = (index: number) => {
-    const currentMain = newProductImage;
-    const selected = newProductGallery[index];
-    setNewProductImage(selected);
-    const updatedGallery = [...newProductGallery];
-    updatedGallery[index] = currentMain;
-    setNewProductGallery(updatedGallery);
-  };
-
+  
   // Asset Management Helpers
   const updateConfig = (key: keyof typeof DEFAULT_CONFIG, value: string) => {
     const newConfig = { ...config, [key]: value.split(',').map(s => s.trim()).filter(Boolean) };
@@ -575,7 +580,7 @@ const AdminDashboard: React.FC = () => {
                                             </div>
                                         </div>
                                     ))}
-                                    <input type="file" ref={assetImageRef} onChange={handleAssetImageUpload} className="hidden" accept="image/*" />
+                                    <input type="file" ref={assetImageRef} onChange={handleAssetImageUpload} multiple className="hidden" accept="image/*" />
                                 </div>
                             </div>
                         </div>
