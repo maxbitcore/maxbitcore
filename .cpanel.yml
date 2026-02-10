@@ -1,5 +1,5 @@
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/Maxbitcore/public_html/
+    - export DEPLOYPATH=/home/maxbwruv/public_html/
     - /bin/cp -R dist/assets $DEPLOYPATH
     - /bin/cp dist/index.html $DEPLOYPATH
