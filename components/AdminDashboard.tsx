@@ -408,9 +408,10 @@ const AdminDashboard: React.FC = () => {
 
   const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0 || !activeAssetCategory) return; // Добавили проверку категории
+    if (files.length === 0 || !activeAssetCategory) return; // Проверка, что категория выбрана
 
     setIsProcessing(true);
+
     try {
       const base64Images = await Promise.all(
         files.map((file: File) => {
@@ -425,17 +426,18 @@ const AdminDashboard: React.FC = () => {
 
       const updatedStyles = { 
         ...caseStyles, 
-        [activeAssetCategory]: base64Images[0] // Берем первое фото как основной скетч
+        [activeAssetCategory]: base64Images[0] 
       };
+      
       setCaseStyles(updatedStyles);
       localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
+      
       notifyUpdate();
-    
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Error uploading images. Check file size.");
     } finally {
       setIsProcessing(false);
+      setActiveAssetCategory(null);
     }
   };
 
