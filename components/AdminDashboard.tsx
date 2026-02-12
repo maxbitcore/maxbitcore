@@ -408,10 +408,9 @@ const AdminDashboard: React.FC = () => {
 
   const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+    if (files.length === 0 || !activeAssetCategory) return; // Добавили проверку категории
 
     setIsProcessing(true);
-
     try {
       const base64Images = await Promise.all(
         files.map((file: File) => {
@@ -424,7 +423,13 @@ const AdminDashboard: React.FC = () => {
         })
       );
 
-      setAssetImages((prev) => [...prev, ...base64Images]); 
+      const updatedStyles = { 
+        ...caseStyles, 
+        [activeAssetCategory]: base64Images[0] // Берем первое фото как основной скетч
+      };
+      setCaseStyles(updatedStyles);
+      localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
+      notifyUpdate();
     
     } catch (error) {
       console.error("Upload error:", error);
@@ -564,7 +569,7 @@ const AdminDashboard: React.FC = () => {
                         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
                             {publishedProducts.map(p => (
                                 <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex gap-6 hover:border-slate-600 transition-all group shadow-xl relative">
-                                    <div className="w-24 h-32 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex-shrink-0"><img src={p.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" /></div>
+                                    <div className="w-24 h-32 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex-shrink-0"><img src={Array.isArray(p.gallery) && p.gallery.length > 0 ? p.gallery[0] : (p.imageUrl || '')} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" /></div>
                                     <div className="flex-1 flex flex-col justify-between py-1">
                                         <div>
                                             <h3 className="font-black text-white text-base uppercase leading-tight mb-2 italic tracking-tighter" dangerouslySetInnerHTML={{ __html: p.name }}></h3>
