@@ -160,6 +160,7 @@ const AdminDashboard: React.FC = () => {
   const [catalogMode, setCatalogMode] = useState<'products' | 'assets'>('products');
   const [isProcessing, setIsProcessing] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [assetImages, setAssetImages] = useState<string[]>([]);
   
   // Product State
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
@@ -224,10 +225,26 @@ const AdminDashboard: React.FC = () => {
   }, [activeAdminTab]);
 
   const allComments = useMemo(() => {
+  
     const list: { productId: string; productName: string; productImage: string; review: Review }[] = [];
+  
     publishedProducts.forEach(p => {
-      p.reviews?.forEach(r => list.push({ productId: p.id, productName: p.name, productImage: p.imageUrl, review: r }));
+    
+      const rawImage = p.images || p.imageUrl || '';
+      const displayImage: string = Array.isArray(rawImage) 
+        ? (rawImage[0] || '') 
+        : (rawImage as string);
+
+      p.reviews?.forEach(r => {
+        list.push({ 
+          productId: p.id, 
+          productName: p.name, 
+          productImage: displayImage, // Теперь здесь точно string
+          review: r 
+        });
+      });
     });
+
     return list.sort((a, b) => new Date(b.review.date).getTime() - new Date(a.review.date).getTime());
   }, [publishedProducts]);
 
@@ -389,17 +406,31 @@ const AdminDashboard: React.FC = () => {
     notifyUpdate();
   };
 
-  const handleAssetImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0] && activeAssetCategory) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
-        const newStyles = { ...caseStyles, [activeAssetCategory]: dataUrl };
-        setCaseStyles(newStyles);
-        localStorage.setItem('maxbit_case_styles', JSON.stringify(newStyles));
-        notifyUpdate();
-      };
-      reader.readAsDataURL(e.target.files[0]);
+  const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsProcessing(true);
+
+    try {
+      const base64Images = await Promise.all(
+        files.map((file: File) => {
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      setAssetImages((prev) => [...prev, ...base64Images]); 
+    
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Error uploading images. Check file size.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
