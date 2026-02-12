@@ -5,6 +5,22 @@ import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 
+const compressImage = (base64Str: string, maxWidth = 800): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const scale = maxWidth / img.width;
+      canvas.width = maxWidth;
+      canvas.height = img.height * scale;
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+    };
+  });
+};
+
 const DEFAULT_LOGO = ""; 
 
 const TACTICAL_PALETTE = [
@@ -194,6 +210,25 @@ const AdminDashboard: React.FC = () => {
   const [regGender, setRegGender] = useState('Not Specified');
   const [regBirthDate, setRegBirthDate] = useState('');
   
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    const reader = new FileReader();
+  
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      const updatedStyles = { ...caseStyles, [category]: base64 };
+    
+      setCaseStyles(updatedStyles);
+      localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
+      notifyUpdate();
+      setIsProcessing(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   useEffect(() => {
     const { token, role } = getStoredAuth();
     if (token && role) { setIsAuthenticated(true); setUserRole(role); }
@@ -288,11 +323,21 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const saveProduct = (e: React.FormEvent) => {
+  const saveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = Date.now();
+    setIsProcessing(true);
     
+    const compressedMain = newProductImage.startsWith('data:image') 
+      ? await compressImage(newProductImage) 
+      : newProductImage;
+
+    const compressedGallery = await Promise.all(
+      newProductGallery.map(img => img.startsWith('data:image') ? compressImage(img) : img)
+    );
+  
+    const now = Date.now();
     const existing = publishedProducts.find(p => p.id === editingId);
+    
     const productData: Product = {
       id: editingId || `PUB-${now}`,
       name: newProductName,
@@ -315,7 +360,8 @@ const AdminDashboard: React.FC = () => {
 
     setPublishedProducts(newList);
     localStorage.setItem('maxbit_published_products', JSON.stringify(newList));
-
+    
+    setIsProcessing(false);
     resetProductForm();
     notifyUpdate();
     alert("Unit Deployed Successfully to MaxBit Armory!");
