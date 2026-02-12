@@ -737,11 +737,11 @@ const AdminDashboard: React.FC = () => {
     )}
 
         {/* SECTION: NEW CUSTOMER REGISTRATION SURVEY */}
+        {!isAuthenticated && (
         <div className="mt-12 bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500">MaxBit LLC Protocol</span>
             <h2 className="text-2xl font-black text-white italic uppercase mt-2">Create Customer Profile</h2>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Everett, WA Headquarters</p>
           </div>
 
           <form onSubmit={async (e) => {
@@ -791,8 +791,15 @@ const AdminDashboard: React.FC = () => {
 
             <div className="space-y-1">
               <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Date of Birth</label>
-              <input type="date" value={regBirthDate} onChange={e => setRegBirthDate(e.target.value)} 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none" />
+              <input
+                type="text"
+                onFocus={(e) => (e.target.type = "date")}
+                onBlur={(e) => (e.target.type = "text")}
+                placeholder="MM/DD/YYYY"
+                value={regBirthDate}
+                onChange={e => setRegBirthDate(e.target.value)} 
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none"
+              />
             </div>
 
             <button type="submit" disabled={isProcessing} className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg">
@@ -800,6 +807,7 @@ const AdminDashboard: React.FC = () => {
             </button>
           </form>
         </div>
+        )}
       </div>
     </div>
   );
