@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 
-const DEFAULT_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAw0lEQVR4AYzMQQvBYBgH8P9WlMsuUpOVXBCHXVx8BB/AlJIPICVfYFyX4qA4uDhaKS057wNIHFacpK1wkeROe2tvW++Up97ep///18N//hweP2Zm7AINA9WBgURljOHSwuF4ozgA44UOpqYNjovAmjcg58VwGM3KuK9b0CciJCVNkbvQi0JSQaykIdMvQjNVOPrF7emj8HXV8dy+cVYtbJp7CryFQCFVh1TL4bGyvZz5CeyNynAWJ6b0BwR2q21/Frp/AQAA///WbkgzAAAABklEQVQDABO8Uu1uvDV4AAAAAElFTkSuQmCC==";
-
 interface NavbarProps {
   activeTab: MainTab | null;
   onTabChange: (tab: MainTab) => void;
