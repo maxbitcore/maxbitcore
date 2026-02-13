@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 
+const DEFAULT_LOGO = "";
+
 interface NavbarProps {
   activeTab: MainTab | null;
   onTabChange: (tab: MainTab) => void;
