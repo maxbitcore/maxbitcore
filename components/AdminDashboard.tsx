@@ -5,7 +5,7 @@ import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 
-const compressImage = (base64Str: string, maxWidth = 800): Promise<string> => {
+const compressImage = (base64Str: string, maxWidth = 600): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = base64Str;
@@ -16,7 +16,7 @@ const compressImage = (base64Str: string, maxWidth = 800): Promise<string> => {
       canvas.width = maxWidth;
       canvas.height = img.height * scale;
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+      resolve(canvas.toDataURL('image/jpeg', 0.6)); 
     };
   });
 };
