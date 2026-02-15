@@ -27,7 +27,7 @@ function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
 
   // Track site visit once on load
   useEffect(() => {
@@ -140,7 +140,7 @@ function App() {
           cartCount={cartItems.length}
           onOpenCart={() => setIsCartOpen(true)}
           onSearch={handleSearch}
-          onRegisterClick={() => setShowRegisterForm(true)}
+          onRegisterClick={() => setShowRegister(true)}
       />
       
       <main className="flex-grow">
@@ -214,8 +214,8 @@ function App() {
 
         {view.type === 'tab' && view.activeTab === 'admin' && (
           <AdminDashboard
-            showRegister={showRegisterForm} 
-            closeRegister={() => setShowRegisterForm(false)} 
+            showRegister={showRegister}
+            closeRegister={() => setShowRegister(false)}
           />
         )}
 
