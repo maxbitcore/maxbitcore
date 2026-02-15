@@ -215,7 +215,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   const [regPhone, setRegPhone] = useState(''); 
   const [regGender, setRegGender] = useState('Not Specified');
   const [regBirthDate, setRegBirthDate] = useState('');
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
   
   const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
     const file = e.target.files?.[0];
@@ -825,7 +824,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     )}
 
         {/* SECTION: NEW CUSTOMER REGISTRATION SURVEY */}
-        {!isAuthenticated && (
+        {showRegister && (
         <div className="mt-12 bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl mx-auto">
           <div className="text-center mb-8">
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500">MaxBit LLC Protocol</span>
@@ -851,7 +850,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
             await sendRegistrationEmail(userData);
             
             setIsProcessing(false);
-            alert("Registration Complete! Welcome to MaxBit LLC.");
+            alert("Registration Complete! Welcome to MaxBit.");
+            if (closeRegister) closeRegister();
           }} className="space-y-4">
             
             <div className="grid grid-cols-2 gap-4">
