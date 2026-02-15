@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 
-const DEFAULT_LOGO = "";
+const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
 interface NavbarProps {
   activeTab: MainTab | null;
@@ -14,7 +14,7 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch }) => {
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
-  const [currentLogo, setCurrentLogo] = useState(DEFAULT_LOGO);
+  const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
 
   // Auth State
   const [role, setRole] = useState<'admin' | 'user' | null>(null);

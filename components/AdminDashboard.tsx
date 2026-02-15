@@ -21,7 +21,7 @@ const compressImage = (base64Str: string, maxWidth = 600): Promise<string> => {
   });
 };
 
-const DEFAULT_LOGO = ""; 
+const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || ""; 
 
 const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
@@ -170,7 +170,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 const AdminDashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
-  const [currentLogo, setCurrentLogo] = useState(DEFAULT_LOGO);
+  const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || ""); 
   const logoUploadRef = useRef<HTMLInputElement>(null);
   const [activeAdminTab, setActiveAdminTab] = useState<'submissions' | 'orders' | 'catalog' | 'analytics' | 'comments'>('submissions');
   const [catalogMode, setCatalogMode] = useState<'products' | 'assets'>('products');
