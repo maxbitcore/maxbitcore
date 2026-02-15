@@ -10,8 +10,9 @@ interface NavbarProps {
   cartCount: number;
   onOpenCart: () => void;
   onSearch: (query: string) => void;
+  onRegisterClick: () => void;
 }
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch }) => {
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch,onRegisterClick }) => {
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
@@ -29,6 +30,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const [adminCode, setAdminCode] = useState(''); // 2FA Login code
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -408,7 +410,16 @@ const LogoSVG = () => {
                 <div className="mt-8 flex justify-center border-t border-slate-800 pt-6">
                     {authStep === 'credentials' ? (
                         <button 
-                            onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setError(null); }}
+                            type="button"
+                            onClick={() => { 
+                                if (authMode=== 'login') { 
+                                    onRegisterClick();
+                                } else { 
+                                    setAuthMode ('login');
+                                    setError(null);
+                                }
+                            }}
+            
                             className="text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-cyan-400 transition-colors"
                         >
                             {authMode === 'login' ? 'Need Access? Register' : 'Have Credentials? Login'}

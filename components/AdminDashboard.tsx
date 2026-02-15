@@ -5,42 +5,40 @@ import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 
-const uploadImageToServer = async (file: File) => {
-  const formData = new FormData();
-  formData.append('image', file);
+interface AdminDashboardProps {
+  showRegister?: boolean;
+  closeRegister?: () => void;
+}
 
-  const response = await fetch('https://maxbitcore.com/upload.php', {
-    method: 'POST',
-    body: formData,
-  });
+interface RichEditorProps {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  label: string;
+}
 
-  const data = await response.json();
-  if (!data.success) {
-    throw new Error(data.error || "Ошибка загрузки");
-  }
+const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  showRegister,
+  closeRegister 
+}) => {
+
+  const uploadImageToServer = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch('https://maxbitcore.com/upload.php', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || "Load error");
+    }
+    return data.url;
+  };
   
-  return data.url;
-};
+  const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
-const compressImage = (base64Str: string, maxWidth = 600): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.src = base64Str;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const scale = maxWidth / img.width;
-      canvas.width = maxWidth;
-      canvas.height = img.height * scale;
-      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.6)); 
-    };
-  });
-};
-
-const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || ""; 
-
-const TACTICAL_PALETTE = [
+ const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
   { color: '#94a3b8', name: 'Phantom Slate' },
   { color: '#22d3ee', name: 'Cyber Cyan' },
@@ -65,16 +63,8 @@ const DEFAULT_CONFIG = {
   resolutions: ['1080p (FHD)', '1440p (QHD)', '2160p (4K)']
 };
 
-interface RichEditorProps {
-  value: string;
-  onChange: (val: string) => void;
-  placeholder: string;
-  label: string;
-}
-
 const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, label }) => {
   const editorRef = useRef<HTMLDivElement>(null);
-
   const exec = (cmd: string, val?: string) => {
     if (cmd === 'createLink') {
      const url = window.prompt('Enter Deployment URL:');
@@ -183,8 +173,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     </div>
   );
 };
-
-const AdminDashboard: React.FC = () => {
+  
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || ""); 
@@ -226,6 +215,7 @@ const AdminDashboard: React.FC = () => {
   const [regPhone, setRegPhone] = useState(''); 
   const [regGender, setRegGender] = useState('Not Specified');
   const [regBirthDate, setRegBirthDate] = useState('');
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
   
   const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
     const file = e.target.files?.[0];
@@ -347,14 +337,6 @@ const AdminDashboard: React.FC = () => {
   const saveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    
-    const compressedMain = newProductImage.startsWith('data:image') 
-      ? await compressImage(newProductImage) 
-      : newProductImage;
-
-    const compressedGallery = await Promise.all(
-      newProductGallery.map(img => img.startsWith('data:image') ? compressImage(img) : img)
-    );
   
     const now = Date.now();
     const existing = publishedProducts.find(p => p.id === editingId);
