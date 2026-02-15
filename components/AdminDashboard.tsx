@@ -236,7 +236,7 @@ const AdminDashboard: React.FC = () => {
     if (storedLogo) setCurrentLogo(storedLogo);
     
     const loadProducts = () => {
-      const storedProducts = localStorage.getItem('maxbit_published_products');
+      const storedProducts = localStorage.getItem('maxbit_published_products_v2');
       if (storedProducts) setPublishedProducts(JSON.parse(storedProducts));
     };
     
@@ -359,7 +359,7 @@ const AdminDashboard: React.FC = () => {
       : [productData, ...publishedProducts];
 
     setPublishedProducts(newList);
-    localStorage.setItem('maxbit_published_products', JSON.stringify(newList));
+    localStorage.setItem('maxbit_published_products_v2', JSON.stringify(newList));
     
     setIsProcessing(false);
     resetProductForm();
@@ -417,7 +417,7 @@ const AdminDashboard: React.FC = () => {
     });
     
     setPublishedProducts(updatedList);
-    localStorage.setItem('maxbit_published_products', JSON.stringify(updatedList));
+    localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
     notifyUpdate();
   };
 
@@ -425,7 +425,7 @@ const AdminDashboard: React.FC = () => {
     if (!window.confirm("Delete this unit from inventory?")) return;
     const updatedList = publishedProducts.filter(p => p.id !== productId);
     setPublishedProducts(updatedList);
-    localStorage.setItem('maxbit_published_products', JSON.stringify(updatedList));
+    localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
     if (editingId === productId) resetProductForm();
     notifyUpdate();
   };
@@ -803,7 +803,7 @@ const AdminDashboard: React.FC = () => {
                                                 return p;
                                             });
                                             setPublishedProducts(updated);
-                                            localStorage.setItem('maxbit_published_products', JSON.stringify(updated));
+                                            localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
                                             notifyUpdate();
                                         }
                                     }} className="text-[10px] font-black text-slate-500 hover:text-rose-500 uppercase tracking-widest transition-colors">Delete Report</button>

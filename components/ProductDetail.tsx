@@ -45,7 +45,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
     };
 
     // Update LocalStorage Product DB
-    const allProductsRaw = localStorage.getItem('maxbit_published_products');
+    const allProductsRaw = localStorage.getItem('maxbit_published_products_v2');
     if (allProductsRaw) {
       const allProducts: Product[] = JSON.parse(allProductsRaw);
       const updatedProducts = allProducts.map(p => {
@@ -54,7 +54,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
         }
         return p;
       });
-      localStorage.setItem('maxbit_published_products', JSON.stringify(updatedProducts));
+      localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedProducts));
       
       // Notify parent/context that data changed (simple way is forcing a reload or local update)
       product.reviews = [newReview, ...(product.reviews || [])];

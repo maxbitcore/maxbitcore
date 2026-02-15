@@ -43,7 +43,7 @@ const getContextData = () => {
 
   try {
     // Load Products
-    const rawProducts = localStorage.getItem('maxbit_published_products');
+    const rawProducts = localStorage.getItem('maxbit_published_products_v2');
     if (rawProducts) {
       products = JSON.parse(rawProducts);
     }

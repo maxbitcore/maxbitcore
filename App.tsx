@@ -65,7 +65,7 @@ function App() {
   useEffect(() => {
     const loadData = () => {
       try {
-        const raw = localStorage.getItem('maxbit_published_products');
+        const raw = localStorage.getItem('maxbit_published_products_v2');
         if (raw) {
           const saved = JSON.parse(raw);
           if (Array.isArray(saved)) {

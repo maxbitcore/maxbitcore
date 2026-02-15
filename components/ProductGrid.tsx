@@ -15,7 +15,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, sea
   const [deployedProducts, setDeployedProducts] = useState<Product[]>([]);
 
   const loadPublished = () => {
-    const saved = localStorage.getItem('maxbit_published_products');
+    const saved = localStorage.getItem('maxbit_published_products_v2');
     if (saved) {
       const all = JSON.parse(saved);
       const onlyActive = all.filter((p: any) => p && p.isPublished === true);
