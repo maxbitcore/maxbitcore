@@ -5,6 +5,23 @@ import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 
+const uploadImageToServer = async (file: File) => {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const response = await fetch('https://maxbitcore.com/upload.php', {
+    method: 'POST',
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error(data.error || "Ошибка загрузки");
+  }
+  
+  return data.url;
+};
+
 const compressImage = (base64Str: string, maxWidth = 600): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -215,19 +232,23 @@ const AdminDashboard: React.FC = () => {
     if (!file) return;
 
     setIsProcessing(true);
-    const reader = new FileReader();
-  
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      const updatedStyles = { ...caseStyles, [category]: base64 };
-    
-      setCaseStyles(updatedStyles);
-      localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
-      notifyUpdate();
-      setIsProcessing(false);
-    };
-    reader.readAsDataURL(file);
-  };
+
+    try {
+        const url = await uploadImageToServer(file);
+        
+        const updatedStyles = { ...caseStyles, [category]: url };
+      
+        setCaseStyles(updatedStyles);
+        localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
+        notifyUpdate();
+        
+    } catch (error) {
+        console.error("Style upload failed:", error);
+        alert("Failed to upload image to server.");
+    } finally {
+        setIsProcessing(false);
+    }
+};
 
   useEffect(() => {
     const { token, role } = getStoredAuth();
@@ -372,27 +393,22 @@ const AdminDashboard: React.FC = () => {
     if (!files || files.length === 0) return;
     setIsProcessing(true);
     
-    const processed: string[] = [];
+    const uploadedUrls: string[] = [];
     for (let i = 0; i < files.length; i++) {
       try {
-        const reader = new FileReader();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          reader.onload = (ev) => resolve(ev.target?.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(files[i]);
-        });
-        processed.push(dataUrl);
+        const url = await uploadImageToServer(files[i]);
+        uploadedUrls.push(url);
       } catch (err) {
-        console.error("Error reading file", err);
+        console.error("Error uploading file", err);
       }
     }
 
-    if (processed.length > 0) {
+    if (uploadedUrls.length > 0) {
       if (!newProductImage) {
-        setNewProductImage(processed[0]);
-        setNewProductGallery(prev => [...prev, ...processed.slice(1)]);
+        setNewProductImage(uploadedUrls[0]);
+        setNewProductGallery(prev => [...prev, ...uploadedUrls.slice(1)]);
       } else {
-        setNewProductGallery(prev => [...prev, ...processed]);
+        setNewProductGallery(prev => [...prev, ...uploadedUrls]);
       }
     }
     
@@ -454,25 +470,20 @@ const AdminDashboard: React.FC = () => {
 
   const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length === 0 || !activeAssetCategory) return; // Проверка, что категория выбрана
+    if (files.length === 0 || !activeAssetCategory) return;
 
     setIsProcessing(true);
 
     try {
-      const base64Images = await Promise.all(
-        files.map((file: File) => {
-          return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+      const file = files[0];
+
+      if (!file) return;
+
+      const url = await uploadImageToServer(file as File);
 
       const updatedStyles = { 
         ...caseStyles, 
-        [activeAssetCategory]: base64Images[0] 
+        [activeAssetCategory]: url 
       };
       
       setCaseStyles(updatedStyles);
@@ -481,6 +492,7 @@ const AdminDashboard: React.FC = () => {
       notifyUpdate();
     } catch (error) {
       console.error("Upload error:", error);
+      alert("Failed to upload image to server.");
     } finally {
       setIsProcessing(false);
       setActiveAssetCategory(null);
@@ -500,18 +512,28 @@ const AdminDashboard: React.FC = () => {
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
                   </div>
-                  <input type="file" ref={logoUploadRef} onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        const dataUrl = ev.target?.result as string;
-                        setCurrentLogo(dataUrl);
-                        localStorage.setItem('maxbit_logo', dataUrl);
-                        window.dispatchEvent(new CustomEvent('logo-updated'));
-                      };
-                      reader.readAsDataURL(e.target.files[0]);
-                    }
-                  }} className="hidden" accept="image/*" />
+                  <input 
+                    type="file" 
+                    ref={logoUploadRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={async (e) => { 
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          const url = await uploadImageToServer(file);
+                        
+                          setCurrentLogo(url);
+                          localStorage.setItem('maxbit_logo', url);
+                        
+                          window.dispatchEvent(new CustomEvent('logo-updated'));
+                        } catch (error) { 
+                          console.error("Logo upload failed:", error);
+                          alert("Failed to upload logo to server.");
+                        }
+                      }
+                    }} 
+                  />
                 </div>
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500">System Administrator</span>
