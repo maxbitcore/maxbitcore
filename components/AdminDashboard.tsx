@@ -5,10 +5,8 @@ import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 
-interface AdminDashboardProps {
-  showRegister?: boolean;
-  closeRegister?: () => void;
-}
+
+interface AdminDashboardProps {}
 
 interface RichEditorProps {
   value: string;
@@ -17,11 +15,7 @@ interface RichEditorProps {
   label: string;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({
-  showRegister,
-  closeRegister 
-}) => {
-
+const AdminDashboard: React.FC<AdminDashboardProps> = () =>{
   const uploadImageToServer = async (file: File) => {
     const formData = new FormData();
     formData.append('image', file);
@@ -207,14 +201,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetImageRef = useRef<HTMLInputElement>(null);
   const [activeAssetCategory, setActiveAssetCategory] = useState<string | null>(null);
-
-  // NEW CUSTOMER REGISTRATION SURVEY
-  const [regFirstName, setRegFirstName] = useState('');
-  const [regLastName, setRegLastName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPhone, setRegPhone] = useState(''); 
-  const [regGender, setRegGender] = useState('Not Specified');
-  const [regBirthDate, setRegBirthDate] = useState('');
   
   const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
     const file = e.target.files?.[0];
@@ -816,89 +802,14 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                         </div>
                     </div>
                 ))}
-             </div>
-          </div>
-        )}
-        
-      </>
-    )}
-
-        {/* SECTION: NEW CUSTOMER REGISTRATION SURVEY */}
-        {showRegister && (
-        <div className="mt-12 bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500">MaxBit LLC Protocol</span>
-            <h2 className="text-2xl font-black text-white italic uppercase mt-2">Create Customer Profile</h2>
-          </div>
-
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            setIsProcessing(true);
-            
-            const userData = {
-              firstName: regFirstName,
-              lastName: regLastName,
-              email: regEmail,
-              phone: regPhone,
-              gender: regGender,
-              birthDate: regBirthDate
-            };
-
-            const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
-            localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
-            
-            await sendRegistrationEmail(userData);
-            
-            setIsProcessing(false);
-            alert("Registration Complete! Welcome to MaxBit.");
-            if (closeRegister) closeRegister();
-          }} className="space-y-4">
-            
-            <div className="grid grid-cols-2 gap-4">
-              <input required placeholder="FIRST NAME *" value={regFirstName} onChange={e => setRegFirstName(e.target.value)} 
-                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none" />
-              
-              <input required placeholder="LAST NAME *" value={regLastName} onChange={e => setRegLastName(e.target.value)} 
-                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none" />
+              </div>
             </div>
-
-            <input required type="email" placeholder="EMAIL ADDRESS *" value={regEmail} onChange={e => setRegEmail(e.target.value)} 
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none" />
-
-            <div className="grid grid-cols-2 gap-4">
-              <input type="tel" placeholder="PHONE (OPTIONAL)" value={regPhone} onChange={e => setRegPhone(e.target.value)} 
-                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none" />
-              
-              <select value={regGender} onChange={e => setRegGender(e.target.value)} 
-                className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none">
-                <option value="Not Specified">GENDER (N/A)</option>
-                <option value="Male">MALE</option>
-                <option value="Female">FEMALE</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Date of Birth</label>
-              <input
-                type="text"
-                onFocus={(e) => (e.target.type = "date")}
-                onBlur={(e) => (e.target.type = "text")}
-                placeholder="MM/DD/YYYY"
-                value={regBirthDate}
-                onChange={e => setRegBirthDate(e.target.value)} 
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase focus:border-cyan-500 outline-none"
-              />
-            </div>
-
-            <button type="submit" disabled={isProcessing} className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg">
-              {isProcessing ? 'PROCESSING...' : 'REGISTER ACCOUNT'}
-            </button>
-          </form>
-        </div>
-        )}
-      </div>
+          )}
+        </>
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 export default AdminDashboard;

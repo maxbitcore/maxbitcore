@@ -28,6 +28,12 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
   const [showRegister, setShowRegister] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('Not Specified');
+  const [birthDate, setBirthDate] = useState('');
 
   // Track site visit once on load
   useEffect(() => {
@@ -233,7 +239,7 @@ function App() {
             />
         )}
       </main>
-
+      
       <Footer onTabChange={handleTabChange} />
       
       <Assistant />
@@ -249,6 +255,61 @@ function App() {
             setView({ type: 'checkout' });
         }}
       />
+
+      {showRegister && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl w-full relative my-auto animate-fade-in">
+            
+            <button 
+              onClick={() => setShowRegister(false)} 
+              className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="text-center mb-8">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500">MaxBit LLC Protocol</span>
+              <h2 className="text-2xl font-black text-white italic uppercase mt-2">Create Customer Profile</h2>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const userData = { firstName, lastName, email, phone, gender, birthDate };
+              
+              const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
+              localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
+              
+              alert("Registration Complete! Welcome to MaxBit.");
+              setShowRegister(false); 
+            }} className="space-y-4 text-left">
+              
+              <div className="grid grid-cols-2 gap-4">
+                <input required placeholder="FIRST NAME *" value={firstName} onChange={e => setFirstName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+                <input required placeholder="LAST NAME *" value={lastName} onChange={e => setLastName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+              </div>
+
+              <input required type="email" placeholder="EMAIL ADDRESS *" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+
+              <div className="grid grid-cols-2 gap-4">
+                <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+                <select value={gender} onChange={e => setGender(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500">
+                  <option value="Not Specified">GENDER (N/A)</option>
+                  <option value="Male">MALE</option>
+                  <option value="Female">FEMALE</option>
+                </select>
+              </div>
+
+              <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">
+                Register account
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ------------------------ */}
+
     </div>
   );
 }

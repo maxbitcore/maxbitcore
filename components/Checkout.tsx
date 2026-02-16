@@ -323,21 +323,24 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
 
           <div className="lg:pl-12 lg:border-l border-slate-800">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] mb-10">Order Summary</h2>
-            
-            <div className="space-y-6 mb-12 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-               {items.map((item, idx) => (
-                 <div key={idx} className="flex gap-4">
-                    <div className="w-16 h-20 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex-shrink-0">
-                       <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+  
+            <div className="space-y-6">
+              {items.map((item, idx) => (
+                <div key={item.id} className="flex justify-between items-start">
+                  <div className="flex gap-4">
+                    <img src={item.imageUrl} className="w-16 h-16 object-cover rounded-xl border border-slate-800" alt="" />
+                    <div>
+                      <div 
+                        className="text-sm font-black uppercase tracking-tighter text-white"
+                        dangerouslySetInnerHTML={{ __html: item.name }} 
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
                     </div>
-                    <div className="flex-1">
-                       <h3 className="font-bold text-white text-sm">{item.name}</h3>
-                       <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">{item.category}</p>
-                       <span className="text-xs font-black text-cyan-400 block mt-1">${item.price}</span>
-                    </div>
+                   </div>
+                   <div className="text-sm font-black text-white font-mono">${item.price}</div>
                  </div>
                ))}
-            </div>
+             </div>
 
             <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 space-y-6">
               <div className="space-y-3">
