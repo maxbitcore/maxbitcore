@@ -29,6 +29,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = () =>{
     }
     return data.url;
   };
+
+  const syncWithServer = async (updatedList: Product[]) => {
+    try {
+      const response = await fetch('https://maxbitcore.com/save_products.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedList)
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        console.log("MaxBit Server: Database synchronized.");
+      }
+    } catch (error) {
+      console.error("MaxBit Server: Sync failed.", error);
+    }
+  };
   
   const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
@@ -783,23 +800,39 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
-                                    <button onClick={() => {
-                                        if (window.confirm("Confirm permanent removal?")) {
-                                            const updated = publishedProducts.map(p => {
-                                                if (p.id === item.productId) {
-                                                    return { ...p, reviews: p.reviews?.filter(r => r.id !== item.review.id) };
+                                    <button 
+                                        onClick={async () => {
+                                            if (window.confirm("Confirm permanent removal?")) {
+                                                const updated = publishedProducts.map(p => {
+                                                    if (p.id === item.productId) {
+                                                        return { 
+                                                            ...p, 
+                                                            reviews: p.reviews?.filter(r => r.id !== item.review.id) 
+                                                        };
+                                                    }
+                                                    return p;
+                                                });
+
+                                                setPublishedProducts(updated);
+                                                localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
+
+                                                if (typeof syncWithServer === 'function') {
+                                                    await syncWithServer(updated);
                                                 }
-                                                return p;
-                                            });
-                                            setPublishedProducts(updated);
-                                            localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
-                                            notifyUpdate();
-                                        }
-                                    }} className="text-[10px] font-black text-slate-500 hover:text-rose-500 uppercase tracking-widest transition-colors">Delete Report</button>
-                                </div>
-                            </div>
-                            <p className="text-slate-400 text-xs italic leading-relaxed border-l-2 border-slate-800 pl-4 group-hover:text-slate-200 transition-colors">"{item.review.comment}"</p>
-                        </div>
+
+                                                notifyUpdate();
+                                            }
+                                         }} 
+                                         className="text-[10px] font-black text-slate-500 hover:text-rose-500 uppercase tracking-widest transition-colors"
+                                     >
+                                         Delete Report
+                                     </button>
+                                 </div>
+                             </div>
+                             <p className="text-slate-400 text-xs italic leading-relaxed border-l-2 border-slate-800 pl-4 group-hover:text-slate-200 transition-colors">
+                                 "{item.review.comment}"
+                             </p>
+                         </div>
                     </div>
                 ))}
               </div>
