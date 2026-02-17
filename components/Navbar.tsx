@@ -48,14 +48,21 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
     // Initial Logo Check
     const storedLogo = localStorage.getItem('maxbit_logo');
+    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png";;
     if (storedLogo) {
       setCurrentLogo(storedLogo);
+    } else {
+      setCurrentLogo(serverLogo);
     }
 
     // Listener for logo updates
     const handleLogoUpdate = () => {
       const newLogo = localStorage.getItem('maxbit_logo');
-      if (newLogo) setCurrentLogo(newLogo);
+      if (newLogo) {
+        setCurrentLogo(newLogo);
+      } else {
+        setCurrentLogo(serverLogo);
+      }
     };
     window.addEventListener('logo-updated', handleLogoUpdate);
 
@@ -156,24 +163,28 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       setIsModalOpen(true);
   };
 
-const LogoSVG = () => {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:gap-3">
-      <img 
-        src={currentLogo} 
-        className="h-8 md:h-10 w-auto object-contain"
-        alt="MAXBIT Logo" 
-        onError={(e) => {
-           console.log("Error: Logo failed to load");
-           e.currentTarget.style.border = "1px solid red";
-        }}
-      />
-      <span className="text-xl md:text-2xl font-black text-white italic">
-        MAXBIT
-      </span>
-    </div>
-  );
-};
+  const LogoSVG = () => {
+    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png"; 
+    const displayLogo = currentLogo || serverLogo;
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:gap-3">
+        <img 
+          src={displayLogo} 
+          className="h-8 md:h-10 w-auto object-contain"
+          alt="MAXBIT Logo" 
+          onError={(e) => {
+             e.currentTarget.src = "/favicon.png";
+             console.log("Logo sync fallback to favicon");
+          }}
+        />
+        <span className="text-xl md:text-2xl font-black text-white italic">
+          MAXBIT
+        </span>
+      </div>
+    );
+  };
+
   // Dedicated Admin Mode View
   if (activeTab === 'admin') {
     return (
