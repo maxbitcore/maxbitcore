@@ -72,7 +72,7 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('https://maxbitcore.com/api/save_products.php');
+        const response = await fetch('https://maxbitcore.com/api/products.php');
         const data = await response.json();
       
         if (Array.isArray(data)) {
