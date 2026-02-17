@@ -248,7 +248,20 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     const storedLogo = localStorage.getItem('maxbit_logo');
     if (storedLogo) setCurrentLogo(storedLogo);
     
-    const loadProducts = () => {
+    const loadProducts = async () => {
+      try {
+        const response = await fetch('https://www.maxbitcore.com/api/products.php');
+        const serverData = await response.json();
+        
+        if (Array.isArray(serverData) && serverData.length > 0) {
+          setPublishedProducts(serverData);
+          localStorage.setItem('maxbit_published_products_v2', JSON.stringify(serverData));
+          return;
+        }
+      } catch (error) {
+        console.error("Server sync failed, falling back to local storage", error);
+      }
+
       const storedProducts = localStorage.getItem('maxbit_published_products_v2');
       if (storedProducts) setPublishedProducts(JSON.parse(storedProducts));
     };
@@ -270,7 +283,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 
     window.addEventListener('maxbit-update', loadProducts);
     return () => window.removeEventListener('maxbit-update', loadProducts);
-  }, [activeAdminTab]);
+  }, []);
 
   const allComments = useMemo(() => {
   
@@ -287,7 +300,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         list.push({ 
           productId: p.id, 
           productName: p.name, 
-          productImage: displayImage, // Теперь здесь точно string
+          productImage: displayImage, 
           review: r 
         });
       });
@@ -410,7 +423,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     updatedGallery[index] = currentMain;
     setNewProductGallery(updatedGallery);
   };
-  const togglePublish = (productId: string) => {
+  const togglePublish = async (productId: string) => {
     const updatedList = publishedProducts.map(p => {
       if (p.id === productId) {
         return { ...p, isPublished: !p.isPublished };
@@ -420,14 +433,17 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     
     setPublishedProducts(updatedList);
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
+    await syncWithServer(updatedList);
+    
     notifyUpdate();
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     if (!window.confirm("Delete this unit from inventory?")) return;
     const updatedList = publishedProducts.filter(p => p.id !== productId);
     setPublishedProducts(updatedList);
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
+    await syncWithServer(updatedList); 
     if (editingId === productId) resetProductForm();
     notifyUpdate();
   };
