@@ -32,7 +32,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = () =>{
 
   const syncWithServer = async (updatedList: Product[]) => {
     try {
-      const response = await fetch('https://maxbitcore.com/save_products.php', {
+      const response = await fetch('https://maxbitcore.com/api/save_products.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedList)
@@ -366,6 +366,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     setPublishedProducts(newList);
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(newList));
     
+    await syncWithServer(newList);
+
     setIsProcessing(false);
     resetProductForm();
     notifyUpdate();

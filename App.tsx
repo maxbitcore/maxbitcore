@@ -70,21 +70,17 @@ function App() {
 
   // Load user products on mount with safety checks
   useEffect(() => {
-    const loadData = () => {
+    const loadData = async () => {
       try {
-        const raw = localStorage.getItem('maxbit_published_products_v2');
-        if (raw) {
-          const saved = JSON.parse(raw);
-          if (Array.isArray(saved)) {
-            // Исправление: фильтруем только опубликованные товары для витрины
-            const approved = saved.filter((p: Product) => p && p.isApproved === true && p.isPublished === true);
-            setPublishedProducts(approved);
-          }
-        } else {
-          setPublishedProducts([]);
+        const response = await fetch('https://maxbitcore.com/api/save_products.php');
+        const data = await response.json();
+      
+        if (Array.isArray(data)) {
+          const approved = data.filter((p) => p && p.isApproved && p.isPublished);
+          setPublishedProducts(approved);
         }
       } catch (e) {
-        console.error("Corrupted product database. Resetting view.", e);
+        console.error("Load Error", e);
         setPublishedProducts([]);
       }
     };
