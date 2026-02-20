@@ -564,7 +564,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                     <>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl h-fit shadow-2xl">
                             <h2 className="text-xl font-black text-white italic uppercase mb-8">{editingId ? 'Modify Unit' : 'Create Unit'}</h2>
-                            <form key={formKey} onSubmit={saveProduct} className="space-y-6">
+                            <form onSubmit={saveProduct} className="space-y-6">
                                 <RichEditor label="Identity (Name)" value={newProductName} onChange={setNewProductName} placeholder="ENTER HARDWARE NAME" />
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
