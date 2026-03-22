@@ -43,7 +43,7 @@ const Contact: React.FC = () => {
             </svg>
           </div>
           <h3 className="font-bold text-white mb-2 uppercase tracking-widest text-xs">Community</h3>
-          <a href="https://www.facebook.com/MaxBit" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+          <a href="https://www.facebook.com/profile.php?id=61578512340598" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
             @maxbit
           </a>
         </div>
