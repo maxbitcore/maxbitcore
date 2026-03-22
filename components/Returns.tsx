@@ -5,77 +5,68 @@ const Returns: React.FC = () => {
     <section className="pt-32 pb-32 px-6 max-w-4xl mx-auto animate-fade-in-up">
       <div className="mb-16">
         <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase mb-6">RETURN POLICY</h1>
-        <p className="text-slate-400 text-lg leading-relaxed">Official protocols for hardware returns and exchanges.</p>
+        <p className="text-slate-400 text-lg leading-relaxed">MaxBit - Gaming PC Returns & Warranty Policy.</p>
       </div>
 
       <div className="space-y-16">
         <section>
-          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">1. 14-Day Return Window</h2>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">1. Return Autorization Required</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>You have 14 calendar days from the date of delivery to request a return for your MAXBIT custom system. To be eligible for a return, the system must be in its original professional packaging and in the same condition as received.</p>
+            <p>All return requests must be submitted in writing to max@maxbitcore.com. Returns sent without prior authorization will be refused and returned to sender. Once approved, all returns must be shipped to MaxBit business address.</p>
           </div>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">2. Restocking Fees</h2>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">2. Change of Mind / Satisfaction Returns</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>All custom-built computers are subject to a <strong>15% restocking fee</strong>. Since each PC is a unique configuration built to order, this fee covers the specialized labor, testing, and depreciation of individual components.</p>
+            <p>Customers may request a return within 7 calendar days of confirmed delivery if they decide they no longer want the PC. The PC must be returned in the exact same condition as received, including: original shipping box, all internal and external packaging materials, foam inserts, accessories, cables, manuals, and documentation. All shipping costs are the responsibility of the customer, including: original outbound shipping, return shipping to MaxBit. Returned systems are subject to a mandatory inspection and diagnostic evaluation prior to any refund approval. Any physical, cosmetic, electrical, or internal damage will: be deducted from the refund or result in a denied refund if damage is deemed excessive or intentional</p>
           </div>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">3. Shipping & Handling</h2>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">3. BIOS, Firmware & User-Induced Damage Protection </h2>
+          <div className="text-slate-400 leading-loose space-y-4">
+            <p>Any changes made to the system without prior written approval from Hall of Tech are done entirely at the customer's own risk, including but not limited to: BIOS configuration changes, voltage, frequency, or power limit adjustments, enabling or disabling XMP/EXPO, PBO, manual overclocking or undervolting, firmware flashing or rollback. If a system becomes unstable, fails, or stops functioning as a result of BIOS or firmware changes made by the customer, the following will apply: warranty is immediately void, the system is not eligible for refunds, repair costs will be billed to the customer. MaxBit is not responsible for damage caused by: customer experimentation, performance tuning, third-party software or guide, failure to contact MaxBit for support before making changes.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">4. Inspection, Diagnostics & Refund Processing</h2>
           <div className="text-slate-400 leading-loose space-y-4">
             <ul className="list-disc list-inside space-y-2">
-                <li>Original shipping charges are non-refundable.</li>
-                <li>Return shipping costs are the responsibility of the customer.</li>
+                <p>Refunds are not automatic and will only be issued after inspection is completed. Hall of Tech reserves the right to: test system stability, verify component serial numbers, check BIOS, firmware, and software integrity. If damage, missing parts, altered components, or signs of misuse are found: repair, replacement, or labor costs will be deducted from the refund. Refunds are issued to the original payment method only. Refund processing time after inspection: 3-7 business days</p>
             </ul>
             <p className="bg-slate-900/50 p-4 border border-slate-800 rounded-xl mt-4">
-                We strongly recommend using a trackable shipping service and purchasing full shipping insurance. MAXBIT is not liable for systems damaged or lost during return transit.
+                Original shipping charges are non-refundable. Return shipping costs are the responsibility of the customer. MAXBIT is not liable for systems damaged or lost during return transit.
             </p>
           </div>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">4. Non-Returnable Items</h2>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">5. Warranty Voidance & Misuse Policy</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-             <p>The following items and services cannot be returned:</p>
-             <div className="grid gap-4 mt-4">
-                <div className="bg-slate-900/40 p-5 rounded-xl border border-slate-800">
-                    <strong className="text-white block text-xs uppercase tracking-widest mb-2">Digital Assets & Licenses</strong>
-                    <p className="text-sm">All digital software keys, including Windows OS licenses and game bundles, are non-refundable once the system has been initialized.</p>
-                </div>
-                <div className="bg-slate-900/40 p-5 rounded-xl border border-slate-800">
-                    <strong className="text-white block text-xs uppercase tracking-widest mb-2">Consumables & Liquids</strong>
-                    <p className="text-sm">Used thermal compounds, custom liquid cooling additives, and specialized coolants cannot be returned or credited once the cooling loop has been filled or the seal is broken.</p>
-                </div>
-                <div className="bg-slate-900/40 p-5 rounded-xl border border-slate-800">
-                    <strong className="text-white block text-xs uppercase tracking-widest mb-2">User-Induced Damage</strong>
-                    <p className="text-sm">Any hardware showing visible evidence of customer-induced physical damage, including bent CPU pins, cracked PCB traces, or damage caused by improper overclocking and third-party BIOS flashing.</p>
-                </div>
-                <div className="bg-slate-900/40 p-5 rounded-xl border border-slate-800">
-                    <strong className="text-white block text-xs uppercase tracking-widest mb-2">Security & Identification</strong>
-                    <p className="text-sm">Systems or individual components where factory serial numbers or warranty stickers have been removed, altered, or tampered with.</p>
-                </div>
-                <div className="bg-slate-900/40 p-5 rounded-xl border border-slate-800">
-                    <strong className="text-white block text-xs uppercase tracking-widest mb-2">Custom Aesthetics</strong>
-                    <p className="text-sm">Specialized services such as custom laser engraving, UV printing, or bespoke automotive-grade paint jobs are permanent and non-refundable.</p>
-                </div>
-             </div>
+            <p>The warranty and refund eligibility are immediately void if any of the following occur: physical damage (drops, impacts, bent pins, cracked PCBs, broken ports), liquid damage or environmental damage, unauthorized repairs, upgrades, or part swaps, removal or tampering with serial numbers or security seals, BIOS or firmware modifications without Maxbit approval Software misuse, malware, crypto mining, or OS corruption caused by user activity, improper power sources, surge damage, or incorrect cabling</p>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">6. Non-Returnable & Final Sale Items</h2>
+          <div className="text-slate-400 leading-loose space-y-4">
+             <p>The following items and services cannot be returned: Custom-built PCs made to customer-selected specifications, clearance, discounted, or promotional systems, PCs returned without original packaging or accessories, Digital Assets & Licenses (All digital software keys, including Windows OS licenses and game bundles, are non-refundable once the system has been initialized)</p>
           </div>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">5. Dead on Arrival (DOA) / Damage</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>If your system arrives damaged or fails to boot, you must contact MAXBIT Support within <strong>48 hours</strong> of delivery. In cases of verified DOA, we will provide a prepaid return label and prioritize a repair or replacement at no additional cost to you.</p>
+            <p>If your system arrives damaged or fails to boot, you must contact MAXBIT Support within <strong>48 hours</strong> of delivery. Claims submitted after 48 hours may be denied. MaxBit reserves the right to determine whether the issue qualifies for: Repair, Replacement, Partial or full refund (at our sole discretion)</p>
           </div>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">6. RMA Requirement</h2>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">6. Chargebacks, Fraud & Abuse Protectio</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>No returns will be accepted without a valid <strong>Return Merchandise Authorization (RMA)</strong> number. Please contact our support team to initiate an RMA request before shipping any product back to our facility.</p>
+            <p>Initiating a chargeback without first contacting MaxBit may result in: immediate warranty voidance, permanent denial of future service or purchases. All systems are documented with: Build photos, Serial numbers, Pre-shipment testing records, Packaging condition documentation</p>
           </div>
         </section>
       </div>

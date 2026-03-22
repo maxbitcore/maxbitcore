@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Contact from './components/Contact';
@@ -35,15 +36,24 @@ function App() {
   const [gender, setGender] = useState('Not Specified');
   const [birthDate, setBirthDate] = useState('');
 
-  // Track site visit once on load
+  const navigate = useNavigate(); 
+  const location = useLocation();
+
+  useEffect(() => {
+    const path = location.pathname.replace('/', '') as MainTab;
+    if (path && path !== (view.type === 'tab' ? view.activeTab : '')) {
+      if (['home', 'configurator', 'gaming-pcs', 'components', 'peripherals', 'contact', 'faq', 'shipping', 'privacy', 'terms', 'returns', 'admin'].includes(path)) {
+        setView({ type: 'tab', activeTab: path });
+      }
+    }
+  }, [location]);
+
   useEffect(() => {
     trackVisit();
   }, []);
 
-  // Admin Mode Shortcut Listener
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check for Ctrl + Shift + A (Access Admin)
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === 'a' || event.key === 'A')) {
         event.preventDefault();
         setView({ type: 'tab', activeTab: 'admin' });
@@ -54,13 +64,10 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Track product views
   useEffect(() => {
     if (view.type === 'product') {
       trackProductView(view.product.id, view.product.name);
     }
-    
-    // Log Navigation
     if (view.type === 'tab') {
         trackPageNav(view.activeTab);
     } else if (view.type === 'checkout') {
@@ -68,13 +75,11 @@ function App() {
     }
   }, [view]);
 
-  // Load user products on mount with safety checks
   useEffect(() => {
     const loadData = async () => {
       try {
         const response = await fetch('https://maxbitcore.com/api/products.php');
         const data = await response.json();
-      
         if (Array.isArray(data)) {
           const approved = data.filter((p) => p && p.isApproved && p.isPublished);
           setPublishedProducts(approved);
@@ -94,7 +99,6 @@ function App() {
     };
   }, [view]);
 
-  // Identify "new" products (added within the last 48 hours)
   const newProducts = useMemo(() => {
     if (!publishedProducts || !Array.isArray(publishedProducts)) return [];
     const now = Date.now();
@@ -108,12 +112,13 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setSearchQuery('');
     setView({ type: 'tab', activeTab: tab });
+    navigate(tab === 'home' ? '/' : `/${tab}`);
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim()) {
-      trackSearch(query); // Log Search Event
+      trackSearch(query); 
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setView({ type: 'tab', activeTab: 'gaming-pcs' });
     }
@@ -134,6 +139,48 @@ function App() {
 
   const currentTab = view.type === 'tab' ? view.activeTab : null;
 
+  const HomePage = () => (
+    <div className="animate-fade-in-up">
+      <Hero onExplore={() => handleTabChange('configurator')} />
+      <NewInStockBanner 
+        newProducts={newProducts} 
+        onProductClick={(p) => setView({ type: 'product', product: p })}
+      />
+      <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
+        <div className="max-w-[1800px] mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
+            <div>
+              <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
+            </div>
+          </div>
+          {publishedProducts && publishedProducts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {publishedProducts.map(product => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  onClick={(p) => setView({ type: 'product', product: p })} 
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="py-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
+               <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mb-8 border border-slate-800">
+                <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-black italic text-slate-500 uppercase tracking-tighter mb-4">No Hardware Published</h3>
+              <p className="text-slate-600 max-w-sm text-sm font-bold uppercase tracking-widest leading-relaxed">
+                This space is reserved for approved custom PC configurations and newly deployed inventory.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#0b0f1a] text-slate-200 selection:bg-cyan-500/30 flex flex-col">
       <Navbar 
@@ -146,93 +193,113 @@ function App() {
       />
       
       <main className="flex-grow">
-        {view.type === 'tab' && view.activeTab === 'home' && (
-          <div className="animate-fade-in-up">
-            <Hero onExplore={() => handleTabChange('configurator')} />
-            
-            <NewInStockBanner 
-              newProducts={newProducts} 
-              onProductClick={(p) => setView({ type: 'product', product: p })}
-            />
-            
-            <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
-              <div className="max-w-[1800px] mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
-                  <div>
-                    <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
-                  </div>
-                </div>
-
-                {publishedProducts && publishedProducts.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                    {publishedProducts.map(product => (
-                      <ProductCard 
-                        key={product.id} 
-                        product={product} 
-                        onClick={(p) => setView({ type: 'product', product: p })} 
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
-                    <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mb-8 border border-slate-800">
-                      <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </div>
-                    <h3 className="text-2xl font-black italic text-slate-500 uppercase tracking-tighter mb-4">No Hardware Published</h3>
-                    <p className="text-slate-600 max-w-sm text-sm font-bold uppercase tracking-widest leading-relaxed">
-                      This space is reserved for approved custom PC configurations and newly deployed inventory.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-        )}
-
-        {view.type === 'tab' && view.activeTab === 'configurator' && (
-          <div className="animate-fade-in-up pt-16">
-            <CustomBuildForm />
-          </div>
-        )}
-
-        {view.type === 'tab' && (view.activeTab === 'gaming-pcs' || view.activeTab === 'components' || view.activeTab === 'peripherals') && (
-          <ProductGrid 
-            category={view.activeTab === 'gaming-pcs' ? (searchQuery ? 'All' : 'Gaming PCs') : view.activeTab === 'components' ? 'Components' : 'Peripherals'}
-            onProductClick={(p) => setView({ type: 'product', product: p })}
-            searchQuery={searchQuery}
-            externalProducts={publishedProducts}
-          />
-        )}
-
         {view.type === 'product' && (
           <ProductDetail 
             product={view.product} 
-            onBack={() => setView({ type: 'tab', activeTab: 'home' })} 
+            onBack={() => handleTabChange('home')} 
             onAddToCart={addToCart} 
           />
         )}
 
-        {view.type === 'tab' && view.activeTab === 'admin' && (
-          <AdminDashboard
-            showRegister={showRegister}
-            closeRegister={() => setShowRegister(false)}
-          />
-        )}
-
-        {view.type === 'tab' && view.activeTab === 'contact' && <Contact />}
-        {view.type === 'tab' && view.activeTab === 'faq' && <FAQ />}
-        {view.type === 'tab' && view.activeTab === 'shipping' && <Shipping />}
-        {view.type === 'tab' && view.activeTab === 'privacy' && <Privacy />}
-        {view.type === 'tab' && view.activeTab === 'terms' && <Terms />}
-        {view.type === 'tab' && view.activeTab === 'returns' && <Returns />}
-
         {view.type === 'checkout' && (
             <Checkout 
                 items={cartItems}
-                onBack={() => setView({ type: 'tab', activeTab: 'home' })}
+                onBack={() => handleTabChange('home')}
             />
+        )}
+      
+        {view.type === 'tab' && (
+          <Routes>
+            <Route path="/" element={
+              <div className="animate-fade-in-up">
+                <Hero onExplore={() => handleTabChange('configurator')} />
+                
+                <NewInStockBanner 
+                  newProducts={newProducts} 
+                  onProductClick={(p) => setView({ type: 'product', product: p })}
+                />
+                
+                <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
+                  <div className="max-w-[1800px] mx-auto">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
+                      <div>
+                        <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
+                      </div>
+                    </div>
+
+                    {publishedProducts && publishedProducts.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                        {publishedProducts.map(product => (
+                          <ProductCard 
+                            key={product.id} 
+                            product={product} 
+                            onClick={(p) => setView({ type: 'product', product: p })} 
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
+                        <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mb-8 border border-slate-800">
+                          <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </div>
+                        <h3 className="text-2xl font-black italic text-slate-500 uppercase tracking-tighter mb-4">No Hardware Published</h3>
+                        <p className="text-slate-600 max-w-sm text-sm font-bold uppercase tracking-widest leading-relaxed">
+                          This space is reserved for approved custom PC configurations and newly deployed inventory.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
+            } />
+            
+            <Route path="/home" element={<Navigate to="/" replace />} />
+
+            <Route path="/configurator" element={<div className="pt-16"><CustomBuildForm /></div>} />
+            
+            <Route path="/gaming-pcs" element={
+              <ProductGrid 
+                category={searchQuery ? 'All' : 'Gaming PCs'} 
+                onProductClick={(p) => setView({ type: 'product', product: p })} 
+                searchQuery={searchQuery} 
+                externalProducts={publishedProducts} 
+              />
+            } />
+            
+            <Route path="/components" element={
+              <ProductGrid 
+                category="Components" 
+                onProductClick={(p) => setView({ type: 'product', product: p })} 
+                searchQuery={searchQuery} 
+                externalProducts={publishedProducts} 
+              />
+            } />
+            
+            <Route path="/peripherals" element={
+              <ProductGrid 
+                category="Peripherals" 
+                onProductClick={(p) => setView({ type: 'product', product: p })} 
+                searchQuery={searchQuery} 
+                externalProducts={publishedProducts} 
+              />
+            } />
+
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/shipping" element={<Shipping />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/returns" element={<Returns />} />
+            
+            <Route path="/admin" element={
+              <AdminDashboard 
+                showRegister={showRegister} 
+                closeRegister={() => setShowRegister(false)} 
+              />
+            } />
+          </Routes>
         )}
       </main>
       
@@ -255,39 +322,27 @@ function App() {
       {showRegister && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl w-full relative my-auto animate-fade-in">
-            
-            <button 
-              onClick={() => setShowRegister(false)} 
-              className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors"
-            >
+            <button onClick={() => setShowRegister(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-
             <div className="text-center mb-8">
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500">MaxBit LLC Protocol</span>
               <h2 className="text-2xl font-black text-white italic uppercase mt-2">Create Customer Profile</h2>
             </div>
-
             <form onSubmit={async (e) => {
               e.preventDefault();
               const userData = { firstName, lastName, email, phone, gender, birthDate };
-              
               const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
               localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
-              
               alert("Registration Complete! Welcome to MaxBit.");
               setShowRegister(false); 
             }} className="space-y-4 text-left">
-              
               <div className="grid grid-cols-2 gap-4">
                 <input required placeholder="FIRST NAME *" value={firstName} onChange={e => setFirstName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
                 <input required placeholder="LAST NAME *" value={lastName} onChange={e => setLastName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
               </div>
-
               <input required type="email" placeholder="EMAIL ADDRESS *" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
-
               <div className="grid grid-cols-2 gap-4">
                 <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
                 <select value={gender} onChange={e => setGender(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500">
@@ -296,10 +351,7 @@ function App() {
                   <option value="Female">FEMALE</option>
                 </select>
               </div>
-
-              <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">
-                Register account
-              </button>
+              <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
             </form>
           </div>
         </div>

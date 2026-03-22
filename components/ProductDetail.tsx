@@ -159,7 +159,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
                  isSoldOut ? 'bg-slate-800 text-slate-500' : 'maxbit-gradient text-slate-900'
                }`}
              >
-               {isSoldOut ? 'ARCHIVE DATA ONLY' : `DEPLOY UNIT — $${product.price}`}
+               {isSoldOut ? 'ARCHIVE DATA ONLY' : `ADD TO CART — $${product.price}`}
              </button>
           </div>
         </div>

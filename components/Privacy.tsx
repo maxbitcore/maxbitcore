@@ -13,28 +13,29 @@ const Privacy: React.FC = () => {
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">1. Information Collection</h2>
           <div className="text-slate-400 leading-loose space-y-4">
             <p>We only collect information essential for the fulfillment of your hardware orders. This includes your name, shipping address, and email for build status updates. We do not profile your gaming behavior or share your data with third-party advertising networks.</p>
-            <p><strong>Technical Data:</strong> During technical support sessions, we may collect system specifications and error logs to assist in troubleshooting hardware issues.</p>
+            <p>Collected automatically when you access our Site using cookies, log files, web beacons, tags, or pixels.</p>
           </div>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">2. Payment Security</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>MaxBit does not store raw credit card data. All financial transactions are handled via industry-standard encrypted gateways (Stripe, PayPal). Your payment information is protected by 256-bit SSL encryption during transmission.</p>
+            <p>MaxBit does not store raw credit card data. All financial transactions are handled via industry-standard encrypted gateways (Stripe, PayPal). Your payment information is protected by SSL encryption during transmission.</p>
           </div>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">3. Data Retention</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>We maintain purchase records for the duration of your 3-year warranty period. This allows us to verify hardware ownership and serial numbers for RMA requests. You may request the deletion of your account at any time, which will remove all non-legal records from our servers.</p>
+            <p></p>
           </div>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">4. Your Rights</h2>
+          <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">4. Cookies</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>In accordance with GDPR and CCPA guidelines, you have the right to access, rectify, and erase your personal data. To exercise these rights, please contact our Data Protection Officer at <strong>privacy@maxbitcore.com</strong>.</p>
+            <p>A cookie is a small amount of information that’s downloaded to your computer or device when you visit our Site. We use a number of different cookies, including functional, performance, advertising, and social media or content cookies. Cookies make your browsing experience better by allowing the website to remember your actions and preferences (such as login and region selection). This means you don’t have to re-enter this information each time you return to the site or browse from one page to another. Cookies also provide information on how people use the website, for instance whether it’s their first time visiting or if they are a frequent visitor.</p>
+            <p>You can control and manage cookies in various ways. Please keep in mind that removing or blocking cookies can negatively impact your user experience and parts of our website may no longer be fully accessible.</p>
           </div>
         </section>
       </div>
