@@ -193,13 +193,6 @@ function App() {
       />
       
        <main className="flex-grow">
-        {view.type === 'checkout' && (
-            <Checkout 
-                items={cartItems}
-                onBack={() => handleTabChange('home')}
-            />
-        )}
-      
           <Routes>
             <Route path="/" element={
               <div className="animate-fade-in-up">
@@ -316,6 +309,16 @@ function App() {
                 onAddToCart={addToCart} 
               />
              } /> 
+
+             <Route path="/checkout" element={
+               <Checkout 
+                 items={cartItems} 
+                 onBack={() => {
+                   setView({ type: 'tab' }); 
+                   navigate('/');            
+                 }} 
+               />
+             } />
           </Routes>
       </main>
       
@@ -331,7 +334,7 @@ function App() {
         onCheckout={() => {
             setIsCartOpen(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            setView({ type: 'checkout' });
+            navigate('/checkout');
         }}
       />
 
