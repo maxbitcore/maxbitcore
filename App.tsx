@@ -192,15 +192,7 @@ function App() {
           onRegisterClick={() => setShowRegister(true)}
       />
       
-      <main className="flex-grow">
-        {view.type === 'product' && (
-          <ProductDetail 
-            product={view.product} 
-            onBack={() => handleTabChange('home')} 
-            onAddToCart={addToCart} 
-          />
-        )}
-
+       <main className="flex-grow">
         {view.type === 'checkout' && (
             <Checkout 
                 items={cartItems}
@@ -208,7 +200,6 @@ function App() {
             />
         )}
       
-        {view.type === 'tab' && (
           <Routes>
             <Route path="/" element={
               <div className="animate-fade-in-up">
@@ -299,8 +290,15 @@ function App() {
                 closeRegister={() => setShowRegister(false)} 
               />
             } />
+
+            <Route path="/product/:id" element={
+              <ProductDetail 
+                product={view.product} 
+                onBack={() => handleTabChange('home')} 
+                onAddToCart={addToCart} 
+              />
+             } /> 
           </Routes>
-        )}
       </main>
       
       <Footer onTabChange={handleTabChange} />
