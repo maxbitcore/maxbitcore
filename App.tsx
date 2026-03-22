@@ -207,7 +207,10 @@ function App() {
                 
                 <NewInStockBanner 
                   newProducts={newProducts} 
-                  onProductClick={(p) => setView({ type: 'product', product: p })}
+                  onProductClick={(p) => {
+                    setView({ type: 'product', product: p });
+                    navigate(`/product/${p.id}`);
+                  }}
                 />
                 
                 <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
@@ -224,7 +227,10 @@ function App() {
                           <ProductCard 
                             key={product.id} 
                             product={product} 
-                            onClick={(p) => setView({ type: 'product', product: p })} 
+                            onClick={(p) => {
+                              setView({ type: 'product', product: p });
+                              navigate(`/product/${p.id}`);
+                            }}
                           />
                         ))}
                       </div>
@@ -253,7 +259,10 @@ function App() {
             <Route path="/gaming-pcs" element={
               <ProductGrid 
                 category={searchQuery ? 'All' : 'Gaming PCs'} 
-                onProductClick={(p) => setView({ type: 'product', product: p })} 
+                onProductClick={(p) => {
+                  setView({ type: 'product', product: p })
+                  navigate(`/product/${p.id}`);
+                }}
                 searchQuery={searchQuery} 
                 externalProducts={publishedProducts} 
               />
@@ -262,7 +271,10 @@ function App() {
             <Route path="/components" element={
               <ProductGrid 
                 category="Components" 
-                onProductClick={(p) => setView({ type: 'product', product: p })} 
+                onProductClick={(p) => {
+                  setView({ type: 'product', product: p })
+                  navigate(`/product/${p.id}`);
+                }}
                 searchQuery={searchQuery} 
                 externalProducts={publishedProducts} 
               />
@@ -271,7 +283,10 @@ function App() {
             <Route path="/peripherals" element={
               <ProductGrid 
                 category="Peripherals" 
-                onProductClick={(p) => setView({ type: 'product', product: p })} 
+                onProductClick={(p) => {
+                  setView({ type: 'product', product: p })
+                  navigate(`/product/${p.id}`);
+                }}
                 searchQuery={searchQuery} 
                 externalProducts={publishedProducts} 
               />
@@ -294,7 +309,10 @@ function App() {
             <Route path="/product/:id" element={
               <ProductDetail 
                 product={view.product} 
-                onBack={() => handleTabChange('home')} 
+                onBack={() => {
+                 navigate(-1); 
+                 setView({ type: 'tab' }); 
+                }}
                 onAddToCart={addToCart} 
               />
              } /> 
