@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { trackOrder } from '../services/analyticsService';
 import { Product } from '../types';
 import { loadStripe } from '@stripe/stripe-js';
 
@@ -11,13 +10,10 @@ interface CheckoutProps {
 }
 
 type CheckoutStep = 'details' | 'processing' | 'success';
-type ShippingMethod = 'standard' | 'express';
 
 const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const [step, setStep] = useState<CheckoutStep>('details');
   const [orderId, setOrderId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'square' | 'card' | 'paypal'>('square');
-  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('standard');
   
   // Customer Data State
   const [email, setEmail] = useState('');
@@ -27,26 +23,60 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   const [country, setCountry] = useState('');
+  
+  const [shippingOptions, setShippingOptions] = useState<{id: string, label: string, price: number, date: string}[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState('');
+  const [isLoadingRates, setIsLoadingRates] = useState(false);
 
+  const TAX_RATE = 0.0995; // 9.95%
   const subtotal = items.reduce((sum, item) => sum + item.price, 0);
-  const shippingCost = shippingMethod === 'express' ? 49 : 0;
-  const taxes = subtotal * 0.0825; // 8.25% Tax Rate
-  const total = subtotal + shippingCost + taxes;
+  const selectedOption = shippingOptions.find(opt => opt.id === selectedShippingId);
+  const shippingCost = selectedOption?.price || 0;
+  const estimatedTax = (subtotal + shippingCost) * TAX_RATE; 
+  const total = subtotal + shippingCost + estimatedTax;
 
   useEffect(() => {
-    // Generate a unique order ID for the session
+    const fetchRates = async () => {
+      if (city && country && zip && address) {
+        setIsLoadingRates(true);
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/get-shipping-rates`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ city, country, zip, address, items })
+          });
+          const rates = await response.json();
+          setShippingOptions(rates);
+          if (rates.length > 0) setSelectedShippingId(rates[0].id);
+        } catch (err) {
+          console.error("Failed to fetch rates:", err);
+        } finally {
+          setIsLoadingRates(false);
+        }
+      }
+    };
+
+    fetchRates();
+  }, [city, country, zip, address]);
+
+  useEffect(() => {
     setOrderId(`MAX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`);
   }, []);
 
 const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep('processing'); 
+    if (!selectedShippingId) return alert("Please select shipping method");
+
+    setStep('processing');
 
     try {
       const stripe = await stripePromise;
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/create-checkout-session`, {
+
+      const response = await fetch('https://maxbitcore.com/api/create-checkout-session.php', { 
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           items: items.map(item => ({
             id: item.id,
@@ -61,22 +91,24 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       });
 
       const session = await response.json();
-
-      if (stripe) {
-        const { error } = await stripe.redirectToCheckout({
-          sessionId: session.id,
-        });
-
-        if (error) {
-          console.error(error);
-          setStep('details');
-          alert(error.message);
-        }
+      
+      if (session.error) {
+        throw new Error(session.error);
       }
-    } catch (err) {
+  
+      if (stripe && session.id) {
+        const { error } = await stripe.redirectToCheckout({ 
+          sessionId: session.id 
+        });
+        if (error) throw error;
+      } else {
+        throw new Error("Failed to create checkout session - No ID received");
+      }
+
+    } catch (err: any) {
       console.error("Payment Error:", err);
       setStep('details');
-      alert("Could not reach the payment gateway. Please try again.");
+      alert(err.message || "Could not reach the payment gateway.");
     }
   };
 
@@ -93,8 +125,8 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           </div>
         </div>
         <h2 className="text-2xl font-black italic text-white uppercase tracking-widest mb-4">
-            {paymentMethod === 'square' ? 'Connecting to Square...' : 'Processing Secure Payment'}
-        </h2>
+            Processing Secure Payment
+        </h2>   
         <div className="max-w-xs w-full bg-slate-900 h-1 rounded-full overflow-hidden mb-6">
           <div className="h-full bg-cyan-500 animate-pulse w-2/3"></div>
         </div>
@@ -123,7 +155,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-2">Estimated Arrival</span>
-                <span className="text-xl font-bold text-white">{shippingMethod === 'express' ? '3-5 Business Days' : '7-10 Business Days'}</span>
+                <span className="text-xl font-bold text-white">{selectedOption?.date || 'Standard Delivery'}</span>
               </div>
             </div>
             <div className="border-t border-slate-800 pt-8">
@@ -209,6 +241,38 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 </div>
               </div>
 
+              {/* Shipping method */}
+              <div className="space-y-6">
+                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] flex items-center gap-4">
+                  <span className="w-8 h-px bg-slate-800"></span>
+                  Shipping method
+                </h2>
+                <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/50">
+                  {isLoadingRates ? (
+                    <div className="p-8 text-center animate-pulse text-xs text-cyan-500 uppercase tracking-widest font-bold">Calculating rates...</div>
+                  ) : shippingOptions.length > 0 ? (
+                    shippingOptions.map((option) => (
+                      <div key={option.id} onClick={() => setSelectedShippingId(option.id)} className={`flex items-center justify-between p-5 cursor-pointer border-b border-slate-800 last:border-0 transition-colors ${selectedShippingId === option.id ? 'bg-cyan-500/10' : 'hover:bg-slate-800/50'}`}>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedShippingId === option.id ? 'border-cyan-500' : 'border-slate-600'}`}>
+                          {selectedShippingId === option.id && <div className="w-2 h-2 bg-cyan-500 rounded-full" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white uppercase tracking-tight">{option.label}</p>
+                          <p className="text-[10px] text-slate-500 font-medium">{option.date}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-mono font-bold text-white">${option.price.toFixed(2)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-[10px] text-slate-500 uppercase tracking-widest italic">
+                    Enter your shipping address to view rates
+                  </div>
+                )}
+              </div>
+            </div>
+
               <button 
                 type="submit"
                 className="w-full mt-8 bg-emerald-400 hover:bg-emerald-300 text-slate-900 font-black text-sm uppercase tracking-widest py-5 rounded-xl transition-all"
@@ -243,18 +307,22 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               <div className="space-y-3">
                 <div className="flex justify-between text-xs font-bold text-slate-500">
                   <span className="uppercase tracking-widest">Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span className="text-white font-mono">${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500">
                     <span className="uppercase tracking-widest">Shipping</span>
                     <span className={shippingCost === 0 ? 'text-emerald-500' : ''}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
                   </div>
                   <div className="flex justify-between text-xs font-bold text-slate-500">
-                    <span className="uppercase tracking-widest">Estimated Tax (8.25%)</span>
-                    <span>${taxes.toFixed(2)}</span>
+                    <span className="uppercase tracking-widest">Estimated Tax (Stripe)</span>
+                    <span className="text-white font-mono">${estimatedTax.toFixed(2)}</span>
                   </div>
                 </div>
-              
+                
+                <p className="text-[9px] text-slate-600 uppercase mt-4 italic">
+                  * Final tax will be calculated by Stripe based on your precise jurisdiction.
+                </p> 
+
                 <div className="border-t border-slate-800 pt-6">
                    <div className="flex justify-between items-center">
                      <span className="font-black italic text-xl text-white uppercase tracking-tighter">Total</span>
