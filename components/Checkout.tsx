@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { trackOrder } from '../services/analyticsService';
 import { Product } from '../types';
+import { loadStripe } from '@stripe/stripe-js';
+
+const stripePromise = loadStripe('pk_test_51Sm3CG3BK91l745A0VN63NLnemQi9vl3HWGTDT18c4hLpZfroanzl50rgKu1VtWFGBzhvNqvKcNYFL0kH0KnRDOS00MznZ24qk');
 
 interface CheckoutProps {
   items: Product[];
@@ -35,30 +38,46 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
     setOrderId(`MAX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`);
   }, []);
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep('processing');
-    
-    // Simulate payment and order processing
-    // In a real Square implementation, we would call: await card.tokenize();
-    setTimeout(() => {
-      trackOrder(
-        orderId, 
-        items, 
-        total, 
-        {
-          name: `${firstName} ${lastName}`,
+    setStep('processing'); 
+
+    try {
+      const stripe = await stripePromise;
+      const response = await fetch('http://localhost:4242/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(item => ({
+            id: item.id,
+            name: item.name.replace(/<[^>]*>?/gm, ''),
+            price: item.price,
+            imageUrl: item.imageUrl
+          })),
           email: email,
-          address: `${address}, ${city}, ${zip}, ${country}`
+          shipping: shippingCost,
+          orderId: orderId
+        }),
+      });
+
+      const session = await response.json();
+
+      if (stripe) {
+        const { error } = await stripe.redirectToCheckout({
+          sessionId: session.id,
+        });
+
+        if (error) {
+          console.error(error);
+          setStep('details');
+          alert(error.message);
         }
-      );
-      
-      // Simulate Backend Email Trigger to Admin
-      console.log(`[System]: Sending payment receipt to ${email}`);
-      console.log(`[System]: Sending new order notification to info@maxbitcore.com`);
-      
-      setStep('success');
-    }, 3000);
+      }
+    } catch (err) {
+      console.error("Payment Error:", err);
+      setStep('details');
+      alert("Could not reach the payment gateway. Please try again.");
+    }
   };
 
   if (step === 'processing') {

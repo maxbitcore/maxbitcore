@@ -110,7 +110,7 @@ const buildSystemInstruction = () => {
 
 export const sendMessageToGemini = async (history: {role: 'user' | 'model', text: string}[], newMessage: string): Promise<string> => {
   try {
-    if (!process.env.API_KEY) return "CRITICAL ERROR: API Key missing. Neural link severed.";
+    if (!process.env.API_) return "CRITICAL ERROR: API Key missing. Neural link severed.";
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
