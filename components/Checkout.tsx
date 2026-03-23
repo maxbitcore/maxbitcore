@@ -44,7 +44,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
 
     try {
       const stripe = await stripePromise;
-      const response = await fetch('http://localhost:4242/create-checkout-session', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -209,137 +209,15 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              {/* Shipping Method */}
-              <div className="space-y-6">
-                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] flex items-center gap-4">
-                  <span className="w-8 h-px bg-slate-800"></span>
-                  Delivery Method
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    { id: 'standard', label: 'Standard Delivery', price: 'Free', time: '7-10 Business Days', icon: 'M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4' },
-                    { id: 'express', label: 'Express Priority', price: '$49', time: '3-5 Business Days', icon: 'M13 10V3L4 14h7v7l9-11h-7z' }
-                  ].map((method) => (
-                    <button
-                      key={method.id}
-                      type="button"
-                      onClick={() => setShippingMethod(method.id as any)}
-                      className={`flex flex-col p-5 rounded-xl border text-left transition-all ${
-                        shippingMethod === method.id 
-                          ? 'border-cyan-500 bg-cyan-500/10' 
-                          : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center mb-3">
-                        <div className={shippingMethod === method.id ? 'text-cyan-400' : 'text-slate-600'}>
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={method.icon} />
-                          </svg>
-                        </div>
-                        <span className="text-[10px] font-black text-cyan-400">{method.price}</span>
-                      </div>
-                      <div>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${shippingMethod === method.id ? 'text-white' : 'text-slate-400'}`}>{method.label}</span>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1">{method.time}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payment Method */}
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] flex items-center gap-4">
-                    <span className="w-8 h-px bg-slate-800"></span>
-                    Payment Method
-                  </h2>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  {[
-                    { id: 'square', label: 'Square', icon: 'M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v8H8V8z' },
-                    { id: 'card', label: 'Credit Card', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
-                    { id: 'paypal', label: 'PayPal', icon: 'M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944 3.723a.641.641 0 01.633-.54h7.19c4.322 0 6.642 2.158 6.014 5.992-.375 2.275-1.742 4.01-3.692 4.935-.95.45-2.072.684-3.21.684H9.15a.641.641 0 00-.632.541l-1.442 5.91-.01.037a.641.641 0 01-.632.441l.642-2.686z' }
-                  ].map((method) => (
-                    <button
-                      key={method.id}
-                      type="button"
-                      onClick={() => setPaymentMethod(method.id as any)}
-                      className={`flex flex-col items-center gap-3 p-4 rounded-xl border transition-all ${
-                        paymentMethod === method.id 
-                          ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' 
-                          : 'border-slate-800 bg-slate-900/50 text-slate-500 hover:border-slate-700'
-                      }`}
-                    >
-                      <svg className="w-6 h-6" fill={method.id === 'paypal' || method.id === 'square' ? 'currentColor' : 'none'} stroke={method.id === 'paypal' || method.id === 'square' ? 'none' : 'currentColor'} viewBox="0 0 24 24">
-                        {method.id === 'paypal' || method.id === 'square' ? (
-                          <path d={method.icon} />
-                        ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={method.icon} />
-                        )}
-                      </svg>
-                      <span className="text-[8px] font-black uppercase tracking-widest">{method.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="p-8 bg-slate-900 border border-slate-800 rounded-2xl min-h-[200px] flex flex-col justify-center">
-                   {paymentMethod === 'square' && (
-                     <div className="animate-fade-in-up space-y-4">
-                        <div className="flex items-center justify-between mb-2">
-                           <span className="text-[10px] font-black uppercase tracking-widest text-white">Square Secure Payment</span>
-                           <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v8H8V8z" /></svg>
-                        </div>
-                        {/* 
-                           In a real implementation, the Square Web Payments SDK attaches the form here.
-                           Example Code:
-                           <div id="card-container"></div> 
-                        */}
-                        <div className="bg-[#0b0f1a] border border-slate-700 rounded-lg p-4">
-                            <div className="flex flex-col gap-3">
-                                <label className="text-[9px] font-bold text-slate-500 uppercase">Card Details (Square Hosted)</label>
-                                <div className="h-10 bg-slate-800/50 rounded border border-slate-800 flex items-center px-3">
-                                    <div className="w-full h-2 bg-slate-700/50 rounded animate-pulse"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <p className="text-[9px] text-slate-500 mt-2">
-                           Payment processed securely by Square. Your card details are never stored on our servers.
-                        </p>
-                     </div>
-                   )}
-
-                   {paymentMethod === 'card' && (
-                     <div className="space-y-4 animate-fade-in-up">
-                        <input required type="text" placeholder="CARD NUMBER" className="w-full bg-[#0b0f1a] border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors font-mono" />
-                        <div className="grid grid-cols-2 gap-4">
-                           <input required type="text" placeholder="MM / YY" className="w-full bg-[#0b0f1a] border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors font-mono" />
-                           <input required type="text" placeholder="CVC / CVV" className="w-full bg-[#0b0f1a] border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors font-mono" />
-                        </div>
-                     </div>
-                   )}
-
-                   {paymentMethod === 'paypal' && (
-                     <div className="text-center py-6 space-y-4 animate-fade-in-up">
-                        <svg className="h-8 mx-auto text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944 3.723a.641.641 0 01.633-.54h7.19c4.322 0 6.642 2.158 6.014 5.992-.375 2.275-1.742 4.01-3.692 4.935-.95.45-2.072.684-3.21.684H9.15a.641.641 0 00-.632.541l-1.442 5.91-.01.037a.641.641 0 01-.632.441l.642-2.686z" />
-                        </svg>
-                        <p className="text-xs text-slate-500 max-w-xs mx-auto">You will be redirected to PayPal to complete your purchase securely.</p>
-                     </div>
-                   )}
-                </div>
-              </div>
-
               <button 
                 type="submit"
-                className="w-full py-6 maxbit-gradient text-slate-950 uppercase tracking-[0.2em] text-sm font-black rounded-xl hover:scale-[1.02] transition-all shadow-xl"
+                className="w-full mt-8 bg-emerald-400 hover:bg-emerald-300 text-slate-900 font-black text-sm uppercase tracking-widest py-5 rounded-xl transition-all"
               >
-                Place Order — ${total.toFixed(2)}
+                Proceed to Payment — ${total.toFixed(2)}
               </button>
             </div>
           </div>
-
+            
           <div className="lg:pl-12 lg:border-l border-slate-800">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] mb-10">Order Summary</h2>
   
@@ -355,11 +233,11 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                       />
                       <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
                     </div>
-                   </div>
-                   <div className="text-sm font-black text-white font-mono">${item.price}</div>
-                 </div>
-               ))}
-             </div>
+                  </div>
+                  <div className="text-sm font-black text-white font-mono">${item.price}</div>
+                </div>
+              ))}
+            </div>
 
             <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 space-y-6">
               <div className="space-y-3">
@@ -368,35 +246,33 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold text-slate-500">
-                  <span className="uppercase tracking-widest">Shipping</span>
-                  <span className={shippingCost === 0 ? 'text-emerald-500' : ''}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
+                    <span className="uppercase tracking-widest">Shipping</span>
+                    <span className={shippingCost === 0 ? 'text-emerald-500' : ''}>{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-bold text-slate-500">
+                    <span className="uppercase tracking-widest">Estimated Tax (8.25%)</span>
+                    <span>${taxes.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs font-bold text-slate-500">
-                  <span className="uppercase tracking-widest">Estimated Tax (8.25%)</span>
-                  <span>${taxes.toFixed(2)}</span>
-                </div>
-              </div>
               
-              <div className="border-t border-slate-800 pt-6">
-                 <div className="flex justify-between items-center">
-                   <span className="font-black italic text-xl text-white uppercase tracking-tighter">Total</span>
-                   <div className="flex items-end gap-1">
-                     <span className="text-[10px] text-slate-500 mb-1">USD</span>
-                     <span className="font-black text-4xl text-white tracking-tighter">${total.toFixed(2)}</span>
+                <div className="border-t border-slate-800 pt-6">
+                   <div className="flex justify-between items-center">
+                     <span className="font-black italic text-xl text-white uppercase tracking-tighter">Total</span>
+                     <div className="flex items-end gap-1">
+                       <span className="text-[10px] text-slate-500 mb-1">USD</span>
+                       <span className="font-black text-4xl text-white tracking-tighter">${total.toFixed(2)}</span>
+                     </div>
                    </div>
-                 </div>
+                </div>
               </div>
-            </div>
 
-            <div className="mt-8 p-6 border border-dashed border-slate-800 rounded-2xl flex items-center gap-4">
-              <div className="text-cyan-500">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              <div className="mt-8 p-6 border border-dashed border-slate-800 rounded-2xl flex items-center gap-4">
+                <div className="text-cyan-500">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <div className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
-                All hardware is fully insured during transit / 3-year warranty included.
-              </div>
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Secure encrypted checkout</span>
             </div>
           </div>
         </form>
