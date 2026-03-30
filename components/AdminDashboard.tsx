@@ -19,7 +19,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = () =>{
   const uploadImageToServer = async (file: File) => {
     const formData = new FormData();
     formData.append('image', file);
-    const response = await fetch('https://maxbitcore.com/upload.php', {
+    const response = await fetch('/upload.php', {
       method: 'POST',
       body: formData,
     });
@@ -32,7 +32,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = () =>{
 
   const syncWithServer = async (updatedList: Product[]) => {
     try {
-      const response = await fetch('https://maxbitcore.com/api/save_products.php', {
+      const response = await fetch('api/save_products.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedList)

@@ -61,7 +61,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       throw new Error("Stripe script failed to load. Check your API key or internet connection.");
     }
 
-      const response = await fetch('https://maxbitcore.com/api/create-checkout-session.php', { 
+      const response = await fetch('api/create-checkout-session.php', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -199,6 +199,10 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 </h2>
                 <div className="space-y-4">
                    <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="EMAIL ADDRESS" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                   <input required type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="FIRST NAME" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
+                   <input required type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="LAST NAME" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
                 </div>
               </div>
 
