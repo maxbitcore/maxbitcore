@@ -68,7 +68,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           items: items.map(item => ({
             id: item.id,
             name: item.name.replace(/<[^>]*>?/gm, ''),
-            price: Math.round(item.price * 100),
+            price:item.price,
             imageUrl: item.imageUrl
           })),
           email: email,

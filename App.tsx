@@ -35,9 +35,25 @@ function App() {
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('Not Specified');
   const [birthDate, setBirthDate] = useState('');
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState('');
 
   const navigate = useNavigate(); 
   const location = useLocation();
+
+  useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('success') === 'true') {
+    const orderId = params.get('orderId') || 'CONFIRMED';
+    setCurrentOrderId(orderId);
+    setShowSuccessAlert(true);
+    if (cartItems.length > 0) {
+      setCartItems([]); 
+      localStorage.removeItem('cart');
+    }
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search, navigate, cartItems.length]);
 
   useEffect(() => {
     const path = location.pathname.replace('/', '') as MainTab;
@@ -192,52 +208,80 @@ function App() {
           onRegisterClick={() => setShowRegister(true)}
       />
       
-       <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={
-              <div className="animate-fade-in-up">
-                <Hero onExplore={() => handleTabChange('configurator')} />
-                
-                <NewInStockBanner 
-                  newProducts={newProducts} 
-                  onProductClick={(p) => {
-                    setView({ type: 'product', product: p });
-                    navigate(`/product/${p.id}`);
-                  }}
-                />
-                
-                <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
-                  <div className="max-w-[1800px] mx-auto">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
-                      <div>
-                        <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
-                      </div>
-                    </div>
+      {showSuccessAlert && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4 animate-fade-in">
+          <div className="bg-emerald-500 text-slate-950 p-6 rounded-3xl shadow-[0_0_50px_rgba(16,185,129,0.4)] border border-emerald-400 flex flex-col items-center text-center">
+            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-4 border border-white/30">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-1">Payment Received</h2>
+            <p className="text-[10px] font-black opacity-90 uppercase tracking-widest mb-6">
+              ORDER ID: {currentOrderId} <br />
+              Confirmation sent to your email
+            </p>
+            <button 
+              onClick={() => {
+                setShowSuccessAlert(false);
+                navigate('/gaming-pcs');
+              }}
+              className="w-full py-3 bg-slate-950 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-slate-800 transition-all active:scale-95"
+            >
+              Continue Shopping
+            </button>
+          </div>
+        </div>
+      )}
 
-                    {publishedProducts && publishedProducts.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                        {publishedProducts.map(product => (
-                          <ProductCard 
-                            key={product.id} 
-                            product={product} 
-                            onClick={(p) => {
-                              setView({ type: 'product', product: p });
-                              navigate(`/product/${p.id}`);
-                            }}
-                          />
-                        ))}
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/index.html" element={<Navigate to="/" replace />} />
+
+          <Route path="/" element={
+            <div className="animate-fade-in-up">
+              <Hero onExplore={() => handleTabChange('configurator')} />
+                
+              <NewInStockBanner 
+                newProducts={newProducts} 
+                onProductClick={(p) => {
+                  setView({ type: 'product', product: p });
+                  navigate(`/product/${p.id}`);
+                }}
+              />
+                
+              <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
+                <div className="max-w-[1800px] mx-auto">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
+                    <div>
+                      <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
+                    </div>
+                  </div>
+
+                  {publishedProducts && publishedProducts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                      {publishedProducts.map(product => (
+                        <ProductCard 
+                           key={product.id} 
+                          product={product} 
+                           onClick={(p) => {
+                            setView({ type: 'product', product: p });
+                            navigate(`/product/${p.id}`);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
+                      <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mb-8 border border-slate-800">
+                        <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" />
+                        </svg>
                       </div>
-                    ) : (
-                      <div className="py-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
-                        <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mb-8 border border-slate-800">
-                          <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" />
-                          </svg>
-                        </div>
-                        <h3 className="text-2xl font-black italic text-slate-500 uppercase tracking-tighter mb-4">No Hardware Published</h3>
-                        <p className="text-slate-600 max-w-sm text-sm font-bold uppercase tracking-widest leading-relaxed">
-                          This space is reserved for approved custom PC configurations and newly deployed inventory.
-                        </p>
+                      <h3 className="text-2xl font-black italic text-slate-500 uppercase tracking-tighter mb-4">No Hardware Published</h3>
+                      <p className="text-slate-600 max-w-sm text-sm font-bold uppercase tracking-widest leading-relaxed">
+                        This space is reserved for approved custom PC configurations and newly deployed inventory.
+                      </p>
                       </div>
                     )}
                   </div>
@@ -299,27 +343,27 @@ function App() {
               />
             } />
 
-            <Route path="/product/:id" element={
-              <ProductDetail 
-                product={view.product} 
-                onBack={() => {
-                 navigate(-1); 
-                 setView({ type: 'tab' }); 
-                }}
-                onAddToCart={addToCart} 
-              />
-             } /> 
+          <Route path="/product/:id" element={
+            <ProductDetail 
+              product={view.product} 
+              onBack={() => {
+                navigate(-1); 
+                setView({ type: 'tab' }); 
+              }}
+              onAddToCart={addToCart} 
+            />
+          } /> 
 
-             <Route path="/checkout" element={
-               <Checkout 
-                 items={cartItems} 
-                 onBack={() => {
-                   setView({ type: 'tab' }); 
-                   navigate('/');            
-                 }} 
-               />
-             } />
-          </Routes>
+          <Route path="/checkout" element={
+            <Checkout 
+              items={cartItems} 
+              onBack={() => {
+                setView({ type: 'tab' }); 
+                navigate('/');            
+              }} 
+            />
+          } />
+        </Routes>
       </main>
       
       <Footer onTabChange={handleTabChange} />
