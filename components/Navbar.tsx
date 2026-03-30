@@ -174,8 +174,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           className="h-8 md:h-10 w-auto object-contain"
           alt="MAXBIT Logo" 
           onError={(e) => {
-             e.currentTarget.src = "/favicon.png";
-             console.log("Logo sync fallback to favicon");
+             e.currentTarget.style.display = 'none';
+             console.log("Server logo failed to load, hiding <img>");
           }}
         />
         <span className="text-xl md:text-2xl font-black text-white italic">
