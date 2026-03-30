@@ -61,14 +61,14 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       throw new Error("Stripe script failed to load. Check your API key or internet connection.");
     }
 
-      const response = await fetch('api/create-checkout-session.php', { 
+      const response = await fetch('/api/create-checkout-session.php', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json'},
         body: JSON.stringify({
           items: items.map(item => ({
             id: item.id,
             name: item.name.replace(/<[^>]*>?/gm, ''),
-            price: item.price,
+            price: Math.round(item.price * 100),
             imageUrl: item.imageUrl
           })),
           email: email,
