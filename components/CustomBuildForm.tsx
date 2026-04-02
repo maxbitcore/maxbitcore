@@ -188,7 +188,7 @@ const CustomBuildForm: React.FC = () => {
     (e.target as HTMLInputElement).setCustomValidity('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
 
     const newSubmission: BuildSubmission = {
@@ -205,18 +205,34 @@ const CustomBuildForm: React.FC = () => {
       manufacturer: selectedGPUManufacturer,
       caseSize,
       caseType,
-      placement: 'Not Specified', // Removed from UI to simplify
+      placement: 'Not Specified',
       aesthetic,
       resolution,
       requirements
     };
 
-    const existing = JSON.parse(localStorage.getItem('maxbit_submissions') || '[]');
-    localStorage.setItem('maxbit_submissions', JSON.stringify([newSubmission, ...existing]));
+    try {
+      const response = await fetch('https://maxbitcore.com/api/submit-build.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newSubmission),
+      });
 
-    setStatus('success');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+      if (!response.ok) throw new Error('Server error');
+
+     const existing = JSON.parse(localStorage.getItem('maxbit_submissions') || '[]');
+     localStorage.setItem('maxbit_submissions', JSON.stringify([newSubmission, ...existing]));
+
+     setStatus('success');
+     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (error) {
+      console.error("Submission failed:", error);
+      alert("System Error: Could not deploy build protocol. Please try again.");
+    }
+  }; 
 
   const toggleSection = (section: string) => {
     setActiveSections(prev => 

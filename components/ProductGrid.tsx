@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PRODUCTS } from '../constants';
 import { Product } from '../types';
 import ProductCard from './ProductCard';
+import { trackProductView } from '../services/analyticsService';
 
 interface ProductGridProps {
   category: 'Gaming PCs' | 'Components' | 'Peripherals' | 'All';
@@ -80,7 +81,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, sea
         {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
             {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} onClick={onProductClick} />
+              <ProductCard key={product.id} product={product} onClick={(p) => { trackView(p.id); onProductClick(p); }} />
             ))}
           </div>
         ) : (

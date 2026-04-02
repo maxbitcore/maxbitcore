@@ -64,6 +64,8 @@ export const saveAnalytics = (data: AnalyticsData) => {
         data.sessions = data.sessions.slice(-200);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    window.dispatchEvent(new CustomEvent('maxbit-update'));
+    
   } catch (e) {}
 };
 

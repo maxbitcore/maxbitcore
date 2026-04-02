@@ -4,7 +4,7 @@ import { BuildSubmission, Product, ProductStatus, Review } from '../types';
 import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession } from '../services/analyticsService';
 import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
-
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
 
 interface AdminDashboardProps {}
 
@@ -212,8 +212,9 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   const [caseStyles, setCaseStyles] = useState<Record<string, string>>({});
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
-  const [shopOrders, setShopOrders] = useState<OrderRecord[]>([]);
+  const [shopOrders, setShopOrders] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetImageRef = useRef<HTMLInputElement>(null);
@@ -247,30 +248,45 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     if (token && role) { setIsAuthenticated(true); setUserRole(role); }
     const storedLogo = localStorage.getItem('maxbit_logo');
     if (storedLogo) setCurrentLogo(storedLogo);
-    
-    const loadProducts = async () => {
+
+    const loadAllData = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch('https://www.maxbitcore.com/api/products.php');
-        const serverData = await response.json();
-        
-        if (Array.isArray(serverData) && serverData.length > 0) {
-          setPublishedProducts(serverData);
-          localStorage.setItem('maxbit_published_products_v2', JSON.stringify(serverData));
-          return;
+        const [prodRes, subRes, orderRes] = await Promise.all([
+          fetch('https://www.maxbitcore.com/api/products.php'),
+          fetch('https://www.maxbitcore.com/api/get-submissions.php'),
+          fetch('https://www.maxbitcore.com/api/get-orders.php')
+        ]);
+
+        const prodData = await prodRes.json();
+        const subData = await subRes.json();
+        const orderData = await orderRes.json();
+
+        if (Array.isArray(prodData)) {
+          setPublishedProducts(prodData);
+          localStorage.setItem('maxbit_published_products_v2', JSON.stringify(prodData));
         }
+        if (Array.isArray(subData)) {
+          setSubmissions(subData);
+          localStorage.setItem('maxbit_submissions', JSON.stringify(subData));
+        }
+        if (Array.isArray(orderData)) {
+          setShopOrders(orderData.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)));
+        }
+
       } catch (error) {
-        console.error("Server sync failed, falling back to local storage", error);
+        console.error("MaxBit OS: Sync Failure. Using backup.", error);
+        const localProd = localStorage.getItem('maxbit_published_products_v2');
+        if (localProd) setPublishedProducts(JSON.parse(localProd));
+        const localSub = localStorage.getItem('maxbit_submissions');
+        if (localSub) setSubmissions(JSON.parse(localSub));
+      } finally {
+        setIsLoading(false);
       }
-
-      const storedProducts = localStorage.getItem('maxbit_published_products_v2');
-      if (storedProducts) setPublishedProducts(JSON.parse(storedProducts));
     };
-    
-    loadProducts();
-    
-    const storedSubmissions = localStorage.getItem('maxbit_submissions');
-    if (storedSubmissions) setSubmissions(JSON.parse(storedSubmissions));
 
+    loadAllData();
+    
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
     if (storedConfig) setConfig(JSON.parse(storedConfig));
 
@@ -279,10 +295,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     
     const analyticsData = getAnalytics();
     setAnalytics(analyticsData);
-    if (analyticsData.orders) setShopOrders(analyticsData.orders.sort((a, b) => b.timestamp - a.timestamp));
-
-    window.addEventListener('maxbit-update', loadProducts);
-    return () => window.removeEventListener('maxbit-update', loadProducts);
+    window.addEventListener('maxbit-update', loadAllData);
+    return () => window.removeEventListener('maxbit-update', loadAllData);
   }, []);
 
   const allComments = useMemo(() => {
@@ -500,6 +514,19 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
       setActiveAssetCategory(null);
     }
   };
+
+  const chartData = useMemo(() => {
+    const last7Days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return d.toISOString().split('T')[0];
+    }).reverse();
+
+    return last7Days.map(date => ({
+      displayDate: date.split('-').reverse().slice(0, 2).join('.'), // формат 01.04
+      visits: (analytics?.sessions || []).filter((s: any) => s.date === date).length
+    }));
+  }, [analytics?.sessions]);
 
   return (
     <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
@@ -730,137 +757,378 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         {/* SUBMISSIONS TAB */}
         {activeAdminTab === 'submissions' && (
           <div className="space-y-6">
-              {submissions.length === 0 ? <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">Empty Submissions Log</div> :
-                  submissions.map(sub => (
-                    <div key={sub.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row justify-between gap-8 hover:border-cyan-500/20 transition-all group">
-                        <div className="space-y-4">
-                            <div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-1 block group-hover:text-white">{sub.purpose} Protocol</span>
-                                <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">{sub.userName}</h3>
-                                <p className="text-xs text-slate-500 font-mono">{sub.userEmail}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                <div><span className="text-slate-600 mr-2 font-black">CPU:</span> {sub.cpu}</div>
-                                <div><span className="text-slate-600 mr-2 font-black">GPU:</span> {sub.gpu}</div>
-                                <div><span className="text-slate-600 mr-2 font-black">Budget:</span> ${sub.budget}</div>
-                                <div><span className="text-slate-600 mr-2 font-black">Deadline:</span> {sub.deadline}</div>
-                            </div>
-                        </div>
-                        <div className="flex flex-col items-end justify-between text-right">
-                             <div className="bg-slate-950 px-6 py-3 rounded-xl border border-slate-800 shadow-inner">
-                                <span className="text-[9px] font-black uppercase text-slate-500 block mb-1">Status</span>
-                                <span className="text-xs font-black text-white italic">Awaiting Debrief</span>
-                             </div>
-                             <span className="text-[9px] font-mono text-slate-700 mt-4 uppercase">Logged: {new Date(sub.timestamp).toLocaleString()}</span>
-                        </div>
+            {submissions.length === 0 ? (
+              <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
+              Empty Submissions Log
+              </div>
+            ) : (
+              
+              [...submissions].sort((a, b) => b.timestamp - a.timestamp).map(sub => (
+                <div key={sub.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row justify-between gap-8 hover:border-cyan-500/20 transition-all group relative overflow-hidden">
+          
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-1 block group-hover:text-white">
+                        {sub.purpose} Protocol
+                      </span>
+                      <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">
+                        {sub.userName}
+                      </h3>
+                      <p className="text-xs text-slate-500 font-mono">{sub.userEmail}</p>
                     </div>
-                  ))
-              }
+            
+                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">CPU:</span> {sub.cpu}</div>
+                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">GPU:</span> {sub.gpu}</div>
+                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Budget:</span> <span className="text-emerald-500">${sub.budget}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Deadline:</span> {sub.deadline}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end justify-between text-right">
+                    <div className="flex gap-4">
+                      <div className="bg-slate-950 px-6 py-3 rounded-xl border border-slate-800 shadow-inner">
+                        <span className="text-[9px] font-black uppercase text-slate-500 block mb-1">Status</span>
+                        <span className="text-xs font-black text-white italic uppercase tracking-wider">Awaiting Debrief</span>
+                      </div>
+              
+                      <button 
+                        onClick={() => { if(window.confirm('Archive this mission?')) {/* Здесь будет логика удаления */} }}
+                        className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-3 rounded-xl border border-rose-500/20 transition-all flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1">
+                       <span className="text-[9px] font-mono text-slate-700 uppercase">
+                        ID: {sub.id.slice(-8)}
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-black">
+                        Logged: {new Date(sub.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
 
         {/* ORDERS TAB */}
         {activeAdminTab === 'orders' && (
-           <div className="space-y-6">
-              {shopOrders.length === 0 ? <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">No transaction records</div> :
-                shopOrders.map(order => (
-                    <div key={order.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl group hover:border-emerald-500/30 transition-all">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 pb-6 border-b border-slate-800/50">
-                            <div><span className="text-[10px] font-black text-emerald-500 uppercase mb-1 block">Deployed Transaction</span><h3 className="text-xl font-mono font-black text-white tracking-tighter">{order.id}</h3></div>
-                            <div className="text-right"><span className="text-3xl font-black text-white italic tracking-tighter">${order.total.toFixed(2)}</span><p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">{new Date(order.timestamp).toLocaleDateString()}</p></div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-12 text-xs">
-                            <div><h4 className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4">Payload</h4><div className="space-y-2">{order.items.map((item, idx) => <div key={idx} className="flex justify-between border-b border-slate-800 pb-1"><span className="text-slate-300 font-bold uppercase">{item.name}</span><span className="text-slate-500 font-mono">${item.price}</span></div>)}</div></div>
-                            <div><h4 className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4">Coordinates</h4><p className="text-white font-black italic">{order.customer.name}</p><p className="text-slate-500 font-mono">{order.customer.email}</p><p className="text-slate-400 italic mt-3 bg-slate-950/50 p-3 rounded-lg border border-slate-800">{order.customer.address}</p></div>
-                        </div>
+          <div className="space-y-6">
+            {shopOrders.length === 0 ? (
+              <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
+                No Orders Logged
+              </div>
+            ) : (
+              shopOrders.map((order) => (
+                <div 
+                  key={order.id} 
+                  className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex justify-between items-center group hover:border-emerald-500/20 transition-all shadow-xl"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                        Transaction Detected
+                      </span>
                     </div>
-                ))
-              }
-           </div>
+                    <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">
+                      {order.orderNumber}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono tracking-tight">
+                      CUSTOMER: {order.customerEmail}
+                    </p>
+                  </div>
+          
+                  <div className="text-right space-y-3">
+                    <div className="text-3xl font-black text-white italic tracking-tighter">
+                      ${Number(order.amount).toLocaleString()}
+                    </div>
+                    <div className={`text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border ${
+                      order.status === 'PAID' 
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                    }`}>
+                      {order.status}
+                    </div>
+                    <div className="text-[9px] font-mono text-slate-600 block uppercase tracking-widest">
+                      {new Date(order.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         )}
 
         {/* ANALYTICS TAB */}
         {activeAdminTab === 'analytics' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-xl">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Total Revenue</span>
-                <div className="text-3xl font-black text-white italic">${shopOrders.reduce((sum, o) => sum + o.total, 0).toLocaleString()}</div>
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                <div className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-2">Total Sessions</div>
+                <div className="text-3xl font-black text-white italic">{analytics?.sessions?.length || 0}</div>
+                <div className="text-[9px] text-slate-500 uppercase mt-1">Unique deployments detected</div>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Total Revenue</div>
+                <div className="text-3xl font-black text-white italic">${shopOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0).toLocaleString()}</div>
+                <div className="text-[9px] text-slate-500 uppercase mt-1">Confirmed transactions</div>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                <div className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-2">Unit Views</div>
+                <div className="text-3xl font-black text-white italic">
+                  {Object.values(analytics?.views || {}).reduce((a: any, b: any) => a + b, 0)}
+                </div>
+                <div className="text-[9px] text-slate-500 uppercase mt-1">Total product interactions</div>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                <div className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">Conversion</div>
+                <div className="text-3xl font-black text-white italic">
+                  {analytics?.sessions?.length ? ((shopOrders.length / analytics.sessions.length) * 100).toFixed(1) : 0}%
+                </div>
+                <div className="text-[9px] text-slate-500 uppercase mt-1">Visitor to Buyer ratio</div>
+              </div>
             </div>
-            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl shadow-xl">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Real Traffic</span>
-                <div className="text-3xl font-black text-cyan-500 italic">{analytics?.visits || 0}</div>
-            </div>
-          </div>
+
+            <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-white font-black italic uppercase tracking-tighter text-xl">Tactical Traffic Flow</h3>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">Operational cycles: Last 7 Days</p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
+                  <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_8px_#06b6d4]"></div>
+                  <span className="text-[9px] font-black text-cyan-500 uppercase italic">Live Monitoring</span>
+                </div>
+              </div>
+
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="cyberCyan" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <XAxis 
+                      dataKey="displayDate" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#475569', fontSize: 10, fontWeight: 'bold'}}
+                      dy={10}
+                    />
+                   <YAxis hide domain={['dataMin', 'dataMax + 5']} />
+                   <Tooltip 
+                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '16px' }}
+                     itemStyle={{ color: '#06b6d4', textTransform: 'uppercase', fontWeight: '900', fontSize: '10px' }}
+                     labelStyle={{ display: 'none' }}
+                     cursor={{ stroke: '#06b6d4', strokeWidth: 1, strokeDasharray: '5 5' }}
+                   />
+                   <Area 
+                     type="monotone" 
+                     dataKey="visits" 
+                     stroke="#06b6d4" 
+                     strokeWidth={4}
+                     fillOpacity={1} 
+                     fill="url(#cyberCyan)" 
+                     animationDuration={2500}
+                     dot={{ r: 4, fill: '#0b0f1a', stroke: '#06b6d4', strokeWidth: 2 }}
+                     activeDot={{ r: 6, fill: '#06b6d4', shadow: '0 0 15px #06b6d4' }}
+                   />
+                 </AreaChart>
+               </ResponsiveContainer>
+             </div>
+           </div>
+
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             {/* Most Viewed */}
+             <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
+               <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
+                 <span className="text-cyan-500">●</span> Most Viewed Armory Units
+               </h3>
+               <div className="space-y-4">
+                 {publishedProducts
+                   .map(p => ({
+                     ...p,
+                     viewCount: analytics?.views?.[p.id] || 0
+                   }))
+                   .sort((a, b) => b.viewCount - a.viewCount)
+                   .slice(0, 5)
+                   .map((product, idx) => (
+                     <div key={product.id} className="group flex items-center justify-between p-3 rounded-2xl bg-slate-950/40 border border-slate-800/50 hover:border-cyan-500/30 transition-all">
+                       <div className="flex items-center gap-4">
+                         <div className="text-xs font-black text-slate-700 w-4">{idx + 1}</div>
+                         <img src={product.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-800" />
+                         <div>
+                           <div className="text-[11px] font-black text-white uppercase italic truncate max-w-[150px]">{product.name}</div>
+                           <div className="text-[9px] text-slate-500 font-bold uppercase">{product.category}</div>
+                         </div>
+                       </div>
+                       <div className="text-right">
+                         <div className="text-sm font-black text-cyan-400">{product.viewCount}</div>
+                         <div className="text-[8px] font-black text-slate-600 uppercase">Target Views</div>
+                       </div>
+                     </div>
+                   ))}
+               </div>
+             </div>
+
+             {/* RECENT ACTIVITY */}
+             <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
+               <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
+                 <span className="text-amber-500">●</span> Live Traffic Control
+               </h3>
+               <div className="space-y-4">
+                 {(analytics?.sessions || []).slice(-6).reverse().map((session: any, idx: number) => (
+                   <div key={idx} className="flex items-center justify-between text-[10px] p-3 border-b border-slate-800/50 last:border-0">
+                     <div className="flex items-center gap-3">
+                       <div className="p-1 bg-slate-800 rounded text-slate-400">
+                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                       </div>
+                       <span className="font-mono text-slate-400">User_{session.id.slice(-4)}</span>
+                     </div>
+                     <div className="flex gap-4 items-center">
+                       <span className="px-2 py-0.5 bg-slate-950 text-slate-500 rounded border border-slate-800 font-black">
+                         {session.duration || '0'}s active
+                       </span>
+                       <span className="text-slate-600 font-bold">{new Date(session.timestamp).toLocaleTimeString()}</span>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           </div>
+         </div>
         )}
 
         {/* REVIEW MODERATION TAB */}
         {activeAdminTab === 'comments' && (
           <div className="space-y-6 animate-fade-in-up">
-             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xs font-bold uppercase tracking-[0.4em] text-slate-500 pl-2">Intel Moderation</h2>
-                <span className="text-xs font-bold text-amber-500 uppercase tracking-widest">{allComments.length} Reports Logged</span>
+             <div className="flex justify-between items-center mb-8 bg-slate-900/20 p-4 rounded-2xl border border-slate-800/50">
+               <div>
+                 <h2 className="text-xs font-bold uppercase tracking-[0.4em] text-slate-500 pl-2">Intel Moderation</h2>
+                 <p className="text-[9px] text-slate-600 uppercase font-black mt-1 pl-2">Field feedback synchronization active</p>
+               </div>
+               <div className="text-right">
+                 <span className="text-xl font-black text-amber-500 italic uppercase tracking-tighter">{allComments.length}</span>
+                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-2">Reports Logged</span>
+               </div>
              </div>
 
              <div className="grid gap-4">
-                {allComments.map((item, idx) => (
-                    <div key={idx} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 hover:border-amber-500/30 transition-all group">
-                        <div className="w-16 h-20 bg-slate-950 rounded-lg overflow-hidden flex-shrink-0 border border-slate-800 shadow-lg">
-                            <img src={item.productImage} className="w-full h-full object-cover opacity-50 group-hover:opacity-100 transition-opacity" alt="" />
-                        </div>
-                        
-                        <div className="flex-1">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <div className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-1">{item.productName}</div>
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-sm font-black text-white italic">{item.review.user}</span>
-                                        <span className="text-[9px] font-mono text-slate-600 uppercase">{item.review.date}</span>
-                                    </div>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button 
-                                        onClick={async () => {
-                                            if (window.confirm("Confirm permanent removal?")) {
-                                                const updated = publishedProducts.map(p => {
-                                                    if (p.id === item.productId) {
-                                                        return { 
-                                                            ...p, 
-                                                            reviews: p.reviews?.filter(r => r.id !== item.review.id) 
-                                                        };
-                                                    }
-                                                    return p;
-                                                });
-
-                                                setPublishedProducts(updated);
-                                                localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
-
-                                                if (typeof syncWithServer === 'function') {
-                                                    await syncWithServer(updated);
-                                                }
-
-                                                notifyUpdate();
-                                            }
-                                         }} 
-                                         className="text-[10px] font-black text-slate-500 hover:text-rose-500 uppercase tracking-widest transition-colors"
-                                     >
-                                         Delete Report
-                                     </button>
-                                 </div>
-                             </div>
-                             <p className="text-slate-400 text-xs italic leading-relaxed border-l-2 border-slate-800 pl-4 group-hover:text-slate-200 transition-colors">
-                                 "{item.review.comment}"
-                             </p>
-                         </div>
+                {allComments.length > 0 ? (
+                  allComments.map((item, idx) => (
+                    <div key={`${item.productId}-${idx}`} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 hover:border-amber-500/30 transition-all group relative overflow-hidden">
+                    {/* Background Accent */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-[50px] pointer-events-none"></div>
+                    
+                    {/* Product Preview Container */}
+                    <div className="w-20 h-24 bg-slate-950 rounded-xl overflow-hidden flex-shrink-0 border border-slate-800 shadow-2xl relative group-hover:border-cyan-500/50 transition-colors">
+                      <img 
+                        src={item.productImage} 
+                        className="w-full h-full object-cover opacity-40 group-hover:opacity-80 transition-opacity duration-500" 
+                        alt="" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
                     </div>
-                ))}
-              </div>
+                    
+                    <div className="flex-1 z-10">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded text-[8px] font-black text-cyan-500 uppercase tracking-tighter">
+                              Unit ID: {item.productId.slice(-6)}
+                            </span>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[200px]">
+                              {item.productName}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-black text-white italic tracking-tight">{item.review.user}</span>
+                            <div className="h-1 w-1 bg-slate-700 rounded-full"></div>
+                            <span className="text-[9px] font-mono font-bold text-slate-500 uppercase">
+                              {new Date(item.review.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                          <button 
+                            onClick={async () => {
+                              if (window.confirm("PROTOCOL WARNING: Confirm permanent removal of this intel report?")) {
+                                const updated = publishedProducts.map(p => {
+                                  if (p.id === item.productId) {
+                                    return { 
+                                      ...p, 
+                                      reviews: (p.reviews || []).filter(r => r.date !== item.review.date || r.user !== item.review.user) 
+                                    };
+                                  }
+                                  return p;
+                                });
+
+                                setPublishedProducts(updated);
+                                localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
+
+                                if (typeof syncWithServer === 'function') {
+                                  await syncWithServer(updated);
+                                }
+
+                                notifyUpdate();
+                              }
+                            }} 
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/5 border border-rose-500/10 text-[9px] font-black text-rose-500/60 hover:text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/40 uppercase tracking-widest transition-all"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            Delete Report
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-500/50 to-transparent"></div>
+                        <p className="text-slate-300 text-xs italic leading-relaxed pl-6 py-1 group-hover:text-slate-100 transition-colors">
+                          "{item.review.comment}"
+                        </p>
+                      </div>
+
+                      {/* Star Rating Display */}
+                      <div className="mt-4 flex gap-1 pl-6">
+                        {[...Array(5)].map((_, i) => (
+                          <div 
+                            key={i} 
+                            className={`w-1.5 h-1.5 rounded-full ${i < (item.review.rating || 5) ? 'bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'bg-slate-800'}`}
+                          ></div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl">
+                  <div className="inline-flex p-4 rounded-full bg-slate-900 mb-4">
+                    <svg className="w-8 h-8 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                  </div>
+                  <div className="text-slate-500 font-black uppercase tracking-[0.3em] text-sm">No Intel Packets Found</div>
+                  <p className="text-[10px] text-slate-700 uppercase mt-2 font-bold tracking-widest">Awaiting field transmissions...</p>
+                </div>
+              )}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+          </>  
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default AdminDashboard;
