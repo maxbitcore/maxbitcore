@@ -6,7 +6,10 @@ import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/
 import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
 
-interface AdminDashboardProps {}
+interface AdminDashboardProps {
+  showRegister: boolean;      
+  closeRegister: () => void;
+}
 
 interface RichEditorProps {
   value: string;
@@ -15,7 +18,7 @@ interface RichEditorProps {
   label: string;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = () =>{
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegister }) => {
   const uploadImageToServer = async (file: File) => {
     const formData = new FormData();
     formData.append('image', file);
@@ -305,8 +308,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   
     publishedProducts.forEach(p => {
     
-      const rawImage = p.images || p.imageUrl || '';
-      const displayImage: string = Array.isArray(rawImage) 
+      const rawImage = p.gallery || p.imageUrl || '';
+      const displayImage: string = Array.isArray(rawImage)
         ? (rawImage[0] || '') 
         : (rawImage as string);
 
@@ -883,7 +886,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
               <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                 <div className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-2">Unit Views</div>
                 <div className="text-3xl font-black text-white italic">
-                  {Object.values(analytics?.views || {}).reduce((a: any, b: any) => a + b, 0)}
+                  {Object.values(analytics?.views || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0)}
                 </div>
                 <div className="text-[9px] text-slate-500 uppercase mt-1">Total product interactions</div>
               </div>
@@ -941,7 +944,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                      fill="url(#cyberCyan)" 
                      animationDuration={2500}
                      dot={{ r: 4, fill: '#0b0f1a', stroke: '#06b6d4', strokeWidth: 2 }}
-                     activeDot={{ r: 6, fill: '#06b6d4', shadow: '0 0 15px #06b6d4' }}
+                     activeDot={{ r: 6, fill: '#06b6d4', stroke: '0 0 15px #06b6d4' }}
                    />
                  </AreaChart>
                </ResponsiveContainer>
