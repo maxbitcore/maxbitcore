@@ -42,6 +42,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [appMode, setAppMode] = useState<'landing' | 'dashboard'>('landing');
+  const [securityKey, setSecurityKey] = useState('');
   
   const navigate = useNavigate(); 
   const location = useLocation();
@@ -245,7 +246,7 @@ function App() {
             user={currentUser} 
             onLogout={() => {
               setCurrentUser(null);
-              setView('landing');
+              setAppMode('landing');
               navigate('/'); 
             }} 
           />
@@ -415,7 +416,7 @@ function App() {
             </div>
             <form onSubmit={async (e) => {
               e.preventDefault();
-              const userData = { firstName, lastName, email, phone, birthDate, password };
+              const userData = { firstName, lastName, email, phone, birthDate, password, securityKey };
               try {
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
                 localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
@@ -458,6 +459,10 @@ function App() {
 
               <div className="grid grid-cols-2 gap-4">
                 <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+                <input required type="password" placeholder="PASSWORD *" value={password} onChange={e => setPassword(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-slate-500"
+                />
+                
+                {email.includes('@maxbit.com') && (
                 <input 
                   required 
                   type="password" 
@@ -466,6 +471,7 @@ function App() {
                   onChange={e => setPassword(e.target.value)} 
                   className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-rose-500/50"
                 />
+                )}
               </div>
               <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
             </form>
