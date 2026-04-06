@@ -43,6 +43,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [appMode, setAppMode] = useState<'landing' | 'dashboard'>('landing');
   const [securityKey, setSecurityKey] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
   const navigate = useNavigate(); 
   const location = useLocation();
@@ -416,6 +417,23 @@ function App() {
             </div>
             <form onSubmit={async (e) => {
               e.preventDefault();
+
+              if (password !== confirmPassword) {
+                alert("CRITICAL ERROR: PASSWORDS DO NOT MATCH.");
+                return;
+              }
+
+              const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/;
+              if (!passwordRegex.test(password)) {
+                alert("SECURITY BREACH: PASSWORD TOO WEAK. Use 8+ chars, Uppercase, Number and Symbol (!@#$%^&*)");
+                return; 
+              }
+
+              if (email.includes('@maxbitcore.com') && !securityKey) {
+                alert("ACCESS DENIED: SECURITY KEY REQUIRED FOR ADMIN PROTOCOL.");
+                return;
+              }
+
               const userData = { firstName, lastName, email, phone, birthDate, password, securityKey };
               try {
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
@@ -459,16 +477,39 @@ function App() {
 
               <div className="grid grid-cols-2 gap-4">
                 <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
-                <input required type="password" placeholder="PASSWORD *" value={password} onChange={e => setPassword(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-slate-500"
-                />
+                <input 
+                  required 
+                  type="password" 
+                  placeholder="CREATE PASSWORD *" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  className={`bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none transition-all ${
+                    password.length > 0 && !/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.*[0-9]).{8,}$/.test(password)
+                      ? "border-amber-500/50 focus:border-amber-500"
+                      : "border-slate-800 focus:border-cyan-500"
+                   }`}
+                 />
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                 <input 
+                   required 
+                   type="password" 
+                   placeholder="CONFIRM PASSWORD *" 
+                   value={confirmPassword} 
+                   onChange={e => setConfirmPassword(e.target.value)} 
+                   className={`bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none ${
+                     confirmPassword && password !== confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-cyan-500"
+                   }`}
+                 />
                 
-                {email.includes('@maxbit.com') && (
+                {email.includes('@maxbitcore.com') && (
                 <input 
                   required 
                   type="password" 
                   placeholder="SECURITY KEY *" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
+                  value={securityKey} 
+                  onChange={e => setSecurityKey(e.target.value)} 
                   className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-rose-500/50"
                 />
                 )}
