@@ -21,6 +21,8 @@ import ProductCard from './components/ProductCard';
 import NewInStockBanner from './components/NewInStockBanner';
 import { trackVisit, trackProductView, trackPageNav, trackSearch } from './services/analyticsService';
 import { Product, ViewState, MainTab } from './types';
+import { CustomerDashboard } from './components/CustomerDashboard';
+import { sendRegistrationEmail } from './services/emailService';
 
 function App() {
   const [view, setView] = useState<ViewState>({ type: 'tab', activeTab: 'home' });
@@ -33,11 +35,14 @@ function App() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [gender, setGender] = useState('Not Specified');
   const [birthDate, setBirthDate] = useState('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState('');
-
+  const [showRegSuccess, setShowRegSuccess] = useState(false);
+  const [password, setPassword] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [appMode, setAppMode] = useState<'landing' | 'dashboard'>('landing');
+  
   const navigate = useNavigate(); 
   const location = useLocation();
 
@@ -235,9 +240,19 @@ function App() {
       )}
 
       <main className="flex-grow">
+        {appMode === 'dashboard' && currentUser ? (
+          <CustomerDashboard 
+            user={currentUser} 
+            onLogout={() => {
+              setCurrentUser(null);
+              setView('landing');
+              navigate('/'); 
+            }} 
+          />
+       ) : (
+
         <Routes>
           <Route path="/index.html" element={<Navigate to="/" replace />} />
-
           <Route path="/" element={
             <div className="animate-fade-in-up">
               <Hero onExplore={() => handleTabChange('configurator')} />
@@ -338,32 +353,37 @@ function App() {
             
             <Route path="/admin" element={
               <AdminDashboard 
-                showRegister={showRegister} 
-                closeRegister={() => setShowRegister(false)} 
+               showRegister={showRegister} 
+               closeRegister={() => setShowRegister(false)} 
               />
             } />
 
           <Route path="/product/:id" element={
-            <ProductDetail 
-              product={view.product} 
-              onBack={() => {
-                navigate(-1); 
-                setView({ type: 'tab' }); 
-              }}
-              onAddToCart={addToCart} 
-            />
+            view.type === 'product' ? (
+              <ProductDetail 
+                product={view.product} 
+                onBack={() => {
+                  navigate(-1); 
+                  setView({ type: 'tab', activeTab: 'gaming-pcs' }); // Добавили activeTab
+                }}
+                onAddToCart={addToCart} 
+              />
+            ) : (
+              <Navigate to="/gaming-pcs" replace /> // Если продукта нет в стейте, кидаем назад
+            )
           } /> 
 
           <Route path="/checkout" element={
             <Checkout 
               items={cartItems} 
               onBack={() => {
-                setView({ type: 'tab' }); 
+                setView({ type: 'tab', activeTab: 'home' }); 
                 navigate('/');            
               }} 
             />
           } />
         </Routes>
+        )}
       </main>
       
       <Footer onTabChange={handleTabChange} />
@@ -395,27 +415,80 @@ function App() {
             </div>
             <form onSubmit={async (e) => {
               e.preventDefault();
-              const userData = { firstName, lastName, email, phone, gender, birthDate };
-              const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
-              localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
-              alert("Registration Complete! Welcome to MaxBit.");
-              setShowRegister(false); 
+              const userData = { firstName, lastName, email, phone, birthDate, password };
+              try {
+                const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
+                localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
+                
+                await sendRegistrationEmail(userData);
+                
+                setCurrentUser(userData);      
+                setAppMode('dashboard');      
+                setShowRegSuccess(true);       
+                setTimeout(() => setShowRegSuccess(false), 5000);
+
+                alert("CONNECTION ESTABLISHED. Welcome to MaxBit.");
+
+                setFirstName(''); setLastName(''); setEmail('');
+                setPhone(''); setBirthDate(''); setPassword('');
+                setShowRegister(false);
+              } catch (error) {
+                console.error("Registration error:", error);
+                alert("System breach detected. Try again.");
+              }
             }} className="space-y-4 text-left">
+
               <div className="grid grid-cols-2 gap-4">
                 <input required placeholder="FIRST NAME *" value={firstName} onChange={e => setFirstName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
                 <input required placeholder="LAST NAME *" value={lastName} onChange={e => setLastName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
               </div>
+
+              {/* Email */}
               <input required type="email" placeholder="EMAIL ADDRESS *" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-500 uppercase ml-2">Date of Birth *</label>
+                <input 
+                  required 
+                  type="date" 
+                  value={birthDate} 
+                  onChange={e => setBirthDate(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 appearance-none" 
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
-                <select value={gender} onChange={e => setGender(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500">
-                  <option value="Not Specified">GENDER (N/A)</option>
-                  <option value="Male">MALE</option>
-                  <option value="Female">FEMALE</option>
-                </select>
+                <input 
+                  required 
+                  type="password" 
+                  placeholder="SECURITY KEY *" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-rose-500/50"
+                />
               </div>
               <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
             </form>
+          </div>
+        </div>
+      )}
+      {showRegSuccess && (
+        <div className="fixed bottom-10 right-10 z-[10000] animate-in fade-in slide-in-from-right-10 duration-500">
+          <div className="bg-slate-950 border-2 border-cyan-500 shadow-[0_0_40px_rgba(6,182,212,0.3)] p-6 rounded-3xl flex items-center gap-5 backdrop-blur-xl">
+            <div className="relative">
+              <div className="absolute inset-0 bg-cyan-500 rounded-full animate-ping opacity-20"></div>
+              <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/40 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-white font-black uppercase italic tracking-tighter text-xl leading-none">Access Granted</h4>
+              <p className="text-[9px] text-cyan-500 font-black uppercase tracking-[0.3em] mt-2 leading-none">
+                Protocol Complete. Check your email.
+              </p>
+            </div>
           </div>
         </div>
       )}

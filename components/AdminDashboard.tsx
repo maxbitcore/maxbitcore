@@ -33,9 +33,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     return data.url;
   };
 
-  const syncWithServer = async (updatedList: Product[]) => {
+  const syncWithServer = async (updatedList: any[], fileName: string = 'save_products.php') => {
     try {
-      const response = await fetch('api/save_products.php', {
+      const response = await fetch(`api/${fileName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedList)
@@ -43,10 +43,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       
       const result = await response.json();
       if (result.success) {
-        console.log("MaxBit Server: Database synchronized.");
+        console.log(`MaxBit Server: ${fileName} synchronized.`);
       }
     } catch (error) {
-      console.error("MaxBit Server: Sync failed.", error);
+      console.error(`MaxBit Server: Sync failed for ${fileName}`, error);
     }
   };
   
@@ -218,6 +218,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   const [shopOrders, setShopOrders] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
+ 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetImageRef = useRef<HTMLInputElement>(null);
@@ -274,7 +276,19 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
           localStorage.setItem('maxbit_submissions', JSON.stringify(subData));
         }
         if (Array.isArray(orderData)) {
+          const validatedOrders: OrderRecord[] = orderData.map((ord: any) => ({
+            items: Array.isArray(ord.items) ? ord.items : [],
+            total: parseFloat(ord.total) || 0,
+            timestamp: ord.timestamp || Date.now(),
+            status: ord.status || 'Processing',
+            customer: {
+              name: ord.customer_name || ord.customer?.name || 'Unknown',
+              email: ord.customer_email || ord.customer?.email || 'No email',
+              address: ord.customer_address || ord.customer?.address || 'No address'
+    }
+          }));
           setShopOrders(orderData.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)));
+          setAllOrders(validatedOrders);
         }
 
       } catch (error) {
@@ -298,6 +312,24 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     
     const analyticsData = getAnalytics();
     setAnalytics(analyticsData);
+    const currentSession: VisitorSession = {
+      id: `ADMIN-${Date.now()}`,
+      user: 'ADMIN',           
+      startTime: Date.now(),
+      lastActive: Date.now(),  
+      pagesVisited: ['/admin-dashboard'],
+      date: new Date().toISOString().split('T')[0],
+      actions: []
+    };
+
+    const updatedAnalytics: AnalyticsData = {
+      ...analyticsData,
+      sessions: [...(analyticsData.sessions || []), currentSession],
+    };
+
+    saveAnalytics(updatedAnalytics); 
+    setAnalytics(updatedAnalytics);
+
     window.addEventListener('maxbit-update', loadAllData);
     return () => window.removeEventListener('maxbit-update', loadAllData);
   }, []);
@@ -348,8 +380,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   const sendRegistrationEmail = async (userData: any) => {
     try {
       await emailjs.send(
-        'YOUR_SERVICE_ID', 
-        'YOUR_TEMPLATE_ID', 
+        'service_2bhrbcn', 
+        'template_vxdzhk8', 
         {
           first_name: userData.firstName,
           last_name: userData.lastName,
@@ -359,10 +391,12 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
           birth_date: userData.birthDate,
           business_name: "MaxBit LLC",
         },
-        'YOUR_PUBLIC_KEY'
+        'ewqLULf0b6_PZy8W5'
       );
+      console.log("Email sent successfully");
     } catch (error) {
       console.error("Email error:", error);
+      throw error;
     }
   };
 
@@ -798,7 +832,14 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                       </div>
               
                       <button 
-                        onClick={() => { if(window.confirm('Archive this mission?')) {/* Здесь будет логика удаления */} }}
+                        onClick={async () => { 
+                          if(window.confirm('Archive this mission?')) {
+                            const updatedSubmissions = submissions.filter(s => s.id !== sub.id);
+                            setSubmissions(updatedSubmissions);
+                             await syncWithServer(updatedSubmissions);
+                          alert("Mission Archived.");   
+                        }  
+                      }}
                         className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-3 rounded-xl border border-rose-500/20 transition-all flex items-center justify-center"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

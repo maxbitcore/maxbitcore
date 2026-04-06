@@ -23,10 +23,9 @@ export interface VisitorSession {
   id: string;
   user: string; // "Guest" or User Email
   startTime: number;
+  pagesVisited: string[];
   lastActive: number;
   date: string; // YYYY-MM-DD
-  device: string;
-  platform: string;
   actions: SessionAction[];
 }
 
@@ -36,6 +35,7 @@ export interface AnalyticsData {
   cartAdditions: Record<string, number>;
   orders: OrderRecord[];
   sessions: VisitorSession[];
+  views: Record<string, number>;
 }
 
 const STORAGE_KEY = 'maxbit_analytics';
@@ -46,7 +46,8 @@ const getInitialData = (): AnalyticsData => ({
   productViews: {},
   cartAdditions: {},
   orders: [],
-  sessions: []
+  sessions: [],
+  views: {},
 });
 
 export const getAnalytics = (): AnalyticsData => {
@@ -92,7 +93,7 @@ const getCurrentUserIdentity = (): string => {
 
 const getCurrentSession = (data: AnalyticsData): VisitorSession | null => {
   const role = localStorage.getItem('maxbit_role');
-  if (role === 'admin') return null; // DO NOT track admin
+  if (role === 'admin') return null;
 
   let sessionId = sessionStorage.getItem(SESSION_KEY);
   let session = data.sessions.find(s => s.id === sessionId);
@@ -110,13 +111,11 @@ const getCurrentSession = (data: AnalyticsData): VisitorSession | null => {
       startTime: Date.now(),
       lastActive: Date.now(),
       date: dateStr,
-      device: getDeviceInfo(),
-      platform: navigator.platform || 'Unknown',
+      pagesVisited: [],
       actions: []
     };
     data.sessions.push(session);
   } else {
-      // Update identity if they logged in during the session
       const currentId = getCurrentUserIdentity();
       if (session.user === 'Guest' && currentId !== 'Guest') {
           session.user = currentId;
@@ -130,7 +129,7 @@ export const logAction = (type: SessionAction['type'], details: string) => {
   const data = getAnalytics();
   const session = getCurrentSession(data);
   
-  if (!session) return; // Skip logging if admin or error
+  if (!session) return; 
   
   session.lastActive = Date.now();
   session.actions.push({
@@ -149,7 +148,6 @@ export const trackVisit = () => {
 
   if (!sessionStorage.getItem(SESSION_KEY)) {
       data.visits += 1;
-      // logAction will initialize the session
       logAction('VIEW', 'Entry point: Landing Page'); 
   } else {
       getCurrentSession(data); 
