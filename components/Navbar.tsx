@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
-import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
+import { loginUser, registerUser, logoutUser, getStoredAuth, forgotPassword } from '../services/authService';
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
@@ -20,12 +20,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
+ 
 
   // Auth State
   const [role, setRole] = useState<'admin' | 'user' | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register'| 'forgot'>('login');
   const [authStep, setAuthStep] = useState<'credentials' | 'admin_code'>('credentials');
+  const [message, setMessage] = useState<string | null>(null);
   
   // Auth Form State
   const [email, setEmail] = useState('');
@@ -115,6 +117,24 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
     try {
       let response: any;
+      if (authMode === 'forgot') {
+        try {
+          response = await forgotPassword(email);
+          if (response.success) {
+            setMessage("Verification link sent to your email."); 
+            setError(null);
+          } else { 
+           setError(response.message || "User not found.");
+          }   
+        } catch (err: any) {
+          setError(err.message);
+          setMessage(null);
+        } finally {
+          setIsLoading(false);
+        }
+        return; 
+      }
+
       if (authMode === 'login') {
         const codeToSend = authStep === 'admin_code' ? adminCode : undefined;
         response = await loginUser(email, password, codeToSend);
@@ -139,11 +159,19 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         };
         localStorage.setItem('maxbit_user', JSON.stringify(user));
         setRole(response.role);
-        if (onLoginSuccess) {
-          onLoginSuccess(user); 
+        try {
+          if (onLoginSuccess) {
+            onLoginSuccess(user); 
+          }
+        } catch (parentError) {
+          console.error("Callback Error in App.tsx:", parentError);
         }
-        setIsModalOpen(false);
-        resetForm();
+
+        setTimeout(() => {
+          setIsModalOpen(false);
+          resetForm();
+          console.log("Authentication successful: Modal closed.");
+        }, 10);
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
@@ -383,6 +411,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors text-xs font-bold uppercase tracking-wider"
                             />
+                            {authMode !== 'forgot' && (
                             <div className="relative">
                                 <input 
                                     type={showPassword ? "text" : "password"}
@@ -403,6 +432,20 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                     )}
                                 </button>
                             </div>
+                        )}
+                        
+                        {authMode === 'login' && (
+                            <div className="flex justify-end px-1">
+                                <button 
+                                    type="button"
+                                    onClick={() => { setAuthMode('forgot'); setError(null); setMessage(null); }}
+                                    className="text-[9px] font-black text-slate-500 hover:text-cyan-400 uppercase tracking-widest transition-colors"
+                                >
+                                    Forgot Password?
+                                </button>
+                            </div>
+                        )}
+                        
                         </>
                     ) : (
                         <div className="animate-fade-in-up">
@@ -419,6 +462,12 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 autoFocus
                                 className="w-full bg-slate-950 border border-rose-900/50 px-4 py-4 rounded-xl text-white placeholder-slate-700 outline-none focus:border-rose-500 transition-colors text-sm font-black uppercase tracking-[0.3em] text-center"
                             />
+                        </div>
+                    )}
+
+                    {message && (
+                        <div className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest text-center bg-emerald-500/10 py-2 rounded border border-emerald-500/20">
+                            {message}
                         </div>
                     )}
 
@@ -448,17 +497,22 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                         <button 
                             type="button"
                             onClick={() => { 
-                                if (authMode=== 'login') { 
+                                if (authMode === 'forgot') {
+                                    setAuthMode('login');
+                                } else if (authMode=== 'login') { 
                                     onRegisterClick();
                                 } else { 
                                     setAuthMode ('login');
-                                    setError(null);
                                 }
+                                setError(null);
+                                setMessage(null);
                             }}
             
                             className="text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-cyan-400 transition-colors"
                         >
-                            {authMode === 'login' ? 'Need Access? Register' : 'Have Credentials? Login'}
+                           {authMode === 'forgot' 
+                            ? '< Back to Login'
+                            : (authMode === 'login' ? 'Need Access? Register' : 'Have Credentials? Login')}
                         </button>
                     ) : (
                         <button 
