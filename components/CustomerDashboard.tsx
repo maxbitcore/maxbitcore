@@ -7,7 +7,7 @@ interface CustomerDashboardProps {
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, onLogout }) => {
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-10 font-sans">
+    <div className="min-h-screen bg-[#050505] text-white p-4 pt-24 md:p-10 md:pt-32 font-sans">
       <div className="max-w-7xl mx-auto">
         
         {/* TOP BAR */}

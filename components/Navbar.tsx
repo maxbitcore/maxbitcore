@@ -11,8 +11,10 @@ interface NavbarProps {
   onOpenCart: () => void;
   onSearch: (query: string) => void;
   onRegisterClick: () => void;
+  currentUser?: any;
+  onLogout?: () => void;
 }
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch,onRegisterClick }) => {
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch,onRegisterClick, currentUser, onLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
@@ -54,7 +56,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     } else {
       setCurrentLogo(serverLogo);
     }
-
+ 
     // Listener for logo updates
     const handleLogoUpdate = () => {
       const newLogo = localStorage.getItem('maxbit_logo');
@@ -143,6 +145,11 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const handleLogout = () => {
     logoutUser();
     setRole(null);
+
+    if (onLogout) {
+    onLogout(); 
+  }
+
     if (activeTab === 'admin') {
         onTabChange('home');
     }
@@ -293,6 +300,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                             Console
                         </button>
                     )}
+
+                    {currentUser && !role && (
+                        <div className="flex flex-col items-end mr-2">
+                            <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter">Active_User</span>
+                            <span className="text-[9px] text-white font-bold uppercase">{currentUser.firstName}</span>
+                        </div>
+                    )}
+
                     <button 
                         onClick={handleLogout}
                         className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-rose-500 transition-colors px-1"
