@@ -11,10 +11,12 @@ interface NavbarProps {
   onOpenCart: () => void;
   onSearch: (query: string) => void;
   onRegisterClick: () => void;
-  currentUser?: any;
-  onLogout?: () => void;
+  currentUser?: any;       
+  onLogout?: () => void;    
+  onLoginSuccess?: (user: any) => void; 
 }
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch,onRegisterClick, currentUser, onLogout }) => {
+
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, onRegisterClick, currentUser, onLogout, onLoginSuccess }) => {
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
@@ -112,9 +114,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     setIsLoading(true);
 
     try {
-      let response;
+      let response: any;
       if (authMode === 'login') {
-        // Pass adminCode if we are in the second step
         const codeToSend = authStep === 'admin_code' ? adminCode : undefined;
         response = await loginUser(email, password, codeToSend);
       } else {
@@ -131,7 +132,16 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       if (response.token) {
         localStorage.setItem('maxbit_token', response.token);
         localStorage.setItem('maxbit_role', response.role);
+        const user = response.user || { 
+          email, 
+          firstName: 'User', 
+          role: response.role 
+        };
+        localStorage.setItem('maxbit_user', JSON.stringify(user));
         setRole(response.role);
+        if (onLoginSuccess) {
+          onLoginSuccess(user); 
+        }
         setIsModalOpen(false);
         resetForm();
       }
