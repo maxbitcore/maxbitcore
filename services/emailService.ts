@@ -4,7 +4,7 @@ export const sendRegistrationEmail = async (userData: any) => {
   try {
     const response = await emailjs.send(
       'service_2bhrbcn', 
-      'template_vxdzhk8', 
+      'template_xysm7er', 
       {
         first_name: userData.firstName,
         last_name: userData.lastName,
