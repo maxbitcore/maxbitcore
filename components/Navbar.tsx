@@ -109,9 +109,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     e.preventDefault();
     setError(null);
     
-    if (!validateForm()) {
-        return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
 
@@ -159,19 +157,16 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         };
         localStorage.setItem('maxbit_user', JSON.stringify(user));
         setRole(response.role);
-        try {
-          if (onLoginSuccess) {
+        
+        if (onLoginSuccess) {
             onLoginSuccess(user); 
-          }
-        } catch (parentError) {
-          console.error("Callback Error in App.tsx:", parentError);
         }
+        setIsModalOpen(false); 
+        resetForm();
 
-        setTimeout(() => {
-          setIsModalOpen(false);
-          resetForm();
-          console.log("Authentication successful: Modal closed.");
-        }, 10);
+        if (authMode === 'register') {
+          window.location.reload();
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
