@@ -464,6 +464,7 @@ function App() {
 
               {/* Email */}
               <input required type="email" placeholder="EMAIL ADDRESS *" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+              
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-500 uppercase ml-2">Date of Birth *</label>
                 <input 
@@ -475,8 +476,9 @@ function App() {
                 />
               </div>
 
+              <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+               
               <div className="grid grid-cols-2 gap-4">
-                <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
                 <input 
                   required 
                   type="password" 
@@ -487,33 +489,32 @@ function App() {
                     password.length > 0 && !/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.*[0-9]).{8,}$/.test(password)
                       ? "border-amber-500/50 focus:border-amber-500"
                       : "border-slate-800 focus:border-cyan-500"
-                   }`}
-                 />
-               </div>
+                  }`}
+                />
 
-               <div className="grid grid-cols-2 gap-4">
-                 <input 
-                   required 
-                   type="password" 
-                   placeholder="CONFIRM PASSWORD *" 
-                   value={confirmPassword} 
-                   onChange={e => setConfirmPassword(e.target.value)} 
-                   className={`bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none ${
-                     confirmPassword && password !== confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-cyan-500"
-                   }`}
-                 />
+                <input 
+                  required 
+                  type="password" 
+                  placeholder="CONFIRM PASSWORD *" 
+                  value={confirmPassword} 
+                  onChange={e => setConfirmPassword(e.target.value)} 
+                  className={`bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none ${
+                    confirmPassword && password !== confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-cyan-500"
+                  }`}
+                />
+              </div>
                 
-                {email.includes('@maxbitcore.com') && (
+              {email.includes('@maxbitcore.com') && (
                 <input 
                   required 
                   type="password" 
                   placeholder="SECURITY KEY *" 
                   value={securityKey} 
                   onChange={e => setSecurityKey(e.target.value)} 
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-rose-500/50"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-rose-500/50"
                 />
-                )}
-              </div>
+              )}
+
               <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
             </form>
           </div>
