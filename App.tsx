@@ -49,6 +49,19 @@ function App() {
   const location = useLocation();
 
   useEffect(() => {
+    const savedToken = localStorage.getItem('maxbit_token');
+    const savedUser = localStorage.getItem('maxbit_user');
+    const savedRole = localStorage.getItem('maxbit_role');
+
+    if (savedToken && savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+      if (savedRole !== 'admin') {
+        setAppMode('dashboard');
+     }
+    }
+  }, []);
+
+  useEffect(() => {
   const params = new URLSearchParams(location.search);
   if (params.get('success') === 'true') {
     const orderId = params.get('orderId') || 'CONFIRMED';
@@ -213,6 +226,9 @@ function App() {
           onOpenCart={() => setIsCartOpen(true)}
           onSearch={handleSearch}
           onRegisterClick={() => setShowRegister(true)}
+          currentUser={currentUser} 
+          onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/');}}
+          onLoginSuccess={(user) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); navigate('/dashboard');}}}
       />
       
       {showSuccessAlert && (
@@ -242,71 +258,25 @@ function App() {
       )}
 
       <main className="flex-grow">
-        {appMode === 'dashboard' && currentUser ? (
-          <CustomerDashboard 
-            user={currentUser} 
-            onLogout={() => {
-              setCurrentUser(null);
-              setAppMode('landing');
-              navigate('/'); 
-            }} 
-          />
-       ) : (
-
         <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/index.html" element={<Navigate to="/" replace />} />
-          <Route path="/" element={
-            <div className="animate-fade-in-up">
-              <Hero onExplore={() => handleTabChange('configurator')} />
-                
-              <NewInStockBanner 
-                newProducts={newProducts} 
-                onProductClick={(p) => {
-                  setView({ type: 'product', product: p });
-                  navigate(`/product/${p.id}`);
-                }}
-              />
-                
-              <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
-                <div className="max-w-[1800px] mx-auto">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
-                    <div>
-                      <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
-                    </div>
-                  </div>
 
-                  {publishedProducts && publishedProducts.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                      {publishedProducts.map(product => (
-                        <ProductCard 
-                           key={product.id} 
-                          product={product} 
-                           onClick={(p) => {
-                            setView({ type: 'product', product: p });
-                            navigate(`/product/${p.id}`);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center px-6">
-                      <div className="w-20 h-20 bg-slate-900 rounded-2xl flex items-center justify-center mb-8 border border-slate-800">
-                        <svg className="w-10 h-10 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </div>
-                      <h3 className="text-2xl font-black italic text-slate-500 uppercase tracking-tighter mb-4">No Hardware Published</h3>
-                      <p className="text-slate-600 max-w-sm text-sm font-bold uppercase tracking-widest leading-relaxed">
-                        This space is reserved for approved custom PC configurations and newly deployed inventory.
-                      </p>
-                      </div>
-                    )}
-                  </div>
-                </section>
-              </div>
-            } />
-            
-            <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/dashboard" element={
+            currentUser ? (
+              <CustomerDashboard 
+                user={currentUser} 
+                onLogout={() => {
+                  setCurrentUser(null);
+                  setAppMode('landing');
+                  navigate('/'); 
+                }} 
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } />
 
             <Route path="/configurator" element={<div className="pt-16"><CustomBuildForm /></div>} />
             
@@ -366,12 +336,12 @@ function App() {
                 product={view.product} 
                 onBack={() => {
                   navigate(-1); 
-                  setView({ type: 'tab', activeTab: 'gaming-pcs' }); // Добавили activeTab
+                  setView({ type: 'tab', activeTab: 'gaming-pcs' }); 
                 }}
                 onAddToCart={addToCart} 
               />
             ) : (
-              <Navigate to="/gaming-pcs" replace /> // Если продукта нет в стейте, кидаем назад
+              <Navigate to="/gaming-pcs" replace /> 
             )
           } /> 
 
@@ -385,7 +355,6 @@ function App() {
             />
           } />
         </Routes>
-        )}
       </main>
       
       <Footer onTabChange={handleTabChange} />
@@ -436,10 +405,9 @@ function App() {
 
               const userData = { firstName, lastName, email, phone, birthDate, password, securityKey };
               try {
+                await sendRegistrationEmail(userData);
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
                 localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
-                
-                await sendRegistrationEmail(userData);
                 
                 setCurrentUser(userData);      
                 setAppMode('dashboard');      

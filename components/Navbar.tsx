@@ -23,14 +23,13 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
  
 
   // Auth State
-  const [role, setRole] = useState<'admin' | 'user' | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'| 'forgot'>('login');
   const [authStep, setAuthStep] = useState<'credentials' | 'admin_code'>('credentials');
   const [message, setMessage] = useState<string | null>(null);
   
   // Auth Form State
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); // Toggle password visibility
   const [adminCode, setAdminCode] = useState(''); // 2FA Login code
@@ -41,16 +40,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
-    
-    // Initial Auth Check
-    const { role: storedRole } = getStoredAuth();
-    setRole(storedRole);
-
-    const handleStorageChange = () => {
-       const { role: r } = getStoredAuth();
-       setRole(r);
-    };
-    window.addEventListener('storage', handleStorageChange);
 
     // Initial Logo Check
     const storedLogo = localStorage.getItem('maxbit_logo');
@@ -74,7 +63,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
     return () => {
         window.removeEventListener('scroll', handleScroll);
-        window.removeEventListener('storage', handleStorageChange);
         window.removeEventListener('logo-updated', handleLogoUpdate);
     };
   }, []);
@@ -108,29 +96,22 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
     if (!validateForm()) return;
 
     setIsLoading(true);
 
     try {
       let response: any;
+
       if (authMode === 'forgot') {
-        try {
           response = await forgotPassword(email);
           if (response.success) {
             setMessage("Verification link sent to your email."); 
-            setError(null);
-          } else { 
-           setError(response.message || "User not found.");
-          }   
-        } catch (err: any) {
-          setError(err.message);
-          setMessage(null);
-        } finally {
+          } else {
+            setError(response.message || "User not found.");
+          }  
           setIsLoading(false);
-        }
-        return; 
+          return; 
       }
 
       if (authMode === 'login') {
@@ -140,27 +121,22 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         response = await registerUser(email, password);
       }
 
-      // Check for multi-step requirement
       if (response.requiresAdminCode) {
           setAuthStep('admin_code');
           setIsLoading(false);
           return;
       }
 
-      if (response.token) {
-        localStorage.setItem('maxbit_token', response.token);
-        localStorage.setItem('maxbit_role', response.role);
-        const user = response.user || { 
-          email, 
-          firstName: 'User', 
-          role: response.role 
-        };
-        localStorage.setItem('maxbit_user', JSON.stringify(user));
-        setRole(response.role);
-        
-        if (onLoginSuccess) {
-            onLoginSuccess(user); 
+      if (response.token || response.success) {
+        if (response.token) {
+          localStorage.setItem('maxbit_token', response.token);
+          localStorage.setItem('maxbit_role', response.role || 'user');
         }
+
+        if (onLoginSuccess) {
+          onLoginSuccess(response.user || { email, role: response.role });
+        }
+
         setIsModalOpen(false); 
         resetForm();
 
@@ -168,6 +144,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           window.location.reload();
         }
       }
+
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {
@@ -177,7 +154,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const handleLogout = () => {
     logoutUser();
-    setRole(null);
 
     if (onLogout) {
     onLogout(); 
@@ -314,7 +290,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         {/* Right: Actions */}
         <div className="flex-1 flex items-center justify-end gap-2 md:gap-6">
             {/* Auth Actions */}
-            {!role ? (
+            {!currentUser ? (
                 <button 
                     onClick={() => openAuthModal('login')}
                     className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-white hover:text-cyan-400 transition-colors border border-slate-700 hover:border-cyan-500/50 rounded-lg px-3 py-1.5 md:px-4 md:py-2 bg-slate-900/50 whitespace-nowrap"
@@ -324,22 +300,24 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                 </button>
             ) : (
                 <div className="flex items-center gap-2 md:gap-3">
-                    {role === 'admin' && (
+                    {currentUser.role === 'admin' && (
                         <button 
-                            onClick={() => onTabChange('admin')}
-                            className="flex items-center text-[8px] md:text-[10px] font-black uppercase tracking-widest md:tracking-[0.2em] text-emerald-500 hover:text-emerald-400 transition-colors bg-emerald-500/10 px-2 py-1 md:px-3 md:py-2 rounded-lg border border-emerald-500/20"
+                            onClick={() => onTabChange('admin' as any)}
+                            className="flex items-center text-[8px] md:text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20"
                         >
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse mr-1.5 md:mr-2"></span>
                             Console
                         </button>
                     )}
 
-                    {currentUser && !role && (
-                        <div className="flex flex-col items-end mr-2">
-                            <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter">Active_User</span>
-                            <span className="text-[9px] text-white font-bold uppercase">{currentUser.firstName}</span>
-                        </div>
-                    )}
+                    <button 
+                        onClick={() => onTabChange('dashboard' as any)}
+                        className="flex flex-col items-end mr-2 group"
+                    >
+                        <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter group-hover:text-white transition-colors">System_Active</span>
+                        <span className="text-[9px] text-white font-bold uppercase">{currentUser.firstName}</span>
+                    </button>
+
+                    <div className="h-4 w-px bg-slate-800"></div>
 
                     <button 
                         onClick={handleLogout}
