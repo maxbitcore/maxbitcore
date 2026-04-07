@@ -50,7 +50,7 @@ function App() {
 
   useEffect(() => {
     const savedToken = localStorage.getItem('maxbit_token');
-    const savedUser = localStorage.getItem('maxbit_user');
+    const savedUser = localStorage.getItem('maxbit_currentUser');
     const savedRole = localStorage.getItem('maxbit_role');
 
     if (savedToken && savedUser) {
@@ -403,28 +403,36 @@ function App() {
                 return;
               }
 
-              const userData = { firstName, lastName, email, phone, birthDate, password, securityKey };
+              const userData = { id: Date.now().toString(), firstName, lastName, email, phone, birthDate, password, securityKey, role: email.includes('@maxbitcore.com') ? 'admin' : 'customer' };
               try {
-                await sendRegistrationEmail(userData);
+                sendRegistrationEmail(userData).catch(err => console.error("Email delay", err));
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
                 localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
                 
-                setCurrentUser(userData);      
-                setAppMode('dashboard');      
-                setShowRegSuccess(true);       
-                setTimeout(() => setShowRegSuccess(false), 5000);
+                localStorage.setItem('maxbit_user', JSON.stringify(userData));
+                setCurrentUser(userData); 
+                setShowRegSuccess(false);
+              
+                if (userData.role !== 'admin') {
+                  setAppMode('dashboard'); 
+                }     
+                setShowRegSuccess(true); 
+                setTimeout(() => setShowRegSuccess(false), 5000);      
 
                 alert("CONNECTION ESTABLISHED. Welcome to MaxBit.");
 
                 setFirstName(''); setLastName(''); setEmail('');
                 setPhone(''); setBirthDate(''); setPassword('');
-                setShowRegister(false);
+                setConfirmPassword('');;
+
               } catch (error) {
                 console.error("Registration error:", error);
                 alert("System breach detected. Try again.");
               }
-            }} className="space-y-4 text-left">
-
+              }} 
+              
+              className="space-y-4 text-left">
+                
               <div className="grid grid-cols-2 gap-4">
                 <input required placeholder="FIRST NAME *" value={firstName} onChange={e => setFirstName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
                 <input required placeholder="LAST NAME *" value={lastName} onChange={e => setLastName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />

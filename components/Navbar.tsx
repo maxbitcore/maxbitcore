@@ -121,11 +121,18 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         response = await registerUser(email, password);
       }
 
+      console.log("ПFULL PHP RESPONSE:", response); 
+
       if (response.requiresAdminCode) {
           setAuthStep('admin_code');
           setIsLoading(false);
           return;
       }
+
+      const isSuccess = response.success === true || response.success === "true" || !!response.token;
+
+      if (isSuccess) {
+        console.log("Login successful, closing modal...");  
 
       if (response.token || response.success) {
         const userData = {
@@ -137,11 +144,11 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         if (response.token) {
            localStorage.setItem('maxbit_token', response.token);
            localStorage.setItem('maxbit_role', response.role || 'user');
-           localStorage.setItem('maxbit_user', JSON.stringify(userData));
+           localStorage.setItem('maxbit_customers', JSON.stringify(userData));
         }
 
         if (onLoginSuccess) {
-          onLoginSuccess(response.user || { email, role: response.role });
+          onLoginSuccess(userData);
         }
 
         setIsModalOpen(false); 
@@ -155,8 +162,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         }
       }
 
+      } else {
+        console.log("Authentication Error:", response.message);
+        setError(response.message || "Authentication failed");
+      }
+
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      console.error("Critical Catch Error:", err);
+      setError(err.message || 'Server connection failed');
     } finally {
       setIsLoading(false);
     }
