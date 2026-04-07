@@ -128,9 +128,16 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       }
 
       if (response.token || response.success) {
+        const userData = {
+             email: email, 
+             role: response.role || 'user',
+             firstName: response.firstName || 'User' 
+        };
+
         if (response.token) {
-          localStorage.setItem('maxbit_token', response.token);
-          localStorage.setItem('maxbit_role', response.role || 'user');
+           localStorage.setItem('maxbit_token', response.token);
+           localStorage.setItem('maxbit_role', response.role || 'user');
+           localStorage.setItem('maxbit_user', JSON.stringify(userData));
         }
 
         if (onLoginSuccess) {
@@ -139,6 +146,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
         setIsModalOpen(false); 
         resetForm();
+
+        onTabChange('dashboard' as any);
+
 
         if (authMode === 'register') {
           window.location.reload();
