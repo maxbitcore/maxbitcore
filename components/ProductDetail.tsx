@@ -20,7 +20,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { role } = getStoredAuth();
-
+ 
   useEffect(() => {
     setActiveImage(product.imageUrl);
   }, [product]);
@@ -89,15 +89,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 mb-24 items-start">
           
           {/* Left: Images */}
-          <div className="flex flex-col gap-6 sticky top-24">
-            <div className="w-full aspect-[4/5] bg-slate-950 border border-slate-800/50 overflow-hidden rounded-[3rem] relative shadow-2xl group">
+          <div className="flex flex-col gap-6 lg:sticky lg:top-24 h-fit z-10">
+            <div className="w-full aspect-[4/5] bg-slate-950 border border-slate-800/50 overflow-hidden rounded-[2rem] md:rounded-[3rem] relative shadow-2xl group">
               <img 
                 src={activeImage} 
                 alt={product.name.replace(/<[^>]*>?/gm, '')} 
                 className="w-full h-full object-cover object-center transition-opacity duration-500"
               />
-              <div className="absolute top-10 left-10">
-                <span className={`flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] px-8 py-4 rounded-full border backdrop-blur-2xl transition-all duration-500 ${
+              <div className="absolute top-6 left-6 md:top-10 md:left-10">
+                <span className={`flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] px-6 py-3 md:px-8 md:py-4 rounded-full border backdrop-blur-2xl transition-all duration-500 ${
                   product.status === 'In Stock' ? 'bg-slate-950/90 border-emerald-500/50 text-emerald-400' :
                   product.status === 'Sold Out' ? 'bg-slate-950/90 border-rose-500/50 text-rose-400' :
                   'bg-slate-950/90 border-cyan-500/50 text-cyan-400'
@@ -125,15 +125,15 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
           </div>
 
           {/* Right: Specs */}
-          <div className="flex flex-col justify-center pt-8">
-             <div className="mb-10">
-                <span className="text-xs font-black text-cyan-500 uppercase tracking-[0.5em] mb-4 block opacity-70">Sector // {product.category}</span>
-                <h1 
-                  className="text-5xl md:text-7xl font-black italic tracking-tighter text-white mb-8 uppercase leading-[0.85]"
-                  dangerouslySetInnerHTML={{ __html: product.name }}
-                />
-                <span className="text-6xl font-black text-white font-mono tracking-tighter">${product.price}</span>
-             </div>
+          <div className="relative z-20 bg-[#0b0f1a] flex flex-col justify-center pt-4 lg:pt-0">
+              <div className="mb-10">
+                 <span className="text-xs font-black text-cyan-500 uppercase tracking-[0.5em] mb-4 block opacity-70">Sector // {product.category}</span>
+                 <h1 
+                   className="text-5xl md:text-7xl font-black italic tracking-tighter text-white mb-8 uppercase leading-[0.85]"
+                   dangerouslySetInnerHTML={{ __html: product.name }}
+                 />
+                 <span className="text-6xl font-black text-white font-mono tracking-tighter">${product.price}</span>
+              </div>
 
              {product.components && (
                <div className="mb-8">
@@ -207,7 +207,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
 
                 {/* Right: Review Form */}
                 <div className="lg:w-1/3">
-                    <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] sticky top-24">
+                    <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] lg:sticky lg:top-24 h-fit bg-[#0b0f1a] z-10">
                         <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-6">File Field Report</h3>
                         <form onSubmit={handleSubmitReview} className="space-y-6">
                             <div>
