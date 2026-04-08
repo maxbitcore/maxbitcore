@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -76,9 +76,39 @@ function App() {
   const [appMode, setAppMode] = useState<'landing' | 'dashboard'>('landing');
   const [securityKey, setSecurityKey] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('home');
   
   const navigate = useNavigate(); 
   const location = useLocation();
+
+  const handleLoginSuccess = (user: any) => {
+    setCurrentUser(user);
+    if (user.role !== 'admin') {
+      setAppMode('dashboard');
+      setView({ type: 'tab', activeTab: 'dashboard' as any });
+      navigate('/dashboard');
+    }
+    console.log("User logged in:", user);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setAppMode('landing');
+    localStorage.clear(); 
+    navigate('/');
+    setView({ type: 'tab', activeTab: 'home' });
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('maxbit_currentUser');
+    if (saved) {
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch (e) {
+        console.error("Ошибка парсинга юзера");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('maxbit_token');

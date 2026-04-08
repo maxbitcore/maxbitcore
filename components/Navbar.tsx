@@ -31,8 +31,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   // Auth Form State
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Toggle password visibility
-  const [adminCode, setAdminCode] = useState(''); // 2FA Login code
+  const [showPassword, setShowPassword] = useState(false); 
+  const [adminCode, setAdminCode] = useState(''); 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
@@ -43,7 +43,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
     // Initial Logo Check
     const storedLogo = localStorage.getItem('maxbit_logo');
-    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png";;
+    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png";
     if (storedLogo) {
       setCurrentLogo(storedLogo);
     } else {
@@ -84,8 +84,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
             setError('Invalid email format');
             return false;
         }
-    } else {
+
         if (!adminCode.trim()) {
+            setError('Admin code is required');
+            return false;
+        }
+
+        } else {
+          if (!adminCode.trim()) {
             setError('Admin code is required');
             return false;
         }
@@ -101,8 +107,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     setIsLoading(true);
 
     try {
-      let response: any;
-
       if (authMode === 'forgot') {
           response = await forgotPassword(email);
           if (response.success) {
@@ -110,7 +114,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           } else {
             setError(response.message || "User not found.");
           }  
-          setIsLoading(false);
           return; 
       }
 
