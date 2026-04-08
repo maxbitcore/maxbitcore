@@ -412,7 +412,7 @@ function App() {
                   setAppMode('dashboard'); 
                 }
 
-                fetch('https://твой-сайт.com/api/register.php', {
+                fetch('https://maxbitcore.com/api/register.php', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(userData)
