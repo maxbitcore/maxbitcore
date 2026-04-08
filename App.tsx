@@ -218,7 +218,7 @@ function App() {
       <Hero onExplore={() => handleTabChange('configurator')} />
       <NewInStockBanner 
         newProducts={newProducts} 
-        onProductClick={(p) => setView({ type: 'product', product: p })}
+        onProductClick={(p) => {navigate(`/product/${p.id}`);}}
       />
       <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
         <div className="max-w-[1800px] mx-auto">
@@ -233,7 +233,7 @@ function App() {
                 <ProductCard 
                   key={product.id} 
                   product={product} 
-                  onClick={(p) => setView({ type: 'product', product: p })} 
+                  onClick={(p) => navigate(`/product/${p.id}`)} 
                 />
               ))}
             </div>
@@ -322,7 +322,6 @@ function App() {
               <ProductGrid 
                 category={searchQuery ? 'All' : 'Gaming PCs'} 
                 onProductClick={(p) => {
-                  setView({ type: 'product', product: p })
                   navigate(`/product/${p.id}`);
                 }}
                 searchQuery={searchQuery} 
@@ -334,7 +333,6 @@ function App() {
               <ProductGrid 
                 category="Components" 
                 onProductClick={(p) => {
-                  setView({ type: 'product', product: p })
                   navigate(`/product/${p.id}`);
                 }}
                 searchQuery={searchQuery} 
@@ -346,7 +344,6 @@ function App() {
               <ProductGrid 
                 category="Peripherals" 
                 onProductClick={(p) => {
-                  setView({ type: 'product', product: p })
                   navigate(`/product/${p.id}`);
                 }}
                 searchQuery={searchQuery} 
