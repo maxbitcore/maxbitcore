@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Contact from './components/Contact';
@@ -23,6 +23,38 @@ import { trackVisit, trackProductView, trackPageNav, trackSearch } from './servi
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { sendRegistrationEmail } from './services/emailService';
+
+const ProductDetailRoute = ({ publishedProducts, addToCart, setView, navigate }: { 
+  publishedProducts: any[], 
+  addToCart: (p: any) => void, 
+  setView: (v: any) => void,
+  navigate: any 
+}) => {
+  const { id } = useParams();
+  const product = publishedProducts.find(p => p && p.id && p.id.toString() === id);
+
+  if (!product) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0f1a]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Initializing System...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ProductDetail 
+      product={product} 
+      onBack={() => {
+        navigate(-1); 
+        setView({ type: 'tab', activeTab: 'gaming-pcs' }); 
+      }}
+      onAddToCart={addToCart} 
+    />
+  );
+}
 
 function App() {
   const [view, setView] = useState<ViewState>({ type: 'tab', activeTab: 'home' });
@@ -147,8 +179,14 @@ function App() {
   const handleTabChange = (tab: MainTab) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setSearchQuery('');
-    setView({ type: 'tab', activeTab: tab });
-    navigate(tab === 'home' ? '/' : `/${tab}`);
+    if (tab !== 'dashboard') {
+      setAppMode('landing');
+    } else {
+      setAppMode('dashboard');
+    }
+
+    const path = tab === 'home' ? '/' : `/${tab}`;
+    navigate(path);
   };
 
   const handleSearch = (query: string) => {
@@ -227,8 +265,8 @@ function App() {
           onSearch={handleSearch}
           onRegisterClick={() => setShowRegister(true)}
           currentUser={currentUser} 
-          onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/');}}
-          onLoginSuccess={(user) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); navigate('/dashboard');}}}
+          onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/'); setView({ type: 'tab', activeTab: 'home' });}}
+          onLoginSuccess={(user) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
       />
       
       {showSuccessAlert && (
@@ -331,19 +369,13 @@ function App() {
             } />
 
           <Route path="/product/:id" element={
-            view.type === 'product' ? (
-              <ProductDetail 
-                product={view.product} 
-                onBack={() => {
-                  navigate(-1); 
-                  setView({ type: 'tab', activeTab: 'gaming-pcs' }); 
-                }}
-                onAddToCart={addToCart} 
-              />
-            ) : (
-              <Navigate to="/gaming-pcs" replace /> 
-            )
-          } /> 
+            <ProductDetailRoute 
+              publishedProducts={publishedProducts} 
+              addToCart={addToCart} 
+              setView={setView} 
+              navigate={navigate}
+            />
+          } />
 
           <Route path="/checkout" element={
             <Checkout 
@@ -410,6 +442,8 @@ function App() {
 
                 if (userData.role !== 'admin') {
                   setAppMode('dashboard'); 
+                  navigate('/dashboard'); 
+                  setView({ type: 'tab', activeTab: 'dashboard' });
                 }
 
                 fetch('https://maxbitcore.com/api/register.php', {
