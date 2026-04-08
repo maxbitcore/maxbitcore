@@ -405,17 +405,29 @@ function App() {
 
               const userData = { id: Date.now().toString(), firstName, lastName, email, phone, birthDate, password, securityKey, role: email.includes('@maxbitcore.com') ? 'admin' : 'customer' };
               try {
-                sendRegistrationEmail(userData).catch(err => console.error("Email delay", err));
+                setShowRegister(false); 
+                setCurrentUser(userData);
+
+                if (userData.role !== 'admin') {
+                  setAppMode('dashboard'); 
+                }
+
+                fetch('https://твой-сайт.com/api/register.php', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(userData)
+                })
+                .then(res => res.json())
+                .then(data => console.log("DB Sync:", data))
+                .catch(err => console.error("DB Error:", err));
+
+                sendRegistrationEmail(userData).then(() => console.log("Email sent via EmailJS")) .catch(err => console.error("Email delay", err));
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
                 localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
                 
                 localStorage.setItem('maxbit_user', JSON.stringify(userData));
-                setCurrentUser(userData); 
-                setShowRegSuccess(false);
-              
-                if (userData.role !== 'admin') {
-                  setAppMode('dashboard'); 
-                }     
+                
+                   
                 setShowRegSuccess(true); 
                 setTimeout(() => setShowRegSuccess(false), 5000);      
 
