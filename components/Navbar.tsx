@@ -121,7 +121,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         response = await registerUser(email, password);
       }
 
-      console.log("ПFULL PHP RESPONSE:", response); 
+      console.log("FULL PHP RESPONSE:", response); 
 
       if (response.requiresAdminCode) {
           setAuthStep('admin_code');
@@ -132,9 +132,10 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       const isSuccess = response.success === true || response.success === "true" || !!response.token;
 
       if (isSuccess) {
+        setIsModalOpen(false);
+
         console.log("Login successful, closing modal...");  
 
-      if (response.token || response.success) {
         const userData = {
              email: email, 
              role: response.role || 'user',
@@ -144,23 +145,15 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         if (response.token) {
            localStorage.setItem('maxbit_token', response.token);
            localStorage.setItem('maxbit_role', response.role || 'user');
-           localStorage.setItem('maxbit_customers', JSON.stringify(userData));
+           localStorage.setItem('maxbit_currentUser', JSON.stringify(userData));
         }
 
         if (onLoginSuccess) {
           onLoginSuccess(userData);
         }
-
-        setIsModalOpen(false); 
+ 
         resetForm();
-
         onTabChange('dashboard' as any);
-
-
-        if (authMode === 'register') {
-          window.location.reload();
-        }
-      }
 
       } else {
         console.log("Authentication Error:", response.message);

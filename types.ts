@@ -64,6 +64,7 @@ export interface ChatMessage {
 
 export type MainTab = 
   | 'home' 
+  | 'dashboard'
   | 'configurator'
   | 'gaming-pcs'
   | 'components'
