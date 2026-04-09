@@ -23,6 +23,9 @@ import { trackVisit, trackProductView, trackPageNav, trackSearch } from './servi
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { sendRegistrationEmail } from './services/emailService';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { enUS } from 'date-fns/locale';
 
 const ProductDetailRoute = ({ publishedProducts, addToCart, setView, navigate }: { 
   publishedProducts: any[], 
@@ -516,13 +519,32 @@ function App() {
               
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-500 uppercase ml-2">Date of Birth *</label>
-                <input 
-                  required 
-                  type="date" 
-                  value={birthDate} 
-                  onChange={e => setBirthDate(e.target.value)} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 appearance-none" 
-                />
+                <div className="custom-datepicker-wrapper">
+                  <DatePicker
+                    selected={birthDate ? new Date(birthDate) : null}
+                    onChange={(date: Date | null) => {
+                      if (date) {
+         
+                        const y = date.getFullYear();
+                        const m = String(date.getMonth() + 1).padStart(2, '0');
+                        const d = String(date.getDate()).padStart(2, '0');
+                        setBirthDate(`${y}-${m}-${d}`);
+                      } else {
+                        setBirthDate('');
+                      }
+                    }}
+                    locale={enUS}
+                    dateFormat="MM/dd/yyyy"
+                    placeholderText="MM/DD/YYYY"
+                    showYearDropdown
+                    scrollableYearDropdown
+                    yearDropdownItemNumber={100}
+                    maxDate={new Date()}
+                    required
+     
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 transition-all"
+                  />
+                </div>
               </div>
 
               <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />

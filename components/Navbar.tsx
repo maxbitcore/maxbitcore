@@ -196,9 +196,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     onLogout(); 
   }
 
-    if (activeTab === 'admin') {
-        onTabChange('home');
-    }
+  localStorage.clear();
+  onTabChange('home');
+  window.location.href = '/';
   };
 
   const resetForm = () => {
