@@ -101,6 +101,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("DEBUG: Current Auth Mode is:", authMode);
     setError(null);
     if (!validateForm()) return;
 
