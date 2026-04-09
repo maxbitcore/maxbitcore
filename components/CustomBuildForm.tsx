@@ -438,12 +438,12 @@ const CustomBuildForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-visible">
               <div className="flex flex-col gap-3">
                 <label className="text-[11px] font-black uppercase tracking-[0.2em] text-[#00c2a8]">Full Name</label>
-                <input required type="text" value={userName} onChange={(e) => setUserName(e.target.value)} onInvalid={handleInvalid} onInput={handleInput} placeholder="e.g. JAMES MILLER" className="w-full border border-slate-800 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#00c2a8] transition-colors uppercase font-bold" style={{ backgroundColor: fieldBg }} />
+                <input required type="text" value={userName} onChange={(e) => setUserName(e.target.value)} onInvalid={handleInvalid} onInput={handleInput} placeholder="e.g. JAMES MILLER" className="w-full border border-slate-800 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#00c2a8] transition-colors font-bold" style={{ backgroundColor: fieldBg }} />
               </div>
 
               <div className="flex flex-col gap-3">
                 <label className="text-[11px] font-black uppercase tracking-[0.2em] text-[#00c2a8]">Email Address</label>
-                <input required type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} onInvalid={handleEmailInvalid} onInput={handleInput} placeholder="OPERATOR@CORE.COM" className="w-full border border-slate-800 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#00c2a8] transition-colors uppercase font-bold" style={{ backgroundColor: fieldBg }} />
+                <input required type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} onInvalid={handleEmailInvalid} onInput={handleInput} placeholder="OPERATOR@CORE.COM" className="w-full border border-slate-800 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#00c2a8] transition-colors font-bold" style={{ backgroundColor: fieldBg }} />
               </div>
 
               <div className="flex flex-col gap-3">
@@ -478,8 +478,8 @@ const CustomBuildForm: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              <label className="text-[11px] font-black uppercase tracking-[0.2em] text-[#00c2a8]">Requirements</label>
-              <textarea required rows={4} value={requirements} onChange={(e) => setRequirements(e.target.value)} onInvalid={handleInvalid} onInput={handleInput} placeholder="Operational requirements, specific software targets, single-brand preferences, or aesthetic details..." className="w-full border border-slate-800 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#00c2a8] transition-colors resize-none uppercase font-bold text-xs" style={{ backgroundColor: fieldBg }} />
+              <label className="text-[11px] font-black uppercase tracking-[0.2em] text-[#00c2a8]">Requirements (Optional)</label>
+              <textarea rows={4} value={requirements} onChange={(e) => setRequirements(e.target.value)} onInvalid={handleInvalid} onInput={handleInput} placeholder="Operational requirements, specific software targets, single-brand preferences, or aesthetic details..." className="w-full border border-slate-800 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#00c2a8] transition-colors resize-none font-bold text-xs" style={{ backgroundColor: fieldBg }} />
             </div>
           </div>
 

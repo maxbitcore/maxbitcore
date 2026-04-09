@@ -82,9 +82,21 @@ function App() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showRegPassword, setShowRegPassword] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   
   const navigate = useNavigate(); 
   const location = useLocation();
+
+  const switchToRegister = () => {
+    setIsLoginOpen(false);
+    setShowRegister(true);
+  };
+
+
+  const switchToLogin = () => {
+    setShowRegister(false);
+    setIsLoginOpen(true);
+  };
 
   const handleLoginSuccess = (user: any) => {
     setCurrentUser(user);
@@ -298,11 +310,13 @@ function App() {
           cartCount={cartItems.length}
           onOpenCart={() => setIsCartOpen(true)}
           onSearch={handleSearch}
-          onRegisterClick={() => setShowRegister(true)}
+          isLoginOpen={isLoginOpen}
+          setIsLoginOpen={setIsLoginOpen}
+          switchToRegister={switchToRegister}
           currentUser={currentUser} 
           onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/'); setView({ type: 'tab', activeTab: 'home' });}}
           onLoginSuccess={(user) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
-      />
+       />
       
       {showSuccessAlert && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4 animate-fade-in">
@@ -598,7 +612,6 @@ function App() {
               </div>
                
               <div className="grid grid-cols-2 gap-4">
-                {/* Первый пароль */}
                 <div className="space-y-1 text-left">
                   <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
                     Create Password *
@@ -630,7 +643,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* Подтверждение пароля */}
                 <div className="space-y-1 text-left">
                   <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
                     Confirm Password *
@@ -666,6 +678,7 @@ function App() {
            )}
 
               <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
+              <button type="button" onClick={switchToLogin} className="w-full mt-4 text-[10px] font-black text-slate-500 uppercase hover:text-cyan-500 transition-colors tracking-widest" > Already have an account? Log In </button>
             </form>
           </div>
         </div>

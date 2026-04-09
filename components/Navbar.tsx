@@ -10,13 +10,17 @@ interface NavbarProps {
   cartCount: number;
   onOpenCart: () => void;
   onSearch: (query: string) => void;
-  onRegisterClick: () => void;
   currentUser?: any;       
   onLogout?: () => void;    
-  onLoginSuccess?: (user: any) => void; 
+  onLoginSuccess?: (user: any) => void;
+  isLoginOpen: boolean;                             
+  setIsLoginOpen: (open: boolean) => void;         
+  switchToRegister: () => void; 
+  username: string; 
+  setUsername: (value: string) => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, onRegisterClick, currentUser, onLogout, onLoginSuccess }) => {
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, isLoginOpen, setIsLoginOpen, username, switchToRegister, currentUser, setUsername, onLogout, onLoginSuccess }) => {
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
@@ -414,48 +418,58 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                 <form onSubmit={handleAuth} className="space-y-4" noValidate>
                     {authStep === 'credentials' ? (
                         <>
-                            <input 
-                                type="email" 
-                                placeholder="Email Address" 
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors text-xs font-bold uppercase tracking-wider"
-                            />
-                            {authMode !== 'forgot' && (
-                            <div className="relative">
+                            <div className="space-y-1 text-left">
+                                <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
+                                    {authMode === 'forgot' ? 'Recovery Identity / Username' : 'Operator ID / Username'}
+                                </label>
                                 <input 
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Password" 
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors text-xs font-bold uppercase tracking-wider"
+                                    type="text" 
+                                    placeholder="ENTER USERNAME" 
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
-                                >
-                                    {showPassword ? (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                                    ) : (
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            </div>
+
+                            {authMode !== 'forgot' && (
+                                <div className="space-y-1 text-left">
+                                    <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
+                                        Access Code / Password
+                                    </label>
+                                    <div className="relative">
+                                        <input 
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="ENTER PASSWORD" 
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                        >
+                                            {showPassword ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                            )}
+                                        </button>
+                                    </div>
+                    
+                                    {authMode === 'login' && (
+                                        <div className="flex justify-end pt-1 px-1">
+                                            <button 
+                                                type="button"
+                                                onClick={() => { setAuthMode('forgot'); setError(null); setMessage(null); }}
+                                                className="text-[9px] font-black text-slate-600 hover:text-cyan-400 uppercase tracking-widest transition-colors"
+                                            >
+                                                Forgot Password?
+                                            </button>
+                                        </div>
                                     )}
-                                </button>
-                            </div>
-                        )}
-                        
-                        {authMode === 'login' && (
-                            <div className="flex justify-end px-1">
-                                <button 
-                                    type="button"
-                                    onClick={() => { setAuthMode('forgot'); setError(null); setMessage(null); }}
-                                    className="text-[9px] font-black text-slate-500 hover:text-cyan-400 uppercase tracking-widest transition-colors"
-                                >
-                                    Forgot Password?
-                                </button>
-                            </div>
-                        )}
-                        
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div className="animate-fade-in-up">
@@ -510,7 +524,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 if (authMode === 'forgot') {
                                     setAuthMode('login');
                                 } else if (authMode=== 'login') { 
-                                    onRegisterClick();
+                                    switchToRegister();
                                 } else { 
                                     setAuthMode ('login');
                                 }
