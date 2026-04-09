@@ -169,7 +169,20 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
     } catch (err: any) {
       console.error("Critical Catch Error:", err);
-      setError(err.message || 'Server connection failed');
+      const errorMessage = String(err?.message || "");
+      if (errorMessage.includes("Admin code is required")) {
+          console.log("Admin security protocol initiated...");
+          setAuthStep("admin_code"); 
+          setError(null);        
+          setIsLoading(!1);          
+          return;
+        }
+      if (errorMessage.includes("exists")) {  
+          setError("Account already exists. Please switch to LOGIN mode.");
+      } else {
+          setError(errorMessage || 'Server connection failed');
+      }
+
     } finally {
       setIsLoading(false);
     }
