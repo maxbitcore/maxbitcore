@@ -74,8 +74,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const validateForm = () => {
     if (authStep === 'credentials') {
-        if (!email.trim() || !password.trim()) {
-            setError('Please fill out all fields');
+        if (!email.trim()) {
+            setError('Email is required');
             return false;
         }
         // Basic email regex pattern
@@ -85,9 +85,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
             return false;
         }
 
-        if (!adminCode.trim()) {
-            setError('Admin code is required');
-            return false;
+        if (authMode !== 'forgot' && !password.trim()) {
+          setError('Please enter your password');
+          return false;
         }
 
         } else {
@@ -107,15 +107,20 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     setIsLoading(true);
 
     try {
+      let response: any;
       if (authMode === 'forgot') {
           response = await forgotPassword(email);
           if (response.success) {
             setMessage("Verification link sent to your email."); 
+            setTimeout(() => setIsModalOpen(false), 2000);
           } else {
             setError(response.message || "User not found.");
-          }  
+          } 
+          setIsLoading(false); 
           return; 
       }
+ 
+      const codeToSend = authStep === 'admin_code' ? adminCode : undefined;
 
       if (authMode === 'login') {
         const codeToSend = authStep === 'admin_code' ? adminCode : undefined;
@@ -126,19 +131,17 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
       console.log("FULL PHP RESPONSE:", response); 
 
-      if (response.requiresAdminCode) {
+      if (response.requiresAdminCode === true || response.requiresAdminCode === "true") {
+          console.log("Switching to admin_code step...");  
           setAuthStep('admin_code');
+          setError(null);
           setIsLoading(false);
           return;
       }
 
-      const isSuccess = response.success === true || response.success === "true" || !!response.token;
+      const isActuallySuccess = response.success === true || response.success === "true" || !!response.token;
 
-      if (isSuccess) {
-        setIsModalOpen(false);
-
-        console.log("Login successful, closing modal...");  
-
+      if (isActuallySuccess) {
         const userData = {
              email: email, 
              role: response.role || 'user',
@@ -155,6 +158,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           onLoginSuccess(userData);
         }
  
+        setIsModalOpen(false);
         resetForm();
         onTabChange('dashboard' as any);
 
