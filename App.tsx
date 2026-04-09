@@ -24,7 +24,6 @@ import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { sendRegistrationEmail } from './services/emailService';
 import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 import { enUS } from 'date-fns/locale';
 
 const ProductDetailRoute = ({ publishedProducts, addToCart, setView, navigate }: { 
@@ -80,6 +79,7 @@ function App() {
   const [securityKey, setSecurityKey] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [activeTab, setActiveTab] = useState<string>('home');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   
   const navigate = useNavigate(); 
   const location = useLocation();
@@ -510,21 +510,56 @@ function App() {
               className="space-y-4 text-left">
                 
               <div className="grid grid-cols-2 gap-4">
-                <input required placeholder="FIRST NAME *" value={firstName} onChange={e => setFirstName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
-                <input required placeholder="LAST NAME *" value={lastName} onChange={e => setLastName(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
-              </div>
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                    First Name *
+                  </label>
+                  <input 
+                    required 
+                    type="text"
+                    placeholder="ENTER FIRST NAME" 
+                    value={firstName} 
+                    onChange={e => setFirstName(e.target.value)} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
+                  />
+                </div>
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                    Last Name *
+                 </label>
+                 <input 
+                   required 
+                   type="text"
+                   placeholder="ENTER LAST NAME" 
+                   value={lastName} 
+                   onChange={e => setLastName(e.target.value)} 
+                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
+                 />
+               </div>
+             </div>
 
               {/* Email */}
-              <input required type="email" placeholder="EMAIL ADDRESS *" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
-              
+              <div className="space-y-1 text-left">
+                <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                 Email Address *
+                </label>
+                <input 
+                  required 
+                  type="email" 
+                  placeholder="EXAMPLE@MAXBITCORE.COM" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
+                />
+              </div>
+
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-500 uppercase ml-2">Date of Birth *</label>
                 <div className="custom-datepicker-wrapper">
                   <DatePicker
-                    selected={birthDate ? new Date(birthDate) : null}
+                    selected={birthDate ? new Date(birthDate.replace(/-/g, '/')) : null}
                     onChange={(date: Date | null) => {
                       if (date) {
-         
                         const y = date.getFullYear();
                         const m = String(date.getMonth() + 1).padStart(2, '0');
                         const d = String(date.getDate()).padStart(2, '0');
@@ -547,44 +582,86 @@ function App() {
                 </div>
               </div>
 
-              <input type="tel" placeholder="PHONE (OPTIONAL)" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500" />
+              <div className="space-y-1 text-left">
+                <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                  Phone (Optional)
+                </label>
+                <input 
+                  type="tel" 
+                  placeholder="ENTER PHONE NUMBER" 
+                  value={phone} 
+                  onChange={e => setPhone(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
+                />
+              </div>
                
               <div className="grid grid-cols-2 gap-4">
-                <input 
-                  required 
-                  type="password" 
-                  placeholder="CREATE PASSWORD *" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  className={`bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none transition-all ${
-                    password.length > 0 && !/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.*[0-9]).{8,}$/.test(password)
-                      ? "border-amber-500/50 focus:border-amber-500"
-                      : "border-slate-800 focus:border-cyan-500"
-                  }`}
-                />
+                {/* Первый пароль */}
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                    Create Password *
+                  </label>
+                  <div className="relative">
+                    <input 
+                      required 
+                      type={showRegPassword ? "text" : "password"}
+                      placeholder="••••••••" 
+                      value={password} 
+                      onChange={e => setPassword(e.target.value)} 
+                      className={`w-full bg-slate-950 border rounded-xl px-4 py-3 pr-10 text-white text-[10px] font-black outline-none transition-all ${
+                        password.length > 0 && !/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.*[0-9]).{8,}$/.test(password)
+                          ? "border-amber-500/50 focus:border-amber-500"
+                          : "border-slate-800 focus:border-cyan-500"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-500 transition-colors"
+                    >
+                      {showRegPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
 
-                <input 
-                  required 
-                  type="password" 
-                  placeholder="CONFIRM PASSWORD *" 
-                  value={confirmPassword} 
-                  onChange={e => setConfirmPassword(e.target.value)} 
-                  className={`bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none ${
+                {/* Подтверждение пароля */}
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                    Confirm Password *
+                  </label>
+                  <input 
+                    required 
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={confirmPassword} 
+                    onChange={e => setConfirmPassword(e.target.value)} 
+                    className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none transition-all ${
                     confirmPassword && password !== confirmPassword ? "border-rose-500" : "border-slate-800 focus:border-cyan-500"
                   }`}
                 />
               </div>
-                
-              {email.includes('@maxbitcore.com') && (
-                <input 
-                  required 
-                  type="password" 
-                  placeholder="SECURITY KEY *" 
-                  value={securityKey} 
-                  onChange={e => setSecurityKey(e.target.value)} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black uppercase outline-none focus:border-cyan-500 placeholder:text-rose-500/50"
-                />
-              )}
+            </div>
+
+           {/* Security Key (если нужен) */}
+           {email.includes('@maxbitcore.com') && (
+             <div className="space-y-1 text-left mt-4">
+               <label className="text-[9px] font-black text-rose-500 uppercase ml-2">
+                 Security Key *
+               </label>
+               <input 
+                 required 
+                 type="password" 
+                 placeholder="ENTER KEY" 
+                 value={securityKey} 
+                 onChange={e => setSecurityKey(e.target.value)} 
+                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 placeholder:text-rose-500/30"
+               />
+             </div>
+           )}
 
               <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
             </form>
