@@ -168,7 +168,12 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
  
         setIsLoginOpen(false);
         resetForm();
-        onTabChange('dashboard' as any);
+        const userRole = response.role || 'user';
+        if (userRole === 'admin') {
+          onTabChange('commander_center' as any); 
+        } else {
+          onTabChange('dashboard' as any);
+        }
 
       } else {
         console.log("Authentication Error:", response.message);
@@ -203,7 +208,10 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     onLogout(); 
   }
 
-  localStorage.clear();
+  localStorage.removeItem('maxbit_token');
+  localStorage.removeItem('maxbit_role');
+  localStorage.removeItem('maxbit_currentUser');
+  
   onTabChange('home');
   window.location.href = '/';
   };
@@ -431,7 +439,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                     placeholder="ENTER USERNAME" 
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
+                                    className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold  tracking-wider"
                                 />
                             </div>
 
@@ -445,7 +453,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                       placeholder="ENTER EMAIL" 
                                       value={email}
                                       onChange={(e) => setEmail(e.target.value)}
-                                      className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
+                                      className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold  tracking-wider"
                                   />
                               </div>
                             )}
@@ -461,7 +469,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                             placeholder="ENTER PASSWORD" 
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
+                                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold  tracking-wider"
                                         />
                                         <button
                                             type="button"

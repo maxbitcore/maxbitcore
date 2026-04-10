@@ -532,7 +532,7 @@ function App() {
               
               className="space-y-4 text-left">
                 <div className="space-y-1 text-left">
-                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-widest">
+                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                     Username *
                   </label>
                   <input 
@@ -547,7 +547,7 @@ function App() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 text-left">
-                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                     First Name *
                   </label>
                   <input 
@@ -560,7 +560,7 @@ function App() {
                   />
                </div>
                 <div className="space-y-1 text-left">
-                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                     Last Name *
                  </label>
                  <input 
@@ -576,7 +576,7 @@ function App() {
 
               {/* Email */}
               <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                  Email Address *
                 </label>
                 <input 
@@ -590,7 +590,7 @@ function App() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-500 uppercase ml-2">Date of Birth *</label>
+                <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">Date of Birth *</label>
                 <div className="custom-datepicker-wrapper">
                   <DatePicker
                     selected={birthDate ? new Date(birthDate.replace(/-/g, '/')) : null}
@@ -619,7 +619,7 @@ function App() {
               </div>
 
               <div className="space-y-1 text-left">
-                <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                   Phone (Optional)
                 </label>
                 <input 
@@ -633,7 +633,7 @@ function App() {
                
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 text-left">
-                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                     Create Password *
                   </label>
                   <div className="relative">
@@ -655,16 +655,16 @@ function App() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-500 transition-colors"
                     >
                       {showRegPassword ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        <svg xmlns="https://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
                       ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        <svg xmlns="https://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                       )}
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-1 text-left">
-                  <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
+                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                     Confirm Password *
                   </label>
                   <input 
@@ -683,7 +683,7 @@ function App() {
            {/* Security Key (если нужен) */}
            {email.includes('@maxbitcore.com') && (
              <div className="space-y-1 text-left mt-4">
-               <label className="text-[9px] font-black text-rose-500 uppercase ml-2">
+               <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                  Security Key *
                </label>
                <input 
