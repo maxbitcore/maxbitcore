@@ -265,7 +265,7 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     navigate('/');      
   };
-  
+
   const addToCart = (product: Product) => {
     setCartItems(prev => [...prev, product]);
     setIsCartOpen(true);
@@ -295,9 +295,9 @@ function App() {
               <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
             </div>
           </div>
-          {publishedProducts && publishedProducts.length > 0 ? (
+          {filteredProducts && filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {publishedProducts.map(product => (
+              {filteredProducts.map(product => (
                 <ProductCard 
                   key={product.id} 
                   product={product} 

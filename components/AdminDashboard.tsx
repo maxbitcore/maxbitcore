@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BuildSubmission, Product, ProductStatus, Review } from '../types';
 import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession } from '../services/analyticsService';
-import { loginUser, registerUser, logoutUser, getStoredAuth } from '../services/authService';
+import { loginUser, registerUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
 
@@ -277,16 +277,27 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         }
         if (Array.isArray(orderData)) {
           const validatedOrders: OrderRecord[] = orderData.map((ord: any) => ({
-            items: Array.isArray(ord.items) ? ord.items : [],
-            total: parseFloat(ord.total) || 0,
-            timestamp: ord.timestamp || Date.now(),
-            status: ord.status || 'Processing',
+            id: ord.id || `ORD-${Math.random().toString(36).substr(2, 9)}`,
+            total: Number(ord.total || ord.amount) || 0,
+            timestamp: Number(ord.timestamp) || Date.now(),
+            status: (['Processing', 'Shipped', 'Delivered', 'Cancelled'].includes(ord.status) 
+              ? ord.status 
+              : 'Processing') as OrderRecord['status'],
+              items: Array.isArray(ord.items) 
+                ? ord.items.map((item: any) => ({
+                id: item.id || 'n/a',
+                name: item.name || 'Unknown Item',
+                price: Number(item.price) || 0
+              }))
+            : [],
             customer: {
               name: ord.customer_name || ord.customer?.name || 'Unknown',
               email: ord.customer_email || ord.customer?.email || 'No email',
               address: ord.customer_address || ord.customer?.address || 'No address'
-    }
+            }
           }));
+
+          const sorted = [...validatedOrders].sort((a, b) => b.timestamp - a.timestamp);
           setShopOrders(orderData.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)));
           setAllOrders(validatedOrders);
         }
@@ -610,7 +621,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                 {(['submissions', 'orders', 'catalog', 'analytics', 'comments'] as const).map(tab => (
                   <button key={tab} onClick={() => setActiveAdminTab(tab)} className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all ${activeAdminTab === tab ? 'bg-cyan-500 text-slate-950' : 'bg-slate-900 text-slate-500 border border-slate-800 hover:border-slate-600'}`}>{tab === 'comments' ? 'Reports' : tab}</button>
                 ))}
-                <button onClick={() => { logoutUser(); window.location.reload(); }} className="text-[10px] font-black text-rose-500 uppercase px-4 py-2 hover:bg-rose-950/30 rounded-lg">Logout</button>
               </div>
             </div>
 
