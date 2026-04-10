@@ -27,7 +27,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
  
 
   // Auth State
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'| 'forgot'>('login');
   const [authStep, setAuthStep] = useState<'credentials' | 'admin_code'>('credentials');
   const [message, setMessage] = useState<string | null>(null);
@@ -78,26 +77,30 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const validateForm = () => {
     if (authStep === 'credentials') {
+      if (!username.trim()) {
+        setError('Username is required');
+        return false;
+      }
+     if (authMode !== 'login') {
         if (!email.trim()) {
             setError('Email is required');
             return false;
         }
-        // Basic email regex pattern
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailPattern.test(email)) {
             setError('Invalid email format');
             return false;
         }
+      }
+      if (authMode !== 'forgot' && !password.trim()) {
+        setError('Please enter your password');
+        return false;
+      }
 
-        if (authMode !== 'forgot' && !password.trim()) {
-          setError('Please enter your password');
+    } else {
+        if (!adminCode.trim()) {
+          setError('Admin code is required');
           return false;
-        }
-
-        } else {
-          if (!adminCode.trim()) {
-            setError('Admin code is required');
-            return false;
         }
     }
     return true;
@@ -117,7 +120,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           response = await forgotPassword(email);
           if (response.success) {
             setMessage("Verification link sent to your email."); 
-            setTimeout(() => setIsModalOpen(false), 2000);
+            setTimeout(() => setIsLoginOpen(false), 2000);
           } else {
             setError(response.message || "User not found.");
           } 
@@ -163,7 +166,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           onLoginSuccess(userData);
         }
  
-        setIsModalOpen(false);
+        setIsLoginOpen(false);
         resetForm();
         onTabChange('dashboard' as any);
 
@@ -207,6 +210,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const resetForm = () => {
     setEmail('');
+    setUsername('');
     setPassword('');
     setAdminCode('');
     setShowPassword(false);
@@ -217,7 +221,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const openAuthModal = (mode: 'login' | 'register') => {
       setAuthMode(mode);
       resetForm();
-      setIsModalOpen(true);
+      setIsLoginOpen(true);
   };
 
   const LogoSVG = () => {
@@ -387,11 +391,11 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     </nav>
 
     {/* Authentication Modal */}
-    {isModalOpen && (
+    {isLoginOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in-up">
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md relative shadow-2xl">
                 <button 
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => setIsLoginOpen(false)}
                     className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -430,6 +434,21 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                     className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
                                 />
                             </div>
+
+                            {(authMode === 'register' || authMode === 'forgot') && (
+                              <div className="space-y-1 text-left mt-4">
+                                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
+                                      Email Address
+                                  </label>
+                                  <input 
+                                      type="email" 
+                                      placeholder="ENTER EMAIL" 
+                                      value={email}
+                                      onChange={(e) => setEmail(e.target.value)}
+                                      className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold uppercase tracking-wider"
+                                  />
+                              </div>
+                            )}
 
                             {authMode !== 'forgot' && (
                                 <div className="space-y-1 text-left">

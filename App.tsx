@@ -112,7 +112,11 @@ function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setAppMode('landing');
-    localStorage.clear(); 
+    
+    localStorage.removeItem('maxbit_token');
+    localStorage.removeItem('maxbit_role');
+    localStorage.removeItem('maxbit_currentUser');
+    
     navigate('/');
     setView({ type: 'tab', activeTab: 'home' });
   };
@@ -123,7 +127,7 @@ function App() {
       try {
         setCurrentUser(JSON.parse(saved));
       } catch (e) {
-        console.error("Ошибка парсинга юзера");
+        console.error("Session error: Profile data corrupted");
       }
     }
   }, []);
