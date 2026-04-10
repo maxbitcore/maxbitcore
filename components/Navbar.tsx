@@ -48,24 +48,12 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    // Initial Logo Check
-    const storedLogo = localStorage.getItem('maxbit_logo');
-    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png";
-    if (storedLogo) {
-      setCurrentLogo(storedLogo);
-    } else {
-      setCurrentLogo(serverLogo);
-    }
- 
-    // Listener for logo updates
+    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png"; 
     const handleLogoUpdate = () => {
       const newLogo = localStorage.getItem('maxbit_logo');
-      if (newLogo) {
-        setCurrentLogo(newLogo);
-      } else {
-        setCurrentLogo(serverLogo);
-      }
+      setCurrentLogo(newLogo || serverLogo);
     };
+
     window.addEventListener('logo-updated', handleLogoUpdate);
 
     return () => {
