@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
 import { loginUser, registerUser, logoutUser, getStoredAuth, forgotPassword } from '../services/authService';
+import { useNavigate } from 'react-router-dom';
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
@@ -24,6 +25,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
+  const navigate = useNavigate();
  
 
   // Auth State
@@ -170,9 +172,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         resetForm();
         const userRole = response.role || 'user';
         if (userRole === 'admin') {
-          onTabChange('commander_center' as any); 
+          navigate('/admin') 
         } else {
-          onTabChange('dashboard' as any);
+          navigate('/dashboard');
         }
 
       } else {
@@ -259,19 +261,33 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     return (
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0b0f1a] border-b border-rose-500/30 py-3 md:py-4 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.1)]">
         <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-14">
+          {/* Left Side */}
           <div className="flex items-center gap-3 md:gap-4">
             <LogoSVG />
             <div className="h-4 md:h-6 w-px bg-slate-800 hidden sm:block"></div>
             <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-rose-500 animate-pulse hidden sm:block">System Administrator</span>
           </div>
+          {/* Right Side */}
           <div className="flex items-center gap-2 md:gap-4">
-            <span className="text-[8px] md:text-[9px] font-mono text-slate-500 uppercase hidden sm:block">{email || 'ADMIN_SESSION'}</span>
+            <span className="text-[8px] md:text-[9px] font-mono text-slate-500 uppercase hidden sm:block">{currentUser?.firstName || 'ADMIN_OPERATOR'}</span>
+            {/* EXIT CONSOLE */}
             <button 
-                onClick={() => onTabChange('home')}
+                onClick={() => {
+                  onTabChange('home');
+                  navigate('/');
+                }}
                 className="flex items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-colors bg-slate-900/50 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-slate-800 hover:border-slate-600"
             >
                 <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-rose-500"></span>
                 Exit<span className="hidden sm:inline"> Console</span>
+            </button>
+            {/* LOGOUT */}
+            <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-rose-500 hover:text-white transition-all bg-rose-500/10 hover:bg-rose-500 px-3 py-2 rounded-lg border border-rose-500/20 hover:border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.1)]"
+            >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                Terminate <span className="hidden sm:inline">Session</span>
             </button>
           </div>
         </div>
@@ -355,15 +371,16 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                 <div className="flex items-center gap-2 md:gap-3">
                     {currentUser.role === 'admin' && (
                         <button 
-                            onClick={() => onTabChange('admin' as any)}
-                            className="flex items-center text-[8px] md:text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20"
+                            onClick={() => navigate('/admin')}
+                            className="flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500 hover:text-[#0b0f1a] px-3 py-2 rounded-lg border border-emerald-500/20 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
                         >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>    
                             Console
                         </button>
                     )}
 
                     <button 
-                        onClick={() => onTabChange('dashboard' as any)}
+                        onClick={() => navigate('/dashboard')}
                         className="flex flex-col items-end mr-2 group"
                     >
                         <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter group-hover:text-white transition-colors">System_Active</span>
@@ -374,7 +391,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
                     <button 
                         onClick={handleLogout}
-                        className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-rose-500 transition-colors px-1"
+                        className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-rose-500 transition-all duration-300 px-1"
                     >
                         Logout
                     </button>
