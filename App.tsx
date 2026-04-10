@@ -69,6 +69,7 @@ function App() {
   const [showRegister, setShowRegister] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -313,6 +314,8 @@ function App() {
           isLoginOpen={isLoginOpen}
           setIsLoginOpen={setIsLoginOpen}
           switchToRegister={switchToRegister}
+          username={username}
+          setUsername={setUsername}
           currentUser={currentUser} 
           onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/'); setView({ type: 'tab', activeTab: 'home' });}}
           onLoginSuccess={(user) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
@@ -481,7 +484,7 @@ function App() {
                 return;
               }
 
-              const userData = { id: Date.now().toString(), firstName, lastName, email, phone, birthDate, password, securityKey, role: email.includes('@maxbitcore.com') ? 'admin' : 'customer' };
+              const userData = { id: Date.now().toString(), username, firstName, lastName, email, phone, birthDate, password, securityKey, role: email.includes('@maxbitcore.com') ? 'admin' : 'customer' };
               try {
                 setShowRegister(false); 
                 setCurrentUser(userData);
@@ -513,7 +516,7 @@ function App() {
 
                 alert("CONNECTION ESTABLISHED. Welcome to MaxBit.");
 
-                setFirstName(''); setLastName(''); setEmail('');
+                setFirstName(''); setLastName(''); setEmail(''); setUsername('');
                 setPhone(''); setBirthDate(''); setPassword('');
                 setConfirmPassword('');;
 
@@ -524,7 +527,20 @@ function App() {
               }} 
               
               className="space-y-4 text-left">
-                
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-widest">
+                    Username *
+                  </label>
+                  <input 
+                    required
+                    type="text" 
+                    placeholder="CHOOSE YOUR LOGIN" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value)} 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 placeholder:text-slate-700 transition-all"
+                  />
+               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 text-left">
                   <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
@@ -538,7 +554,7 @@ function App() {
                     onChange={e => setFirstName(e.target.value)} 
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
                   />
-                </div>
+               </div>
                 <div className="space-y-1 text-left">
                   <label className="text-[9px] font-black text-slate-500 uppercase ml-2">
                     Last Name *
