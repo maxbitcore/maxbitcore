@@ -204,10 +204,12 @@ function App() {
         if (Array.isArray(data)) {
           const approved = data.filter((p) => p && p.isApproved && p.isPublished);
           setPublishedProducts(approved);
+          setFilteredProducts(approved);
         }
       } catch (e) {
         console.error("Load Error", e);
         setPublishedProducts([]);
+        setFilteredProducts([]);
       }
     };
 
