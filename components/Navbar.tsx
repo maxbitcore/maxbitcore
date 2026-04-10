@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
 import { loginUser, registerUser, logoutUser, getStoredAuth, forgotPassword } from '../services/authService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
@@ -26,6 +26,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
   const navigate = useNavigate();
+  const location = useLocation();
+
  
 
   // Auth State
@@ -74,7 +76,11 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch(localQuery);
+    if (localQuery.trim()) {
+      onSearch(localQuery); 
+      onTabChange('home');  
+      navigate('/');    
+    }
   };
 
   const validateForm = () => {
@@ -215,7 +221,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   localStorage.removeItem('maxbit_currentUser');
   
   onTabChange('home');
-  window.location.href = '/';
+  navigate('/');
   };
 
   const resetForm = () => {
@@ -257,7 +263,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   };
 
   // Dedicated Admin Mode View
-  if (activeTab === 'admin') {
+  if (activeTab === 'admin' && location.pathname !== '/') {
     return (
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0b0f1a] border-b border-rose-500/30 py-3 md:py-4 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.1)]">
         <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-14">

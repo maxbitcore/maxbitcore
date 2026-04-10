@@ -84,6 +84,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<string>('home');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   
   const navigate = useNavigate(); 
   const location = useLocation();
@@ -243,13 +244,28 @@ function App() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    if (query.trim()) {
-      trackSearch(query); 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setView({ type: 'tab', activeTab: 'gaming-pcs' });
+    if (!query.trim()) {
+      setFilteredProducts(publishedProducts);
+    } else {
+      const lowerQuery = query.toLowerCase();
+      const filtered = publishedProducts.filter((p: any) => {
+        if (!p) return false;
+        const nameMatch = p.name?.toLowerCase().includes(lowerQuery);
+        const searchTarget = [
+          p.name,
+          p.description,
+          p.components,
+          p['Core Components']
+        ].join(' ').toLowerCase();
+        return searchTarget.includes(lowerQuery);
+      });  
+      setFilteredProducts(filtered);
     }
+    setActiveTab('home'); 
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate('/');      
   };
-
+  
   const addToCart = (product: Product) => {
     setCartItems(prev => [...prev, product]);
     setIsCartOpen(true);
