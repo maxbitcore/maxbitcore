@@ -129,9 +129,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
       if (authMode === 'login') {
         const codeToSend = authStep === 'admin_code' ? adminCode : undefined;
-        response = await loginUser(email, password, codeToSend);
+        response = await loginUser(username, password, codeToSend);
       } else {
-        response = await registerUser(email, password);
+        response = await registerUser(username, email, password);
       }
 
       console.log("FULL PHP RESPONSE:", response); 
