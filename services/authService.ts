@@ -1,8 +1,8 @@
-
 export interface AuthResponse {
   token: string;
   role: 'admin' | 'user';
   user?: {
+    username: string;
     email: string;
     firstName?: string;
     lastName?: string;
@@ -23,11 +23,11 @@ const handleResponse = async (response: Response) => {
   return data;
 };
 
-export const registerUser = async (email: string, password: string): Promise<AuthResponse> => {
+export const registerUser = async (username: string, email: string, password: string, adminCode?: string): Promise<AuthResponse> => {
   const response = await fetch(`${API_URL}/register.php`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username: username, email: email, password: password, adminCode: adminCode }),
   });
   
   const data = await handleResponse(response);
@@ -39,11 +39,11 @@ if (data.token) {
   return data;
 };
 
-export const loginUser = async (email: string, password: string, adminCode?: string): Promise<AuthResponse> => {
-  const response = await fetch(`${API_URL}/login.php`, {
+export const loginUser = async (username: string, password: string, adminCode?: string): Promise<AuthResponse> => {
+  const response = await fetch(`https://maxbitcore.com/api/login.php`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, adminCode }),
+    body: JSON.stringify({ username: username, password: password, adminCode: adminCode }),
   });
 
   const data = await handleResponse(response);
