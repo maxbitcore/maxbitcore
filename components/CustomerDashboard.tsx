@@ -21,14 +21,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ user, onLo
               Welcome, <span className="text-slate-400">{user.firstName}</span>
             </h1>
           </div>
-          
-          <button 
-            onClick={onLogout}
-            className="group flex flex-col items-end"
-          >
-            <span className="text-[10px] font-black uppercase text-slate-500 group-hover:text-rose-500 transition-colors">Disconnect</span>
-            <span className="text-xs font-mono text-slate-700 group-hover:text-rose-400 tracking-widest uppercase">Terminate_Session</span>
-          </button>
         </div>
 
         {/* DASHBOARD GRID */}

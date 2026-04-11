@@ -134,15 +134,21 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('maxbit_token');
-    const savedUser = localStorage.getItem('maxbit_currentUser');
+    const savedUser = localStorage.getItem('maxbit_currentUser') || localStorage.getItem('maxbit_user');
     const savedRole = localStorage.getItem('maxbit_role');
 
-    if (savedToken && savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-      if (savedRole !== 'admin') {
-        setAppMode('dashboard');
-     }
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setCurrentUser(parsedUser);
+        
+        if (parsedUser.role !== 'admin' && savedRole !== 'admin') {
+          setAppMode('dashboard');
+        }
+      } catch (e) {
+        console.error("Session error: Profile data corrupted");
+        localStorage.removeItem('maxbit_currentUser');
+      }
     }
   }, []);
 
@@ -220,7 +226,7 @@ function App() {
       window.removeEventListener('storage', loadData);
       window.removeEventListener('maxbit-update', loadData);
     };
-  }, [view]);
+  }, []);
 
   const newProducts = useMemo(() => {
     if (!publishedProducts || !Array.isArray(publishedProducts)) return [];
@@ -245,27 +251,22 @@ function App() {
   };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setFilteredProducts(publishedProducts);
-    } else {
-      const lowerQuery = query.toLowerCase();
+    const lowerQuery = query.toLowerCase().trim();
+    setSearchQuery(lowerQuery);
+
+    if (!lowerQuery) {
+      setFilteredProducts(publishedProducts); 
       const filtered = publishedProducts.filter((p: any) => {
         if (!p) return false;
-        const nameMatch = p.name?.toLowerCase().includes(lowerQuery);
-        const searchTarget = [
-          p.name,
-          p.description,
-          p.components,
-          p['Core Components']
-        ].join(' ').toLowerCase();
-        return searchTarget.includes(lowerQuery);
-      });  
+        const name = p.name?.toLowerCase() || '';
+        const desc = p.description?.toLowerCase() || '';
+        const comps = typeof p.components === 'string' ? p.components.toLowerCase() : '';
+      
+        return name.includes(lowerQuery) || desc.includes(lowerQuery) || comps.includes(lowerQuery);
+      });
       setFilteredProducts(filtered);
     }
-    setActiveTab('home'); 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    navigate('/');      
+    navigate('/gaming-pcs');
   };
 
   const addToCart = (product: Product) => {
@@ -340,7 +341,7 @@ function App() {
           setUsername={setUsername}
           currentUser={currentUser} 
           onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/'); setView({ type: 'tab', activeTab: 'home' });}}
-          onLoginSuccess={(user) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
+          onLoginSuccess={(user: any) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
           allProducts={publishedProducts}
        />
       
@@ -400,7 +401,7 @@ function App() {
                   navigate(`/product/${p.id}`);
                 }}
                 searchQuery={searchQuery} 
-                externalProducts={publishedProducts} 
+                externalProducts={filteredProducts}
               />
             } />
             
@@ -411,7 +412,7 @@ function App() {
                   navigate(`/product/${p.id}`);
                 }}
                 searchQuery={searchQuery} 
-                externalProducts={publishedProducts} 
+                externalProducts={filteredProducts} 
               />
             } />
             
@@ -422,7 +423,7 @@ function App() {
                   navigate(`/product/${p.id}`);
                 }}
                 searchQuery={searchQuery} 
-                externalProducts={publishedProducts} 
+                externalProducts={filteredProducts} 
               />
             } />
 
@@ -509,28 +510,26 @@ function App() {
 
               const userData = { id: Date.now().toString(), username, firstName, lastName, email, phone, birthDate, password, securityKey, role: email.includes('@maxbitcore.com') ? 'admin' : 'customer' };
               try {
-                setShowRegister(false); 
-                setCurrentUser(userData);
-
-                if (userData.role !== 'admin') {
-                  setAppMode('dashboard'); 
-                  navigate('/dashboard'); 
-                  setView({ type: 'tab', activeTab: 'dashboard' });
-                }
-
-                fetch('https://maxbitcore.com/api/register.php', {
+                const response = await fetch('https://maxbitcore.com/api/register.php', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(userData)
-                })
-                .then(res => res.json())
-                .then(data => console.log("DB Sync:", data))
-                .catch(err => console.error("DB Error:", err));
+                });
+    
+                const data = await response.json();
+                console.log("DB Sync Response:", data);
 
-                sendRegistrationEmail(userData).then(() => console.log("Email sent via EmailJS")) .catch(err => console.error("Email delay", err));
+                if (data.success === true || data.message?.includes("success") || response.ok) {
+
+                    setShowRegister(false); 
+                    setCurrentUser(userData);
+
+                sendRegistrationEmail(userData)
+                    .then(() => console.log("Email sent via EmailJS")) 
+                    .catch(err => console.error("Email delay", err));    
+                
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
                 localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
-                
                 localStorage.setItem('maxbit_user', JSON.stringify(userData));
                 
                    
@@ -543,13 +542,26 @@ function App() {
                 setPhone(''); setBirthDate(''); setPassword('');
                 setConfirmPassword('');;
 
-              } catch (error) {
-                console.error("Registration error:", error);
-                alert("System breach detected. Try again.");
-              }
-              }} 
+                   if (userData.role !== 'admin') {
+                       setAppMode('dashboard'); 
+                       setView({ type: 'tab', activeTab: 'dashboard' });
+                       navigate('/dashboard'); 
+                   } else {
+                       setView({ type: 'tab', activeTab: 'admin' });
+                       navigate('/admin'); 
+                   }
+
+               } else {
+                   alert(`REGISTRATION DENIED: ${data.error || data.message || "User already exists"}`);
+               }
+
+             } catch (error) {
+    
+               console.error("Registration API error:", error);
+               alert("CRITICAL SYSTEM FAILURE: Unable to reach database. Try again.");
+             } 
               
-              className="space-y-4 text-left">
+           }} className="space-y-4 text-left">
                 <div className="space-y-1 text-left">
                   <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">
                     Username *

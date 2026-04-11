@@ -19,6 +19,7 @@ interface NavbarProps {
   switchToRegister: () => void; 
   username: string; 
   setUsername: (value: string) => void;
+  allProducts?: any[];
 }
 
 const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, isLoginOpen, setIsLoginOpen, username, switchToRegister, currentUser, setUsername, onLogout, onLoginSuccess }) => {
@@ -157,7 +158,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
            localStorage.setItem('maxbit_role', response.role || 'user');
            localStorage.setItem('maxbit_currentUser', JSON.stringify(userData));
         }
-
+  
         if (onLoginSuccess) {
           onLoginSuccess(userData);
         }
@@ -228,27 +229,21 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       setIsLoginOpen(true);
   };
 
-  const LogoSVG = () => {
-    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png"; 
-    const displayLogo = currentLogo || serverLogo;
-
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:gap-3">
-        <img 
-          src={displayLogo} 
-          className="h-8 md:h-10 w-auto object-contain"
-          alt="MAXBIT Logo" 
-          onError={(e) => {
-             e.currentTarget.style.display = 'none';
-             console.log("Server logo failed to load, hiding <img>");
-          }}
-        />
-        <span className="text-xl md:text-2xl font-black text-white italic">
-          MAXBIT
-        </span>
-      </div>
-    );
-  };
+  const logoContent = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:gap-3">
+      <img 
+        src={currentLogo || "https://www.maxbitcore.com/uploads/logo.png"} 
+        className="h-8 md:h-10 w-auto object-contain"
+        alt="MAXBIT Logo" 
+        onError={(e) => {
+           e.currentTarget.style.display = 'none';
+        }}
+      />
+      <span className="text-xl md:text-2xl font-black text-white italic">
+        MAXBIT
+      </span>
+    </div>
+  );
 
   // Dedicated Admin Mode View
   if (activeTab === 'admin' && location.pathname !== '/') {
@@ -257,7 +252,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-14">
           {/* Left Side */}
           <div className="flex items-center gap-3 md:gap-4">
-            <LogoSVG />
+            {logoContent}
             <div className="h-4 md:h-6 w-px bg-slate-800 hidden sm:block"></div>
             <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-rose-500 animate-pulse hidden sm:block">System Administrator</span>
           </div>
@@ -298,7 +293,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         {/* Left: Brand Space */}
         <div className="flex-1 flex justify-start items-center gap-4 md:gap-8">
           <button onClick={() => onTabChange('home')} className="flex items-center hover:scale-[1.03] active:scale-95 transition-all duration-300">
-             <LogoSVG />
+            {logoContent}
           </button>
           
           {/* Desktop Nav Links */}
