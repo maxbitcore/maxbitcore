@@ -5,6 +5,7 @@ import { Product } from '../types';
 interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
+  label?: string;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
