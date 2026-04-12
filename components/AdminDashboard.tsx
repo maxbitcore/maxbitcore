@@ -79,6 +79,12 @@ const DEFAULT_CONFIG = {
 
 const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, label }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editorRef.current && document.activeElement !== editorRef.current) {
+      editorRef.current.innerHTML = value || '';
+    }
+  }, [value]);
+
   const exec = (cmd: string, val?: string) => {
     if (cmd === 'createLink') {
      const url = window.prompt('Enter Deployment URL:');
@@ -87,14 +93,14 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     } else {
       document.execCommand(cmd, false, val);
     }
-    if (editorRef.current) onChange(editorRef.current.innerHTML); 
+    if (editorRef.current) {onChange(editorRef.current.innerHTML);}
   };
 
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || '';
-    }
-  }, [value]);
+  if (editorRef.current && document.activeElement !== editorRef.current) {
+    editorRef.current.innerHTML = value || '';
+  }
+}, [value]);
 
   return (
     <div className="space-y-2">
@@ -181,7 +187,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
           className="p-4 min-h-[60px] outline-none text-white text-sm prose prose-invert max-w-none relative z-10"
         ></div>
         {!value && (
-          <div className="absolute top-20 left-4 px-4 py-2 text-slate-700 text-[10px] font-black uppercase pointer-events-none z-0">{placeholder}</div>
+          <div className="absolute top-[70px] left-4 px-4 py-2 text-slate-700 text-[10px] font-black uppercase pointer-events-none z-0">{placeholder}</div>
         )}
       </div>
     </div>
@@ -571,7 +577,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     }).reverse();
 
     return last7Days.map(date => ({
-      displayDate: date.split('-').reverse().slice(0, 2).join('.'), // формат 01.04
+      displayDate: date.split('-').reverse().slice(0, 2).join('.'), 
       visits: (analytics?.sessions || []).filter((s: any) => s.date === date).length
     }));
   }, [analytics?.sessions]);
@@ -639,7 +645,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl h-fit shadow-2xl">
                             <h2 className="text-xl font-black text-white italic uppercase mb-8">{editingId ? 'Modify Unit' : 'Create Unit'}</h2>
                             <form onSubmit={saveProduct} className="space-y-6">
-                                <RichEditor label="Identity (Name)" value={newProductName} onChange={setNewProductName} placeholder="ENTER HARDWARE NAME" />
+                                <RichEditor label="Identity (Name)" value={newProductName} onChange={setNewProductName} />
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Sector</label>
