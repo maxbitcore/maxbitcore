@@ -90,14 +90,15 @@ function App() {
   const location = useLocation();
 
   const switchToRegister = () => {
+    resetRegForm();
     setIsLoginOpen(false);
     setShowRegister(true);
   };
 
 
   const switchToLogin = () => {
-    setShowRegister(false);
     resetRegForm();
+    setShowRegister(false);
     setIsLoginOpen(true);
   };
 

@@ -20,23 +20,20 @@ interface NavbarProps {
   username: string; 
   setUsername: (value: string) => void;
   allProducts?: any[];
+  resetRegForm: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, isLoginOpen, setIsLoginOpen, username, switchToRegister, currentUser, setUsername, onLogout, onLoginSuccess }) => {
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, isLoginOpen, setIsLoginOpen, username, switchToRegister, currentUser, setUsername, onLogout, resetRegForm, onLoginSuccess }) => {
   const [scrolled, setScrolled] = useState(false);
   const [localQuery, setLocalQuery] = useState('');
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
   const navigate = useNavigate();
   const location = useLocation();
 
- 
-
-  // Auth State
   const [authMode, setAuthMode] = useState<'login' | 'register'| 'forgot'>('login');
   const [authStep, setAuthStep] = useState<'credentials' | 'admin_code'>('credentials');
   const [message, setMessage] = useState<string | null>(null);
   
-  // Auth Form State
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); 
@@ -411,7 +408,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in-up">
             <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md relative shadow-2xl">
                 <button 
-                    onClick={() => setIsLoginOpen(false)}
+                    onClick={() => {setIsLoginOpen(false); resetRegForm();}}
                     className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

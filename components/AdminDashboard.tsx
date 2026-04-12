@@ -14,7 +14,7 @@ interface AdminDashboardProps {
 interface RichEditorProps {
   value: string;
   onChange: (val: string) => void;
-  placeholder: string;
+  placeholder?: string;
   label: string;
 }
 
@@ -181,7 +181,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
           className="p-4 min-h-[60px] outline-none text-white text-sm prose prose-invert max-w-none relative z-10"
         ></div>
         {!value && (
-          <div className="absolute top-16 left-0 px-4 py-2 text-slate-600 text-[10px] font-bold uppercase pointer-events-none z-0">{placeholder}</div>
+          <div className="absolute top-20 left-4 px-4 py-2 text-slate-700 text-[10px] font-black uppercase pointer-events-none z-0">{placeholder}</div>
         )}
       </div>
     </div>
@@ -661,7 +661,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Credits (Price)</label>
-                                    <input required value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} type="number" placeholder="PRICE ($)" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-mono" />
+                                    <input required value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-mono" />
                                 </div>
                                 <div className="space-y-4">
                                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Visual Evidence</label>
@@ -706,8 +706,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                                         </div>
                                     )}
                                 </div>
-                                <RichEditor label="Hardware Components" value={newProductComponents} onChange={setNewProductComponents} placeholder="CPU, GPU, RAM details..." />
-                                <RichEditor label="Intel Briefing (Description)" value={newProductDesc} onChange={setNewProductDesc} placeholder="Full specs..." />
+                                <RichEditor label="Hardware Components" value={newProductComponents} onChange={setNewProductComponents}/>
+                                <RichEditor label="Intel Briefing (Description)" value={newProductDesc} onChange={setNewProductDesc}/>
                                 <button type="submit" disabled={isProcessing} className="w-full py-4 maxbit-gradient text-slate-950 font-black uppercase text-sm rounded-xl shadow-lg hover:opacity-90 transition-all">{isProcessing ? 'COMMITTING...' : (editingId ? 'UPDATE RECORD' : 'SAVE TO ARMORY')}</button>
                                 {editingId && <button type="button" onClick={resetProductForm} className="w-full py-4 bg-slate-800 text-slate-400 font-black uppercase text-xs rounded-xl hover:text-white transition-all">Abort</button>}
                             </form>
@@ -718,7 +718,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                                     <div className="w-24 h-32 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex-shrink-0"><img src={Array.isArray(p.gallery) && p.gallery.length > 0 ? p.gallery[0] : (p.imageUrl || '')} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" /></div>
                                     <div className="flex-1 flex flex-col justify-between py-1">
                                         <div>
-                                            <h3 className="font-black text-white text-base uppercase leading-tight mb-2 italic tracking-tighter" dangerouslySetInnerHTML={{ __html: p.name }}></h3>
+                                            <h3 className="font-black text-white text-sm uppercase leading-tight mb-2 italic tracking-tighter h-10 overflow-hidden line-clamp-2">{(p.name || '').replace(/<[^>]*>/g, '')}</h3>
                                             <div className="text-sm font-black text-cyan-400 font-mono tracking-tighter">${p.price}</div>
                                             <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">{(p as any).isPublished ? 'DEPLOYED' : 'IN ARMORY'}</div>
                                         </div>
