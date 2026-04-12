@@ -97,6 +97,7 @@ function App() {
 
   const switchToLogin = () => {
     setShowRegister(false);
+    resetRegForm();
     setIsLoginOpen(true);
   };
 
@@ -120,6 +121,18 @@ function App() {
     
     navigate('/');
     setView({ type: 'tab', activeTab: 'home' });
+  };
+
+  const resetRegForm = () => {
+    setFirstName('');
+    setLastName('');
+    setUsername('');
+    setEmail('');
+    setPhone('');
+    setBirthDate('');
+    setPassword('');
+    setConfirmPassword('');
+    setSecurityKey('');
   };
 
   useEffect(() => {
@@ -481,7 +494,7 @@ function App() {
       {showRegister && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-2xl w-full relative my-auto animate-fade-in">
-            <button onClick={() => setShowRegister(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
+            <button onClick={() => {setShowRegister(false); resetRegForm();}} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>

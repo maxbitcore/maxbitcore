@@ -17,7 +17,7 @@ const NewInStockBanner: React.FC<NewInStockBannerProps> = ({ newProducts, onProd
       setIsVisible(true);
     }
   }, [newProducts]);
-
+ 
   const handleDismiss = () => {
     setIsVisible(false);
     setIsDismissed(true);
@@ -42,7 +42,7 @@ const NewInStockBanner: React.FC<NewInStockBannerProps> = ({ newProducts, onProd
           </div>
           <div className="h-4 w-px bg-slate-800 hidden md:block"></div>
           <p className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            New Loadout Available: <span className="text-cyan-400 italic font-black">"{latestProduct.name}"</span>
+           New Loadout Available: <span className="text-cyan-400 italic font-black">"{latestProduct.name.replace(/<[^>]*>/g, '')}"</span>
           </p>
         </div>
 
@@ -58,7 +58,7 @@ const NewInStockBanner: React.FC<NewInStockBannerProps> = ({ newProducts, onProd
             className="text-slate-500 hover:text-white transition-colors"
             title="Dismiss Notification"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+            <svg xmlns="https://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
