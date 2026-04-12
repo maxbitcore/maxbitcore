@@ -79,37 +79,36 @@ const DEFAULT_CONFIG = {
 
 const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, label }) => {
   const editorRef = useRef<HTMLDivElement>(null);
-  const isTypingRef = useRef(false);
+  const isUpdatingRef = useRef(false);
   useEffect(() => {
-    if (editorRef.current && !isTypingRef.current) {
-      if (editorRef.current.innerHTML !== value) {
-        editorRef.current.innerHTML = value || '';
-      }
+    if (isUpdatingRef.current) return;
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || '';
     }
   }, [value]);
 
   const handleInput = () => {
     if (editorRef.current) {
-      const html = editorRef.current.innerHTML;
-      isTypingRef.current = true; 
-      onChange(html);
-      
-      setTimeout(() => {
-        isTypingRef.current = false;
-      }, 0);
+      onChange(editorRef.current.innerHTML);
     }
   };
 
   const exec = (cmd: string, val?: string) => {
     editorRef.current?.focus();
+    isUpdatingRef.current = true;
     if (cmd === 'createLink') {
      const url = window.prompt('Enter Deployment URL:');
-     if (!url) return;
+     if (url)
      document.execCommand(cmd, false, url);
     } else {
       document.execCommand(cmd, false, val);
     }
-    handleInput();
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+    setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 0);
   };
 
   return (
