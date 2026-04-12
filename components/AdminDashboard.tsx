@@ -79,13 +79,29 @@ const DEFAULT_CONFIG = {
 
 const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, label }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const isTypingRef = useRef(false);
   useEffect(() => {
-    if (editorRef.current && document.activeElement !== editorRef.current) {
-      editorRef.current.innerHTML = value || '';
+    if (editorRef.current && !isTypingRef.current) {
+      if (editorRef.current.innerHTML !== value) {
+        editorRef.current.innerHTML = value || '';
+      }
     }
   }, [value]);
 
+  const handleInput = () => {
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      isTypingRef.current = true; 
+      onChange(html);
+      
+      setTimeout(() => {
+        isTypingRef.current = false;
+      }, 0);
+    }
+  };
+
   const exec = (cmd: string, val?: string) => {
+    editorRef.current?.focus();
     if (cmd === 'createLink') {
      const url = window.prompt('Enter Deployment URL:');
      if (!url) return;
@@ -93,14 +109,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     } else {
       document.execCommand(cmd, false, val);
     }
-    if (editorRef.current) {onChange(editorRef.current.innerHTML);}
+    handleInput();
   };
-
-  useEffect(() => {
-  if (editorRef.current && document.activeElement !== editorRef.current) {
-    editorRef.current.innerHTML = value || '';
-  }
-}, [value]);
 
   return (
     <div className="space-y-2">
@@ -109,85 +119,106 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         <div className="bg-slate-900/50 border-b border-slate-800 p-2 flex flex-wrap gap-2 items-center">
           {/* Group: Typography */}
           <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
-            <button type="button" onClick={() => exec('bold')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Bold">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('bold'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6zM6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" /></svg>
             </button>
-            <button type="button" onClick={() => exec('italic')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Italic">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M10 20l4-16m-9 16h6m2-16h6" /></svg>
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('italic'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors">
+               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M10 20l4-16m-9 16h6m2-16h6" /></svg>
             </button>
-            <button type="button" onClick={() => exec('underline')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Underline">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3M4 21h16" /></svg>
+          </div>
+          <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
+            {/* Underline */}
+            <button 
+              type="button" 
+              onMouseDown={(e) => { e.preventDefault(); exec('underline'); }} 
+              className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" 
+              title="Underline"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                <path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3M4 21h16" />
+              </svg>
             </button>
-            <button type="button" onClick={() => exec('strikeThrough')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Strikethrough">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M5 12h14M16 6l-8 0M17 18l-10 0" /></svg>
+
+            {/*  Strikethrough */}
+            <button 
+              type="button" 
+              onMouseDown={(e) => { e.preventDefault(); exec('strikeThrough'); }} 
+              className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" 
+              title="Strikethrough"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                <path d="M5 12h14M16 6l-8 0M17 18l-10 0" />
+              </svg>
             </button>
           </div>
 
-          {/* Group: Font Sizes */}
           <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
-            {[
-              { label: 'MIN', size: '1', title: 'Small' },
-              { label: 'STD', size: '3', title: 'Normal' },
-              { label: 'MAG', size: '5', title: 'Large' },
-              { label: 'MAX', size: '7', title: 'Huge' }
-            ].map((s) => (
+            {['1', '3', '5', '7'].map((size, idx) => (
               <button
-                key={s.size}
+                key={size}
                 type="button"
-                onClick={() => exec('fontSize', s.size)}
-                className="px-1.5 py-0.5 hover:bg-slate-800 rounded text-[8px] font-black text-slate-500 hover:text-cyan-400 transition-colors uppercase tracking-tighter"
-                title={s.title}
+                onMouseDown={(e) => { e.preventDefault(); exec('fontSize', size); }}
+                className="px-1.5 py-0.5 hover:bg-slate-800 rounded text-[8px] font-black text-slate-500 hover:text-cyan-400 uppercase"
               >
-                {s.label}
+                {['MIN', 'STD', 'MAG', 'MAX'][idx]}
               </button>
             ))}
           </div>
 
           {/* Group: Lists */}
           <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
-            <button type="button" onClick={() => exec('insertUnorderedList')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Bullets">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('insertUnorderedList'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Bullets">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M9 6l11 0M9 12l11 0M9 18l11 0M5 6l0.01 0M5 12l0.01 0M5 18l0.01 0" /></svg>
             </button>
-            <button type="button" onClick={() => exec('insertOrderedList')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Numbered List">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('insertOrderedList'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Numbered List">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M10 6h10M10 12h10M10 18h10M4 6h1v4M4 10h2M4 18h3" /></svg>
             </button>
           </div>
 
           {/* Group: Alignment */}
           <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
-            <button type="button" onClick={() => exec('justifyLeft')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Align Left">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('justifyLeft'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Align Left">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M4 6h16M4 12h10M4 18h14" /></svg>
             </button>
-            <button type="button" onClick={() => exec('justifyCenter')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Align Center">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('justifyCenter'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Align Center">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M4 6h16M7 12h10M6 18h12" /></svg>
             </button>
-            <button type="button" onClick={() => exec('justifyRight')} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Align Right">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('justifyRight'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors" title="Align Right">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M4 6h16M10 12h10M6 18h14" /></svg>
             </button>
-          </div>
+          </div> 
 
           {/* Action: Clear */}
-          <button type="button" onClick={() => exec('removeFormat')} className="p-2 hover:bg-rose-950/30 rounded text-rose-500 hover:text-rose-400 transition-colors" title="Clear Formatting">
+          <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('removeFormat'); }} className="p-2 hover:bg-rose-950/30 rounded text-rose-500 hover:text-rose-400 transition-colors" title="Clear Formatting">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M6 18L18 6M6 6l12 12M19 19l-4-4" /></svg>
           </button>
 
           <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block"></div>
 
           {/* Color Palette */}
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 ml-2">
             {TACTICAL_PALETTE.map((item) => (
-              <button key={item.color} type="button" onClick={() => exec('foreColor', item.color)} className="w-4 h-4 rounded-sm border border-slate-700 hover:scale-125 transition-transform" style={{ backgroundColor: item.color }} title={item.name} />
+              <button 
+                key={item.color} 
+                type="button" 
+                onMouseDown={(e) => { e.preventDefault(); exec('foreColor', item.color); }} 
+                className="w-4 h-4 rounded-sm border border-slate-700 hover:scale-125 transition-transform" 
+                style={{ backgroundColor: item.color }} 
+              />
             ))}
           </div>
         </div>
         <div 
           ref={editorRef} 
           contentEditable 
-          onInput={(e) => onChange(e.currentTarget.innerHTML)} 
-          className="p-4 min-h-[60px] outline-none text-white text-sm prose prose-invert max-w-none relative z-10"
+          onInput={handleInput}
+          suppressContentEditableWarning={true}
+          className="p-4 min-h-[80px] outline-none text-white text-sm prose prose-invert max-w-none relative z-10"
         ></div>
         {!value && (
-          <div className="absolute top-[70px] left-4 px-4 py-2 text-slate-700 text-[10px] font-black uppercase pointer-events-none z-0">{placeholder}</div>
+          <div className="absolute top-[70px] left-4 px-4 py-2 text-slate-800 text-[10px] font-black uppercase pointer-events-none z-0">
+            {placeholder || 'Enter protocol data...'}
+          </div>
         )}
       </div>
     </div>
