@@ -6,9 +6,46 @@ interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
   label?: string;
+  currentUser: any;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser }) => {
+
+  const handleAddToWishlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Проверяем, залогинен ли юзер
+    if (!currentUser?.email) {
+      alert("PLEASE INITIALIZE CONNECTION (LOGIN) TO SAVE HARDWARE.");
+      return;
+    }
+
+    // Ищем его личный список в памяти
+    const key = `maxbit_wishlist_${currentUser.email}`;
+    const existingList = JSON.parse(localStorage.getItem(key) || '[]');
+
+    // Проверяем, не добавлен ли товар уже
+    if (existingList.find((item: any) => item.id === product.id)) {
+      alert("ITEM ALREADY IN WISH LIST.");
+      return;
+    }
+
+    // Сохраняем товар
+    existingList.push({
+      id: product.id,
+      name: product.name,
+      category: product.category || 'HARDWARE',
+      price: product.price
+    });
+
+    localStorage.setItem(key, JSON.stringify(existingList));
+    
+    // ОТПРАВЛЯЕМ СИГНАЛ В ДАШБОРД (чтобы он обновил счетчик мгновенно)
+    window.dispatchEvent(new Event('wishlist-updated'));
+    
+    alert("HARDWARE SAVED TO SECURE WISH LIST.");
+  };
+
   return (
     <div 
       className="group relative bg-slate-900/40 border border-slate-800/50 rounded-[2rem] overflow-hidden cursor-pointer hover:border-cyan-500/40 transition-all duration-700 flex flex-col hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.7)]" 

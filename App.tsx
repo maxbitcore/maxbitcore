@@ -319,6 +319,7 @@ function App() {
                   key={product.id} 
                   product={product} 
                   onClick={(p) => navigate(`/product/${p.id}`)} 
+                  currentUser={currentUser}
                 />
               ))}
             </div>
@@ -357,6 +358,7 @@ function App() {
           onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/'); setView({ type: 'tab', activeTab: 'home' });}}
           onLoginSuccess={(user: any) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
           allProducts={publishedProducts}
+          resetRegForm={resetRegForm}
        />
       
       {showSuccessAlert && (
@@ -394,7 +396,7 @@ function App() {
           <Route path="/dashboard" element={
             currentUser ? (
               <CustomerDashboard 
-                user={currentUser} 
+                currentUser={currentUser} 
                 onLogout={() => {
                   setCurrentUser(null);
                   setAppMode('landing');
@@ -406,7 +408,7 @@ function App() {
             )
           } />
 
-            <Route path="/configurator" element={<div className="pt-16"><CustomBuildForm /></div>} />
+            <Route path="/configurator" element={<div className="pt-16"><CustomBuildForm currentUser={currentUser}/></div>} />
             
             <Route path="/gaming-pcs" element={
               <ProductGrid 
@@ -416,6 +418,7 @@ function App() {
                 }}
                 searchQuery={searchQuery} 
                 externalProducts={filteredProducts}
+                currentUser={currentUser}
               />
             } />
             
@@ -427,6 +430,7 @@ function App() {
                 }}
                 searchQuery={searchQuery} 
                 externalProducts={filteredProducts} 
+                currentUser={currentUser}
               />
             } />
             
@@ -438,6 +442,7 @@ function App() {
                 }}
                 searchQuery={searchQuery} 
                 externalProducts={filteredProducts} 
+                currentUser={currentUser}
               />
             } />
 
