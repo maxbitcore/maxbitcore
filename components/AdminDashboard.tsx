@@ -77,7 +77,7 @@ const DEFAULT_CONFIG = {
   resolutions: ['1080p (FHD)', '1440p (QHD)', '2160p (4K)']
 };
 
-const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder,label }) => {
+const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, label }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
   useEffect(() => {

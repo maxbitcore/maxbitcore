@@ -72,26 +72,6 @@ const Footer: React.FC<FooterProps> = ({ onTabChange }) => {
         <div className="text-[10px] uppercase tracking-[0.3em] text-slate-600 order-2 md:order-1">
           <p>© 2025 {BRAND_NAME}. All rights reserved.</p>
         </div>
-        
-        <div className="flex flex-col items-center md:items-end gap-4 order-1 md:order-2">
-           <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Accepted Payment Protocols</span>
-           <div className="flex gap-4">
-              <div className="w-10 h-6 bg-slate-900 rounded border border-slate-800 flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-50 hover:opacity-100 cursor-default" title="Visa">
-                <svg className="h-3" viewBox="0 0 24 24" fill="white"><path d="M1.2 5h4l2.5 11.5L10 5h4l-4 14H6L1.2 5zm17.5 0h-4v14h4v-14zm4 0h-4v14h4v-14z" /></svg>
-              </div>
-              <div className="w-10 h-6 bg-slate-900 rounded border border-slate-800 flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-50 hover:opacity-100 cursor-default" title="Mastercard">
-                <div className="flex -space-x-2">
-                   <div className="w-3 h-3 rounded-full bg-rose-500 opacity-80"></div>
-                   <div className="w-3 h-3 rounded-full bg-amber-500 opacity-80"></div>
-                </div>
-              </div>
-              <div className="w-10 h-6 bg-slate-900 rounded border border-slate-800 flex items-center justify-center grayscale hover:grayscale-0 transition-all opacity-50 hover:opacity-100 cursor-default" title="PayPal">
-                <svg className="h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944 3.723a.641.641 0 01.633-.54h7.19c4.322 0 6.642 2.158 6.014 5.992-.375 2.275-1.742 4.01-3.692 4.935-.95.45-2.072.684-3.21.684H9.15a.641.641 0 00-.632.541l-1.442 5.91-.01.037a.641.641 0 01-.632.441l.642-2.686z" />
-                </svg>
-              </div>
-           </div>
-        </div>
       </div>
     </footer>
   );

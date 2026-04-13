@@ -12,7 +12,7 @@ const Returns: React.FC = () => {
         <section>
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">1. Return Autorization Required</h2>
           <div className="text-slate-400 leading-loose space-y-4">
-            <p>All return requests must be submitted in writing to max@maxbitcore.com. Returns sent without prior authorization will be refused and returned to sender. Once approved, all returns must be shipped to MaxBit business address.</p>
+            <p>All return requests must be submitted in writing to support@maxbitcore.com. Returns sent without prior authorization will be refused and returned to sender. Once approved, all returns must be shipped to MaxBit business address.</p>
           </div>
         </section>
 
@@ -63,7 +63,7 @@ const Returns: React.FC = () => {
           </div>
         </section>
 
-        <section>
+        <section> 
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">6. Chargebacks, Fraud & Abuse Protectio</h2>
           <div className="text-slate-400 leading-loose space-y-4">
             <p>Initiating a chargeback without first contacting MaxBit may result in: immediate warranty voidance, permanent denial of future service or purchases. All systems are documented with: Build photos, Serial numbers, Pre-shipment testing records, Packaging condition documentation</p>

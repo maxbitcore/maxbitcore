@@ -14,38 +14,12 @@ const FAQ: React.FC = () => {
           a: "Never. We only use Tier-1 brands like Corsair, Samsung, G.Skill, and Crucial. You will always receive the specific brand or an equivalent premium alternative if stock is fluctuating." 
         },
         { 
-          q: "Can I request a custom loop or specific cooling fluid?", 
-          a: "Our standard Apex Sentinel X1 comes with a high-performance custom loop. For unique colors or complex routing, please contact our concierge team before placing your order." 
-        }
-      ]
-    },
-    {
-      title: "Performance & Warranty",
-      items: [
-        { 
-          q: "Is my PC overclocked out of the box?", 
-          a: "We perform 'Safe-OC' by default on all K-series CPUs and enthusiast GPUs. We optimize voltage and frequency for peak stable performance without compromising the lifespan of the hardware." 
+          q: "Do I get the original component boxes?", 
+          a: "Yes. We ship a separate 'Armory Accessory Box' containing all original component manuals, extra cables, and driver media." 
         },
-        { 
-          q: "What does the 3-year warranty cover?", 
-          a: "It covers all hardware failure under normal gaming usage. It includes free labor for repairs and original part replacement. Shipping is covered by MaxBit during the first 12 months." 
-        },
-        { 
-          q: "Does opening my case void the warranty?", 
-          a: "No. We encourage enthusiasts to maintain their systems. Adding your own storage or cleaning dust does not void the warranty, provided no physical damage occurs to the original components." 
-        }
-      ]
-    },
-    {
-      title: "Software & OS",
-      items: [
         { 
           q: "Is there bloatware installed?", 
           a: "Absolutely not. We provide a clean installation of Windows 11 Pro with only the necessary drivers and hardware control software (like RGB sync) pre-installed and optimized." 
-        },
-        { 
-          q: "Do I get the original component boxes?", 
-          a: "Yes. We ship a separate 'Armory Accessory Box' containing all original component manuals, extra cables, and driver media." 
         }
       ]
     }

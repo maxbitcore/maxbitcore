@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback} from 'react';
 import { PRODUCTS } from '../constants';
 import { Product } from '../types';
 import ProductCard from './ProductCard';
@@ -10,9 +10,10 @@ interface ProductGridProps {
   onProductClick: (product: Product) => void;
   searchQuery?: string;
   externalProducts?: Product[];
+  currentUser: any;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, searchQuery = '' }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, currentUser, searchQuery = '' }) => {
   const [deployedProducts, setDeployedProducts] = useState<Product[]>([]);
 
   const loadPublished = () => {
@@ -25,6 +26,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, sea
       setDeployedProducts([]);
     }
   };
+ const handleProductClick = useCallback((p: Product) => {
+  trackProductView(p.id, p.name);
+  onProductClick(p);
+}, [onProductClick]);
 
   useEffect(() => {
     loadPublished();
@@ -81,7 +86,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, sea
         {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
             {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} onClick={(p) => { trackView(p.id); onProductClick(p); }} />
+              <ProductCard key={product.id} product={product} onClick={handleProductClick} label="Product Info" currentUser={currentUser} /> 
             ))}
           </div>
         ) : (
