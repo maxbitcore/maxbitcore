@@ -97,7 +97,11 @@ const AccordionSection: React.FC<AccordionProps> = ({ id, title, value, isOpen, 
   );
 };
 
-const CustomBuildForm: React.FC = () => {
+interface CustomBuildFormProps {
+  currentUser?: any;
+}
+
+const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [status, setStatus] = useState<'idle' | 'success'>('idle');
   const [activeSections, setActiveSections] = useState<string[]>([]);
   const [hoveredSize, setHoveredSize] = useState<string | null>(null);
@@ -112,6 +116,14 @@ const CustomBuildForm: React.FC = () => {
   const [exactBudget, setExactBudget] = useState('');
   const [targetDeadline, setTargetDeadline] = useState('');
   const [requirements, setRequirements] = useState('');
+
+  useEffect(() => {
+    if (currentUser) {
+      const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ');
+      if (fullName) setUserName(fullName);
+      if (currentUser.email) setUserEmail(currentUser.email);
+    }
+  }, [currentUser]);
 
   // Selections
   const [purpose, setPurpose] = useState('Not Specified');
