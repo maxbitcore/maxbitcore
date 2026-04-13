@@ -282,6 +282,17 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     );
   }
 
+  useEffect(() => {
+    if (currentUser) {
+      // Собираем полное имя из firstName и lastName
+      const fullName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
+      
+      // Заполняем поля, если они еще пустые
+      if (fullName) setUserName(fullName.toUpperCase()); // Ты любишь капс в стиле MaxBit
+      if (currentUser.email) setUserEmail(currentUser.email.toLowerCase());
+    }
+  }, [currentUser]);
+
   return (
     <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] flex flex-col items-center border-t border-slate-900 relative">
       <div className="max-w-[900px] w-full space-y-12">
@@ -444,7 +455,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
 
           <div className="space-y-10 bg-slate-900/40 border border-slate-800 rounded-3xl p-8 md:p-12 shadow-2xl overflow-visible">
             <div className="border-b border-slate-800 pb-6">
-              <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Contact & Delivery</h3>
+              <h3 className="text-xl font-black text-white uppercase italic tracking-tighter"> </h3>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 overflow-visible">

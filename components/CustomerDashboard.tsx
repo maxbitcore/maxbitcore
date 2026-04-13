@@ -86,16 +86,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500">System Active</span>
             </div>
             <h1 className="text-3xl font-black italic uppercase tracking-tighter">
-              Welcome, <span className="text-slate-400">{currentUser?.firstName}</span>
+              Welcome, <span className="text-slate-400">{currentUser?.username || currentUser?.firstName}</span>
             </h1>
           </div>
-          
-          <button 
-            onClick={onLogout}
-            className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-rose-500 transition-colors"
-          >
-            Disconnect
-          </button>
         </div>
 
         {/* DASHBOARD GRID */}
