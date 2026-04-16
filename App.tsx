@@ -349,14 +349,6 @@ function App() {
           cartCount={cartItems.length}
           onOpenCart={() => setIsCartOpen(true)}
           onSearch={handleSearch}
-          isLoginOpen={isLoginOpen}
-          setIsLoginOpen={setIsLoginOpen}
-          switchToRegister={switchToRegister}
-          username={username}
-          setUsername={setUsername}
-          currentUser={currentUser} 
-          onLogout={() => { setCurrentUser(null); setAppMode('landing'); localStorage.clear(); navigate('/'); setView({ type: 'tab', activeTab: 'home' });}}
-          onLoginSuccess={(user: any) => {setCurrentUser(user);if (user.role !== 'admin') {setAppMode('dashboard'); setView({ type: 'tab', activeTab: 'dashboard' }); navigate('/dashboard');}}}
           allProducts={publishedProducts}
           resetRegForm={resetRegForm}
        />

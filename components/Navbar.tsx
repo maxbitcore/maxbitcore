@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
 import { loginUser, registerUser, logoutUser, getStoredAuth, forgotPassword } from '../services/authService';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
@@ -11,29 +12,24 @@ interface NavbarProps {
   cartCount: number;
   onOpenCart: () => void;
   onSearch: (query: string) => void;
-  currentUser?: any;       
-  onLogout?: () => void;    
-  onLoginSuccess?: (user: any) => void;
-  isLoginOpen: boolean;                             
-  setIsLoginOpen: (open: boolean) => void;         
-  switchToRegister: () => void; 
-  username: string; 
-  setUsername: (value: string) => void;
   allProducts?: any[];
   resetRegForm: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, isLoginOpen, setIsLoginOpen, username, switchToRegister, currentUser, setUsername, onLogout, resetRegForm, onLoginSuccess }) => {
-  const [scrolled, setScrolled] = useState(false);
-  const [localQuery, setLocalQuery] = useState('');
-  const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, resetRegForm }) => {
+  const { currentUser, setCurrentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [scrolled, setScrolled] = useState(false);
+  const [localQuery, setLocalQuery] = useState('');
+  const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || "");
+
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'| 'forgot'>('login');
   const [authStep, setAuthStep] = useState<'credentials' | 'admin_code'>('credentials');
   const [message, setMessage] = useState<string | null>(null);
-  
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); 
@@ -156,8 +152,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
            localStorage.setItem('maxbit_currentUser', JSON.stringify(userData));
         }
   
-        if (onLoginSuccess) {
-          onLoginSuccess(userData);
+        if (setCurrentUser) {
+          setCurrentUser(userData);
         }
  
         setIsLoginOpen(false);
@@ -198,8 +194,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const handleLogout = () => {
     logoutUser();
 
-    if (onLogout) {
-    onLogout(); 
+    if (setCurrentUser) {
+    setCurrentUser(null); 
   }
 
   localStorage.removeItem('maxbit_token');
@@ -556,7 +552,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 if (authMode === 'forgot') {
                                     setAuthMode('login');
                                 } else if (authMode=== 'login') { 
-                                    switchToRegister();
+                                    setAuthMode('register');
                                 } else { 
                                     setAuthMode ('login');
                                 }

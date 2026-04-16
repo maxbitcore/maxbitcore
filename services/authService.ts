@@ -48,6 +48,7 @@ if (data.token) {
 };
 
 export const loginUser = async (username: string, password: string, adminCode?: string): Promise<AuthResponse> => {
+  console.log("DEBUG LOGIN:", { username, password });
   const response = await fetch(`https://maxbitcore.com/api/login.php`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
