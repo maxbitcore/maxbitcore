@@ -24,7 +24,7 @@ import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { sendRegistrationEmail } from './services/emailService';
 import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css"
+import 'react-datepicker/dist/react-datepicker.css';
 import { enUS } from 'date-fns/locale';
 
 

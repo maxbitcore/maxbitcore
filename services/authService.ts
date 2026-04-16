@@ -85,6 +85,17 @@ export const logoutUser = () => {
 };
 
 export const getStoredAuth = () => {
+  const userJson = localStorage.getItem('maxbit_currentUser');
+  let email = '';
+  
+  if (userJson) {
+    try {
+      const parsed = JSON.parse(userJson);
+      email = parsed.email || '';
+    } catch (e) {
+      console.error("Ошибка парсинга пользователя", e);
+    }
+  }
   return {
     token: localStorage.getItem('maxbit_token'),
     role: localStorage.getItem('maxbit_role') as 'admin' | 'user' | null,
