@@ -36,6 +36,13 @@ export const registerUser = async (username: string, email: string, password: st
 if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
+    const userToSave = {
+      email: data.user?.email || email, 
+      firstName: data.user?.firstName || '',
+      lastName: data.user?.lastName || '',
+      role: data.role
+    };
+    localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
   }
   return data;
 };
@@ -54,9 +61,15 @@ export const loginUser = async (username: string, password: string, adminCode?: 
   if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
-    if (data.user?.email) {
-      localStorage.setItem('maxbit_email', data.user.email);
-    }
+  if (data.user?.email)
+    localStorage.setItem('maxbit_email', data.user.email);
+  const userToSave = {
+    email: data.user?.email || '',
+    firstName: data.user?.firstName || '',
+    lastName: data.user?.lastName || '',
+    role: data.role
+  };
+  localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
   }
   return data;
 };
@@ -82,23 +95,32 @@ export const resetPassword = async (token: string, newPassword: string) => {
 export const logoutUser = () => {
   localStorage.removeItem('maxbit_token');
   localStorage.removeItem('maxbit_role');
+  localStorage.removeItem('maxbit_email');
+  localStorage.removeItem('maxbit_currentUser');
 };
 
 export const getStoredAuth = () => {
+  const token = localStorage.getItem('maxbit_token');
+  const role = localStorage.getItem('maxbit_role') as 'admin' | 'user' | null;
   const userJson = localStorage.getItem('maxbit_currentUser');
-  let email = '';
   
+  let email = '';
+  let firstName = '';
+
   if (userJson) {
     try {
-      const parsed = JSON.parse(userJson);
-      email = parsed.email || '';
+      const userObj = JSON.parse(userJson);
+      email = userObj.email || '';
+      firstName = userObj.firstName || '';
     } catch (e) {
-      console.error("Ошибка парсинга пользователя", e);
+      console.error("Error parsing user data", e);
     }
   }
+
   return {
-    token: localStorage.getItem('maxbit_token'),
-    role: localStorage.getItem('maxbit_role') as 'admin' | 'user' | null,
-    email: localStorage.getItem('maxbit_email')
+    token,
+    role,
+    email,
+    firstName
   };
 };
