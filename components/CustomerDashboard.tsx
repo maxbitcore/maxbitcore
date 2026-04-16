@@ -120,7 +120,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                 <div className="border-l-2 border-slate-800 pl-4">
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 block mb-1">System Joined</span>
                     <span className="text-sm font-black text-white uppercase italic tracking-wider">
-                        {currentUser?.id && !isNaN(Number(currentUser.id)) ? new Date(Number(currentUser.id)).toLocaleDateString('en-US', {
+                        {currentUser?.joined ? new Date(currentUser.joined).toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric'

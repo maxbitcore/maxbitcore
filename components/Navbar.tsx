@@ -141,10 +141,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
       if (isActuallySuccess) {
         const userData = {
-             email: email, 
+             id: response.id || response.user_id,
+             email: response.email || email, 
              role: response.role || 'user',
-             firstName: response.firstName || 'User' 
+             firstName: response.firstName || 'User', 
+             joined: response.joined || new Date().toISOString()
         };
+        
+        console.log("DEBUG: Saving to LocalStorage:", userData);
 
         if (response.token) {
            localStorage.setItem('maxbit_token', response.token);
