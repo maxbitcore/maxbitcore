@@ -159,6 +159,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         setIsLoginOpen(false);
         resetForm();
         const userRole = response.role || 'user';
+        console.log("DEBUG: Login successful. Role detected:", userRole);
         if (userRole === 'admin') {
           navigate('/admin') 
         } else {
