@@ -35,7 +35,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   const syncWithServer = async (updatedList: any[], fileName: string = 'save_products.php') => {
     try {
-      const response = await fetch(`api/${fileName}`, {
+      const response = await fetch(`https://www.maxbitcore.com/api/${fileName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedList)

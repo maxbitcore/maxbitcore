@@ -219,7 +219,7 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('https://maxbitcore.com/api/products.php');
+        const response = await fetch('https://www.maxbitcore.com/api/products.php');
         const data = await response.json();
         if (Array.isArray(data)) {
           const approved = data.filter((p) => p && p.isApproved && p.isPublished);
