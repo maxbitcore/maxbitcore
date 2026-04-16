@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { trackCartAddition, logAction } from '../services/analyticsService';
 import { Product, Review } from '../types';
 import { getStoredAuth } from '../services/authService';
+import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 
 interface ProductDetailProps {
   product: Product;
@@ -11,15 +12,29 @@ interface ProductDetailProps {
 }
 
 const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToCart }) => {
-  const isSoldOut = product.status === 'Sold Out';
+  const { email, role } = getStoredAuth();
   const [activeImage, setActiveImage] = useState(product.imageUrl);
+  const isSoldOut = product.status === 'Sold Out';
+
+  const [isWishlisted, setIsWishlisted] = useState(() => 
+    checkIsWishlisted(product.id, email || '')
+  );
+
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!email) { 
+        alert("PLEASE INITIALIZE CONNECTION (LOGIN).");
+        return;
+    }
+    const newState = toggleWishlist(product.id, email);
+    setIsWishlisted(newState);
+  };
   
   // Review Form State
   const [reviewName, setReviewName] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { role } = getStoredAuth();
  
   useEffect(() => {
     setActiveImage(product.imageUrl);
@@ -160,6 +175,16 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
                }`}
              >
                {isSoldOut ? 'ARCHIVE DATA ONLY' : `ADD TO CART — $${product.price}`}
+             </button>
+             <button 
+                 onClick={handleWishlistClick}
+                 className={`w-20 rounded-[1.5rem] border ... ${
+                     isWishlisted ? 'border-rose-500/50 text-rose-500' : 'border-slate-700/50 text-slate-400'
+                 }`}
+             >
+                 <svg className="w-6 h-6" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                 </svg>
              </button>
           </div>
         </div>

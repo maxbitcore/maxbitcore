@@ -396,7 +396,9 @@ function App() {
           <Route path="/dashboard" element={
             currentUser ? (
               <CustomerDashboard 
-                currentUser={currentUser} 
+                currentUser={currentUser}
+                allProducts={publishedProducts}
+                onSelectProduct={(product) => navigate(`/product/${product.id}`)}
                 onLogout={() => {
                   setCurrentUser(null);
                   setAppMode('landing');

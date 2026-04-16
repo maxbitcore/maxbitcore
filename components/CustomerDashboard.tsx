@@ -3,11 +3,29 @@ import React, { useState, useEffect } from 'react';
 interface CustomerDashboardProps {
   currentUser: any;
   onLogout: () => void;
+  allProducts: any[];
+  onSelectProduct: (product: any) => void;
 }
 
-export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUser, onLogout }) => {
+export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUser, onLogout, allProducts, onSelectProduct }) => {
   const [userSubmissions, setUserSubmissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [wishlist, setWishlist] = useState<any[]>([]);
+
+   useEffect(() => {
+    const loadWishlist = () => {
+      if (!currentUser?.email) return;
+      const stored = localStorage.getItem(`maxbit_wishlist_${currentUser.email}`);
+      if (stored) {
+        setWishlist(JSON.parse(stored));
+      }
+    };
+
+    loadWishlist();
+    
+    window.addEventListener('wishlist-updated', loadWishlist);
+    return () => window.removeEventListener('wishlist-updated', loadWishlist);
+  }, [currentUser]);
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -50,23 +68,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
     }
   };
 
-  const [wishlist, setWishlist] = useState<any[]>([]);
-
-  useEffect(() => {
-    const loadWishlist = () => {
-      if (!currentUser?.email) return;
-      const stored = localStorage.getItem(`maxbit_wishlist_${currentUser.email}`);
-      if (stored) {
-        setWishlist(JSON.parse(stored));
-      }
-    };
-
-    loadWishlist();
-    
-    window.addEventListener('wishlist-updated', loadWishlist);
-    return () => window.removeEventListener('wishlist-updated', loadWishlist);
-  }, [currentUser]);
-
   const handleRemoveFromWishlist = (productId: string) => {
     const updated = wishlist.filter(item => item.id !== productId);
     setWishlist(updated);
@@ -104,7 +105,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                 {/* NAME */}
                 <div className="border-l-2 border-cyan-500/30 pl-4">
                   <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Full Name</p>
-                  <p className="text-sm font-bold uppercase italic">{currentUser?.firstName} {currentUser?.lastName}</p>
+                  <p className="text-sm font-bold uppercase italic">
+                    {`${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'IDENTIFIED OPERATOR'}
+                  </p>
                 </div>
 
                 {/* Email (Comm_Link) */}
@@ -117,7 +120,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                 <div className="border-l-2 border-slate-800 pl-4">
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 block mb-1">System Joined</span>
                     <span className="text-sm font-black text-white uppercase italic tracking-wider">
-                        {currentUser?.id ? new Date(parseInt(currentUser.id)).toLocaleDateString('en-US', {
+                        {currentUser?.id && !isNaN(Number(currentUser.id)) ? new Date(Number(currentUser.id)).toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric'
@@ -146,14 +149,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                   wishlist.map((item) => (
                     <div key={item.id} className="border-l-2 border-slate-800 pl-4 py-1 flex justify-between items-center group hover:border-cyan-500/50 transition-colors">
                       <div>
-                        {/* Если у товара нет категории, пишем HARDWARE */}
-                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">{item.category || 'HARDWARE'}</p>
-                        <p className="text-sm font-bold uppercase italic text-white group-hover:text-cyan-400 transition-colors cursor-pointer line-clamp-1">
+                        <p className="text-[9px] text-slate-500 uppercase font-black mb-1">
+                          {item.category || 'HARDWARE'}
+                        </p>
+                        <p className="text-sm font-bold uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
                           {item.name}
                         </p>
                       </div>
                       <button 
-                        onClick={() => handleRemoveFromWishlist(item.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFromWishlist(item.id);
+                        }}
                         className="text-[10px] font-black text-slate-600 hover:text-rose-500 uppercase tracking-widest transition-colors ml-4"
                       >
                         Remove

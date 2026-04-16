@@ -1,6 +1,6 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
@@ -47,7 +47,7 @@ app.post('/create-checkout-session', async (req, res) => {
         quantity: 1,
       });
     }
-    
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items,

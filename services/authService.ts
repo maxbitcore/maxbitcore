@@ -11,6 +11,7 @@ export interface AuthResponse {
   message?: string;
   success?: boolean;
   requiresAdminCode?: boolean;
+  email: string | null;
 }
 
 const API_URL = "https://maxbitcore.com/api";
@@ -53,6 +54,9 @@ export const loginUser = async (username: string, password: string, adminCode?: 
   if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
+    if (data.user?.email) {
+      localStorage.setItem('maxbit_email', data.user.email);
+    }
   }
   return data;
 };
@@ -83,6 +87,7 @@ export const logoutUser = () => {
 export const getStoredAuth = () => {
   return {
     token: localStorage.getItem('maxbit_token'),
-    role: localStorage.getItem('maxbit_role') as 'admin' | 'user' | null
+    role: localStorage.getItem('maxbit_role') as 'admin' | 'user' | null,
+    email: localStorage.getItem('maxbit_email')
   };
 };

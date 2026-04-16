@@ -8,7 +8,7 @@ export interface Review {
   comment: string;
 }
 
-export type ProductStatus = 'In Stock' | 'Sold Out' | 'Pre-Order' | 'Limited Edition' | 'Coming Soon' | 'Backordered';
+export type ProductStatus = 'In Stock' | 'Sold Out' | 'Pre-Order' | 'Limited Edition' | 'Coming Soon' | 'Backordered' | 'Discontinued';
 
 export interface Product {
   id: string;

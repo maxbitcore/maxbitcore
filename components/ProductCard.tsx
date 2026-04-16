@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
+import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -10,40 +11,26 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser }) => {
+  const [isWishlisted, setIsWishlisted] = useState(() => 
+    currentUser?.email ? checkIsWishlisted(product.id, currentUser.email) : false
+  );
 
-  const handleAddToWishlist = (e: React.MouseEvent) => {
+  useEffect(() => {
+    if (currentUser?.email) {
+      setIsWishlisted(checkIsWishlisted(product.id, currentUser.email));
+    } else {
+      setIsWishlisted(false);
+    }
+  }, [currentUser, product.id]);
+
+  const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    // Проверяем, залогинен ли юзер
     if (!currentUser?.email) {
       alert("PLEASE INITIALIZE CONNECTION (LOGIN) TO SAVE HARDWARE.");
       return;
     }
-
-    // Ищем его личный список в памяти
-    const key = `maxbit_wishlist_${currentUser.email}`;
-    const existingList = JSON.parse(localStorage.getItem(key) || '[]');
-
-    // Проверяем, не добавлен ли товар уже
-    if (existingList.find((item: any) => item.id === product.id)) {
-      alert("ITEM ALREADY IN WISH LIST.");
-      return;
-    }
-
-    // Сохраняем товар
-    existingList.push({
-      id: product.id,
-      name: product.name,
-      category: product.category || 'HARDWARE',
-      price: product.price
-    });
-
-    localStorage.setItem(key, JSON.stringify(existingList));
-    
-    // ОТПРАВЛЯЕМ СИГНАЛ В ДАШБОРД (чтобы он обновил счетчик мгновенно)
-    window.dispatchEvent(new Event('wishlist-updated'));
-    
-    alert("HARDWARE SAVED TO SECURE WISH LIST.");
+    const newState = toggleWishlist(product.id, currentUser.email);
+    setIsWishlisted(newState);
   };
 
   return (
@@ -107,12 +94,25 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
               </span>
               <div className="h-0.5 w-0 group-hover:w-full bg-cyan-500 transition-all duration-500"></div>
             </div>
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-700 ${
-              product.status === 'Sold Out' ? 'bg-slate-800 text-slate-600' : 'bg-slate-800/50 border border-slate-700/50 group-hover:bg-cyan-500 text-slate-400 group-hover:text-slate-950 group-hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] group-hover:border-cyan-400'
-            }`}>
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
+            <div className="flex gap-2">
+                {/* Wishlist */}
+                <button 
+                    onClick={handleToggle} 
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${
+                        isWishlisted ? 'border-rose-500/50 text-rose-500' : 'border-slate-700/50 text-slate-400 hover:text-rose-500'
+                    }`}
+                >
+                    <svg className="w-6 h-6" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                </button>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-700 ${
+                    product.status === 'Sold Out' ? 'bg-slate-800 text-slate-600' : 'bg-slate-800/50 border border-slate-700/50 group-hover:bg-cyan-500 text-slate-400 group-hover:text-slate-950 group-hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] group-hover:border-cyan-400'
+                }`}>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                </div>
             </div>
         </div>
       </div>
