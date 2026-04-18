@@ -292,6 +292,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 
     const loadAllData = async () => {
       setIsLoading(true);
+      console.log("DEBUG: loadAllData START");
       
       try {
         try {
@@ -361,6 +362,10 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         setIsLoading(false);
       }
     };
+
+    if (token) {
+      loadAllData();
+    }
     
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
     if (storedConfig) setConfig(JSON.parse(storedConfig));
