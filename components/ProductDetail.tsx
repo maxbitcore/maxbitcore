@@ -45,7 +45,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
     onAddToCart(product);
   };
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewComment.trim()) return;
 
@@ -59,20 +59,30 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
       comment: reviewComment.trim()
     };
 
-    // Update LocalStorage Product DB
-    const allProductsRaw = localStorage.getItem('maxbit_published_products_v2');
-    if (allProductsRaw) {
-      const allProducts: Product[] = JSON.parse(allProductsRaw);
-      const updatedProducts = allProducts.map(p => {
+    product.reviews = [newReview, ...(product.reviews || [])];
+
+    try {
+      const res = await fetch('https://www.maxbitcore.com/api/products.php');
+      const freshProducts = await res.json();
+
+      const updatedProducts = freshProducts.map((p: Product) => {
         if (p.id === product.id) {
-          return { ...p, reviews: [newReview, ...(p.reviews || [])] };
+          return { ...p, reviews: product.reviews };
         }
-        return p;
+        return p; 
       });
+
+      await fetch('https://www.maxbitcore.com/api/save_products.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedProducts)
+      });
+      console.log("Intel Report successfully transmitted to Server.");
+
       localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedProducts));
-      
-      // Notify parent/context that data changed (simple way is forcing a reload or local update)
-      product.reviews = [newReview, ...(product.reviews || [])];
+
+    } catch (error) {
+      console.error("Failed to sync report with MaxBit server:", error);
     }
 
     logAction('CLICK', `Posted Review on ${product.name.replace(/<[^>]*>?/gm, '')}`);
