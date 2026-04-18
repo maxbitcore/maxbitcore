@@ -292,64 +292,75 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 
     const loadAllData = async () => {
       setIsLoading(true);
+      
       try {
-        const [prodRes, subRes, orderRes] = await Promise.all([
-          fetch('https://www.maxbitcore.com/api/products.php'),
-          fetch('https://www.maxbitcore.com/api/get-submissions.php'),
-          fetch('https://www.maxbitcore.com/api/get-orders.php')
-        ]);
-
-        const prodData = await prodRes.json();
-        const subData = await subRes.json();
-        const orderData = await orderRes.json();
-
-        if (Array.isArray(prodData)) {
-          setPublishedProducts(prodData);
-          localStorage.setItem('maxbit_published_products_v2', JSON.stringify(prodData));
-        }
-        if (Array.isArray(subData)) {
-          setSubmissions(subData);
-          localStorage.setItem('maxbit_submissions', JSON.stringify(subData));
-        }
-        if (Array.isArray(orderData)) {
-          const validatedOrders: OrderRecord[] = orderData.map((ord: any) => ({
-            id: ord.id || `ORD-${Math.random().toString(36).substr(2, 9)}`,
-            total: Number(ord.total || ord.amount) || 0,
-            timestamp: Number(ord.timestamp) || Date.now(),
-            status: (['Processing', 'Shipped', 'Delivered', 'Cancelled'].includes(ord.status) 
-              ? ord.status 
-              : 'Processing') as OrderRecord['status'],
-              items: Array.isArray(ord.items) 
-                ? ord.items.map((item: any) => ({
-                id: item.id || 'n/a',
-                name: item.name || 'Unknown Item',
-                price: Number(item.price) || 0
-              }))
-            : [],
-            customer: {
-              name: ord.customer_name || ord.customer?.name || 'Unknown',
-              email: ord.customer_email || ord.customer?.email || 'No email',
-              address: ord.customer_address || ord.customer?.address || 'No address'
+        try {
+          const prodRes = await fetch('https://www.maxbitcore.com/api/products.php');
+          if (prodRes.ok) {
+            const prodData = await prodRes.json();
+            if (Array.isArray(prodData)) {
+              setPublishedProducts(prodData);
+              localStorage.setItem('maxbit_published_products_v2', JSON.stringify(prodData));
             }
-          }));
-
-          const sorted = [...validatedOrders].sort((a, b) => b.timestamp - a.timestamp);
-          setShopOrders(orderData.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)));
-          setAllOrders(validatedOrders);
+          }
+        } catch (e) {
+          console.error("Products Sync Failed:", e);
+          const localProd = localStorage.getItem('maxbit_published_products_v2');
+          if (localProd) setPublishedProducts(JSON.parse(localProd));
         }
 
-      } catch (error) {
-        console.error("MaxBit OS: Sync Failure. Using backup.", error);
-        const localProd = localStorage.getItem('maxbit_published_products_v2');
-        if (localProd) setPublishedProducts(JSON.parse(localProd));
-        const localSub = localStorage.getItem('maxbit_submissions');
-        if (localSub) setSubmissions(JSON.parse(localSub));
+        try {
+          const subRes = await fetch('https://www.maxbitcore.com/api/get-submissions.php');
+          if (subRes.ok) {
+            const subData = await subRes.json();
+            if (Array.isArray(subData)) {
+              setSubmissions(subData);
+              localStorage.setItem('maxbit_submissions', JSON.stringify(subData));
+            }
+          }
+        } catch (e) {
+          console.error("Submissions Sync Failed:", e);
+          const localSub = localStorage.getItem('maxbit_submissions');
+          if (localSub) setSubmissions(JSON.parse(localSub));
+        }
+
+        try {
+          const orderRes = await fetch('https://www.maxbitcore.com/api/get-orders.php');
+          if (orderRes.ok) {
+            const orderData = await orderRes.json();
+            if (Array.isArray(orderData)) {
+              const validatedOrders: OrderRecord[] = orderData.map((ord: any) => ({
+                id: ord.id || `ORD-${Math.random().toString(36).substr(2, 9)}`,
+                total: Number(ord.total || ord.amount) || 0,
+                timestamp: Number(ord.timestamp) || Date.now(),
+                status: (['Processing', 'Shipped', 'Delivered', 'Cancelled'].includes(ord.status) 
+                  ? ord.status 
+                  : 'Processing') as OrderRecord['status'],
+                items: Array.isArray(ord.items) 
+                  ? ord.items.map((item: any) => ({
+                      id: item.id || 'n/a',
+                      name: item.name || 'Unknown Item',
+                      price: Number(item.price) || 0
+                    }))
+                  : [],
+                customer: {
+                  name: ord.customer_name || ord.customer?.name || 'Unknown',
+                  email: ord.customer_email || ord.customer?.email || 'No email',
+                  address: ord.customer_address || ord.customer?.address || 'No address'
+                }
+              }));
+              setShopOrders(orderData.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)));
+              setAllOrders(validatedOrders);
+            }
+          }
+        } catch (e) {
+          console.error("Orders Sync Failed:", e);
+        }
+
       } finally {
         setIsLoading(false);
       }
     };
-
-    loadAllData();
     
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
     if (storedConfig) setConfig(JSON.parse(storedConfig));
