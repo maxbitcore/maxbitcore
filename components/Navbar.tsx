@@ -14,10 +14,13 @@ interface NavbarProps {
   onSearch: (query: string) => void;
   allProducts?: any[];
   resetRegForm: () => void;
+  currentUser?: any;
+  onLogout: () => void;
+  onLoginSuccess: (user: any) => void;
+  onOpenRegister: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, resetRegForm }) => {
-  const { currentUser, setCurrentUser } = useAuth();
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, resetRegForm, currentUser, onLogout, onLoginSuccess, onOpenRegister }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -155,11 +158,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
            localStorage.setItem('maxbit_role', response.role || 'user');
            localStorage.setItem('maxbit_currentUser', JSON.stringify(userData));
         }
-  
-        if (setCurrentUser) {
-          setCurrentUser(userData);
-        }
- 
+
+        onLoginSuccess(userData);
+
         setIsLoginOpen(false);
         resetForm();
         const userRole = response.role || 'user';
@@ -194,21 +195,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    logoutUser();
-
-    if (setCurrentUser) {
-    setCurrentUser(null); 
-  }
-
-  localStorage.removeItem('maxbit_token');
-  localStorage.removeItem('maxbit_role');
-  localStorage.removeItem('maxbit_currentUser');
-  
-  onTabChange('home');
-  navigate('/');
   };
 
   const resetForm = () => {
@@ -270,7 +256,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
             </button>
             {/* LOGOUT */}
             <button 
-                onClick={handleLogout}
+                onClick={onLogout}
                 className="flex items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-colors bg-slate-900/50 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-slate-800 hover:border-slate-600"
             >
                 Logout<span className="hidden sm:inline"></span>
@@ -379,7 +365,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                     <div className="h-4 w-px bg-slate-800"></div>
 
                     <button 
-                        onClick={handleLogout}
+                        onClick={onLogout}
                         className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-rose-500 bg-slate-900/50 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-slate-800 hover:border-slate-600 transition-all"
                     >
                         Logout
@@ -557,7 +543,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 if (authMode === 'forgot') {
                                     setAuthMode('login');
                                 } else if (authMode=== 'login') { 
-                                    setAuthMode('register');
+                                    setIsLoginOpen(false);
+                                    onOpenRegister();
                                 } else { 
                                     setAuthMode ('login');
                                 }

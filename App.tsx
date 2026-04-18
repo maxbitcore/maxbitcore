@@ -351,6 +351,10 @@ function App() {
           onSearch={handleSearch}
           allProducts={publishedProducts}
           resetRegForm={resetRegForm}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onLoginSuccess={handleLoginSuccess}
+          onOpenRegister={switchToRegister}
        />
       
       {showSuccessAlert && (
@@ -523,7 +527,7 @@ function App() {
 
               const userData = { id: Date.now().toString(), username, firstName, lastName, email, phone, birthDate, password, securityKey, role: email.includes('@maxbitcore.com') ? 'admin' : 'customer' };
               try {
-                const response = await fetch('https://maxbitcore.com/api/register.php', {
+                const response = await fetch('https://www.maxbitcore.com/api/register.php', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(userData)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CustomerDashboardProps {
   currentUser: any;
@@ -32,7 +33,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       if (!currentUser?.email) return;
       
       try {
-        const response = await fetch('https://maxbitcore.com/api/submissions.json');
+        const response = await fetch('https://www.maxbitcore.com/api/submissions.json');
         if (!response.ok) throw new Error('Failed to fetch');
         
         const allSubmissions = await response.json();
@@ -58,7 +59,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
     setUserSubmissions(prev => prev.filter(sub => sub.id !== submissionId));
 
     try {
-      await fetch('https://maxbitcore.com/api/delete-submission.php', {
+      await fetch('https://www.maxbitcore.com/api/delete-submission.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: submissionId })

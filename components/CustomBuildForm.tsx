@@ -224,7 +224,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     };
 
     try {
-      const response = await fetch('https://maxbitcore.com/api/submit-build.php', {
+      const response = await fetch('https://www.maxbitcore.com/api/submit-build.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

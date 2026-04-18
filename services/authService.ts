@@ -14,7 +14,7 @@ export interface AuthResponse {
   email: string | null;
 }
 
-const API_URL = "https://maxbitcore.com/api";
+const API_URL = "https://www.maxbitcore.com/api";
 
 const handleResponse = async (response: Response) => {
   const data = await response.json();
@@ -49,7 +49,7 @@ if (data.token) {
 
 export const loginUser = async (username: string, password: string, adminCode?: string): Promise<AuthResponse> => {
   console.log("DEBUG LOGIN:", { username, password });
-  const response = await fetch(`https://maxbitcore.com/api/login.php`, {
+  const response = await fetch(`https://www.maxbitcore.com/api/login.php`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: username, password: password, adminCode: adminCode }),
