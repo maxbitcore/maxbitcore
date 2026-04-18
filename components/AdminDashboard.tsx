@@ -35,16 +35,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   const syncWithServer = async (updatedList: any[], fileName: string = 'save_products.php') => {
     try {
-      const response = await fetch(`https://www.maxbitcore.com/api/${fileName}`, {
+      const response = await fetch(`/api/${fileName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedList)
       });
       
       const result = await response.json();
-      if (result.success) {
-        console.log(`MaxBit Server: ${fileName} synchronized.`);
-      }
+      console.log("SYNC RESULT:", result);
     } catch (error) {
       console.error(`MaxBit Server: Sync failed for ${fileName}`, error);
     }
@@ -311,18 +309,19 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         }
 
         try {
-          const subRes = await fetch('https://www.maxbitcore.com/api/get-submissions.php');
-          if (subRes.ok) {
-            const subData = await subRes.json();
-            if (Array.isArray(subData)) {
-              setSubmissions(subData);
-              localStorage.setItem('maxbit_submissions', JSON.stringify(subData));
-            }
+          const subRes = await fetch(`/api/get-submissions.php?v=${Date.now()}`);
+          const text = await subRes.text(); // Сначала берем как текст
+  
+          if (text && text.trim().startsWith('[')) { // Проверяем, что это похоже на массив JSON
+            const subData = JSON.parse(text);
+            setSubmissions(subData);
+          } else {
+            console.warn("RADAR: Received empty or invalid response for submissions.");
+            setSubmissions([]);
           }
         } catch (e) {
-          console.error("Submissions Sync Failed:", e);
-          const localSub = localStorage.getItem('maxbit_submissions');
-          if (localSub) setSubmissions(JSON.parse(localSub));
+          console.error("Submissions channel offline:", e);
+          setSubmissions([]);
         }
 
         try {
@@ -554,10 +553,16 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 
   const handleDeleteProduct = async (productId: string) => {
     if (!window.confirm("Delete this unit from inventory?")) return;
+    console.log("DELETING UNIT:", productId);
     const updatedList = publishedProducts.filter(p => p.id !== productId);
     setPublishedProducts(updatedList);
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
-    await syncWithServer(updatedList); 
+    try {
+      await syncWithServer(updatedList); 
+      console.log("SERVER SYNC COMPLETE");
+    } catch (e) {
+       alert("SERVER ERROR: Unit may return after refresh.");
+    }
     if (editingId === productId) resetProductForm();
     notifyUpdate();
   };
