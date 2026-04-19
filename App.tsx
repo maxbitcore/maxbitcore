@@ -745,8 +745,8 @@ function App() {
              </div>
            )}
 
-              <button type="submit" className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:bg-cyan-400 transition-all shadow-lg mt-4">Register account</button>
-              <button type="button" onClick={switchToLogin} className="w-full mt-4 text-[10px] font-black text-slate-500 uppercase hover:text-cyan-500 transition-colors tracking-widest" > Already have an account? Log In </button>
+              <button type="submit" className="w-full py-4 bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-black uppercase text-xs rounded-xl hover:opacity-90 transition-all shadow-lg shadow-cyan-500/10 mt-4 active:scale-[0.98]" >Register account</button>
+              <button  type="button" onClick={switchToLogin} className="w-full mt-4 text-[10px] font-black text-slate-500 uppercase hover:text-cyan-500 transition-colors tracking-widest"> Already have an account? Log In </button>
             </form>
           </div>
         </div>

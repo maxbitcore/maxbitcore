@@ -139,37 +139,54 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
               </div>
               <div className="space-y-4">
                 {wishlist.map((item) => (
-                  <div 
-                    key={item.id} 
-                    onClick={() => onSelectProduct(item)} 
-                    className="border-l-2 border-slate-800 pl-4 py-3 flex justify-between items-center group hover:border-cyan-500/50 hover:bg-white/5 transition-all cursor-pointer rounded-r-xl"
-                  >
+                    <div 
+                      key={item.id} 
+                      onClick={() => onSelectProduct(item)}
+                      className="group flex items-center gap-4 p-3 bg-slate-950/30 border border-white/5 rounded-2xl hover:border-cyan-500/30 hover:bg-white/5 transition-all cursor-pointer mb-3"
+                    >
+                      {/* ФОТО ТОВАРА */}
+                      <div className="w-16 h-16 bg-slate-900 rounded-xl overflow-hidden border border-white/10 shrink-0 shadow-lg">
+                        <img 
+                        src={item.imageUrl || 'https://via.placeholder.com/150'} 
+                        alt="Unit Preview" 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    </div>
+
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">
-                        {item.category || 'HARDWARE UNIT'}
-                      </p>
+                      <div className="flex items-center gap-2 mb-1">
+                         <div className="w-1 h-1 bg-cyan-500 rounded-full" />
+                         <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest leading-none">
+                           {item.category || 'HARDWARE UNIT'}
+                         </p>
+                      </div>
       
                       <h4 
-                        className="text-sm font-bold uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1"
-                        dangerouslySetInnerHTML={{ __html: item.name || 'Unknown Unit' }}
+                         className="text-sm font-black uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1 leading-tight"
+                         dangerouslySetInnerHTML={{ __html: item.name || 'Unknown Unit' }}
                       />
       
-                      <p className="text-[10px] font-black text-cyan-500 font-mono mt-1">
+                      <p className="text-xs font-black text-cyan-500 font-mono mt-1">
                         ${item.price || '0.00'}
                       </p>
                     </div>
     
+                    {/* DELETE */}
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemoveFromWishlist(item.id);
                       }}
-                      className="text-[10px] font-black text-slate-600 hover:text-rose-500 uppercase tracking-widest transition-colors ml-4 p-2"
+                      className="p-3 text-[10px] font-black text-slate-700 hover:text-rose-500 uppercase tracking-widest transition-colors"
+                      title="Remove from list"
                     >
-                      Remove
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                     </button>
                   </div>
-                ))} 
+                ))}
               </div>
             </div>
           </div>

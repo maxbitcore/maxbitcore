@@ -535,7 +535,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                     </button>
                 </form>
 
-                <div className="mt-8 flex justify-center border-t border-slate-800 pt-6">
+                <div className="mt-8 flex justify-center border-t border-white/5 pt-6">
                     {authStep === 'credentials' ? (
                         <button 
                             type="button"
@@ -543,7 +543,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 if (authMode === 'forgot') {
                                     setAuthMode('login');
                                 } else if (authMode=== 'login') { 
-                                    setIsLoginOpen(false);
                                     onOpenRegister();
                                 } else { 
                                     setAuthMode ('login');
@@ -563,7 +562,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                             onClick={() => { setAuthStep('credentials'); setAdminCode(''); setError(null); }}
                             className="text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-rose-400 transition-colors"
                         >
-                            &lt; Cancel Verification
+                           <span className="text-base leading-none">←</span> Cancel Verification
                         </button>
                     )}
                 </div>
