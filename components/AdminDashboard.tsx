@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BuildSubmission, Product, ProductStatus, Review } from '../types';
 import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession } from '../services/analyticsService';
@@ -6,51 +5,9 @@ import { loginUser, registerUser, getStoredAuth } from '../services/authService'
 import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
 
-interface AdminDashboardProps {
-  showRegister: boolean;      
-  closeRegister: () => void;
-}
+const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
-interface RichEditorProps {
-  value: string;
-  onChange: (val: string) => void;
-  placeholder?: string;
-  label: string;
-}
-
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegister }) => {
-  const uploadImageToServer = async (file: File) => {
-    const formData = new FormData();
-    formData.append('image', file);
-    const response = await fetch('/upload.php', {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.error || "Load error");
-    }
-    return data.url;
-  };
-
-  const syncWithServer = async (updatedList: any[], fileName: string = 'save_products.php') => {
-    try {
-      const response = await fetch(`/api/${fileName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedList)
-      });
-      
-      const result = await response.json();
-      console.log("SYNC RESULT:", result);
-    } catch (error) {
-      console.error(`MaxBit Server: Sync failed for ${fileName}`, error);
-    }
-  };
-  
-  const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
-
- const TACTICAL_PALETTE = [
+const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
   { color: '#94a3b8', name: 'Phantom Slate' },
   { color: '#22d3ee', name: 'Cyber Cyan' },
@@ -75,45 +32,53 @@ const DEFAULT_CONFIG = {
   resolutions: ['1080p (FHD)', '1440p (QHD)', '2160p (4K)']
 };
 
+interface AdminDashboardProps {
+  showRegister: boolean;      
+  closeRegister: () => void;
+}
+
+interface RichEditorProps {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  label: string;
+}
+
 const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, label }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
+
   useEffect(() => {
-    if (isUpdatingRef.current) return;
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || '';
+    if (!isUpdatingRef.current && editorRef.current && value !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = value || "";
     }
   }, [value]);
 
   const handleInput = () => {
     if (editorRef.current) {
+      isUpdatingRef.current = true;
       onChange(editorRef.current.innerHTML);
+      setTimeout(() => { isUpdatingRef.current = false; }, 0);
     }
   };
 
   const exec = (cmd: string, val?: string) => {
     editorRef.current?.focus();
-    isUpdatingRef.current = true;
     if (cmd === 'createLink') {
-     const url = window.prompt('Enter Deployment URL:');
-     if (url)
-     document.execCommand(cmd, false, url);
+      const url = window.prompt('Enter Deployment URL:');
+      if (url) document.execCommand(cmd, false, url);
     } else {
       document.execCommand(cmd, false, val);
     }
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
-    }
-    setTimeout(() => {
-      isUpdatingRef.current = false;
-    }, 0);
+    handleInput();
   };
 
-  return (
+return (
     <div className="space-y-2">
       <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">{label}</label>
       <div className="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden focus-within:border-cyan-500/50 transition-all">
         <div className="bg-slate-900/50 border-b border-slate-800 p-2 flex flex-wrap gap-2 items-center">
+
           {/* Group: Typography */}
           <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
             <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('bold'); }} className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors">
@@ -124,6 +89,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
             </button>
           </div>
           <div className="flex bg-slate-950/50 rounded-lg p-0.5 border border-slate-800 gap-0.5">
+
             {/* Underline */}
             <button 
               type="button" 
@@ -189,9 +155,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
           <button type="button" onMouseDown={(e) => { e.preventDefault(); exec('removeFormat'); }} className="p-2 hover:bg-rose-950/30 rounded text-rose-500 hover:text-rose-400 transition-colors" title="Clear Formatting">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M6 18L18 6M6 6l12 12M19 19l-4-4" /></svg>
           </button>
-
           <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block"></div>
-
           {/* Color Palette */}
           <div className="flex flex-wrap gap-1 ml-2">
             {TACTICAL_PALETTE.map((item) => (
@@ -221,18 +185,17 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     </div>
   );
 };
-  
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegister }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [currentLogo, setCurrentLogo] = useState(localStorage.getItem('maxbit_logo') || ""); 
   const logoUploadRef = useRef<HTMLInputElement>(null);
+
+  // 2. NAVIGATION STATE
   const [activeAdminTab, setActiveAdminTab] = useState<'submissions' | 'orders' | 'catalog' | 'analytics' | 'comments'>('submissions');
   const [catalogMode, setCatalogMode] = useState<'products' | 'assets'>('products');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [formKey, setFormKey] = useState(0);
-  const [assetImages, setAssetImages] = useState<string[]>([]);
-  
-  // Product State
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newProductName, setNewProductName] = useState('');
@@ -258,7 +221,61 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetImageRef = useRef<HTMLInputElement>(null);
   const [activeAssetCategory, setActiveAssetCategory] = useState<string | null>(null);
-  
+
+  const uploadImageToServer = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    const response = await fetch('/upload.php', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || "Load error");
+    }
+    return data.url;
+  };
+
+  const syncWithServer = async (updatedList: any[], fileName: string = 'save_products.php') => {
+    try {
+      const response = await fetch(`/api/${fileName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedList)
+      });
+
+      const result = await response.json();
+      console.log("SYNC RESULT:", result);
+    } catch (error) {
+      console.error(`MaxBit Server: Sync failed for ${fileName}`, error);
+    }
+  };
+
+  const notifyUpdate = () => {
+    window.dispatchEvent(new CustomEvent('maxbit-update'));
+    window.dispatchEvent(new CustomEvent('storage'));
+    window.dispatchEvent(new CustomEvent('configurator-updated'));
+  };
+
+  const resetProductForm = () => {
+    setEditingId(null);
+    setNewProductName('');
+    setNewProductPrice('');
+    setNewProductImage('');
+    setNewProductGallery([]);
+    setNewProductComponents('');
+    setNewProductDesc('');
+    setNewProductCategory('Gaming PCs');
+    setNewProductStatus('In Stock');
+    setCatalogMode('products'); window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    const { token } = getStoredAuth();
+    if (token) setIsAuthenticated(true);
+  }, []);
+
   const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -267,13 +284,10 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 
     try {
         const url = await uploadImageToServer(file);
-        
         const updatedStyles = { ...caseStyles, [category]: url };
-      
         setCaseStyles(updatedStyles);
         localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
         notifyUpdate();
-        
     } catch (error) {
         console.error("Style upload failed:", error);
         alert("Failed to upload image to server.");
@@ -291,7 +305,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     const loadAllData = async () => {
       setIsLoading(true);
       console.log("DEBUG: loadAllData START");
-      
       try {
         try {
           const prodRes = await fetch('https://www.maxbitcore.com/api/products.php');
@@ -311,7 +324,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         try {
           const subRes = await fetch(`/api/get-submissions.php?v=${Date.now()}`);
           const text = await subRes.text(); // Сначала берем как текст
-  
           if (text && text.trim().startsWith('[')) { // Проверяем, что это похоже на массив JSON
             const subData = JSON.parse(text);
             setSubmissions(subData);
@@ -365,7 +377,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     if (token) {
       loadAllData();
     }
-    
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
     if (storedConfig) setConfig(JSON.parse(storedConfig));
 
@@ -397,11 +408,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   }, []);
 
   const allComments = useMemo(() => {
-  
     const list: { productId: string; productName: string; productImage: string; review: Review }[] = [];
-  
     publishedProducts.forEach(p => {
-    
       const rawImage = p.gallery || p.imageUrl || '';
       const displayImage: string = Array.isArray(rawImage)
         ? (rawImage[0] || '') 
@@ -419,25 +427,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
 
     return list.sort((a, b) => new Date(b.review.date).getTime() - new Date(a.review.date).getTime());
   }, [publishedProducts]);
-
-  const notifyUpdate = () => {
-    window.dispatchEvent(new CustomEvent('maxbit-update'));
-    window.dispatchEvent(new CustomEvent('storage'));
-    window.dispatchEvent(new CustomEvent('configurator-updated'));
-  };
-
-  const resetProductForm = () => {
-    setEditingId(null);
-    setNewProductName('');
-    setNewProductPrice('');
-    setNewProductImage('');
-    setNewProductGallery([]);
-    setNewProductComponents('');
-    setNewProductDesc('');
-    setNewProductCategory('Gaming PCs');
-    setNewProductStatus('In Stock');
-    setFormKey(prev => prev + 1);
-  };
 
   const sendRegistrationEmail = async (userData: any) => {
     try {
@@ -468,7 +457,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   
     const now = Date.now();
     const existing = publishedProducts.find(p => p.id === editingId);
-    
+
     const productData: Product = {
       id: editingId || `PUB-${now}`,
       name: newProductName,
@@ -504,7 +493,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setIsProcessing(true);
-    
     const uploadedUrls: string[] = [];
     for (let i = 0; i < files.length; i++) {
       try {
@@ -523,7 +511,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         setNewProductGallery(prev => [...prev, ...uploadedUrls]);
       }
     }
-    
     setIsProcessing(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -546,8 +533,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
     
     setPublishedProducts(updatedList);
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
+
     await syncWithServer(updatedList);
-    
     notifyUpdate();
   };
 
@@ -606,10 +593,10 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
         ...caseStyles, 
         [activeAssetCategory]: url 
       };
-      
+
       setCaseStyles(updatedStyles);
       localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
-      
+
       notifyUpdate();
     } catch (error) {
       console.error("Upload error:", error);
@@ -636,10 +623,9 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
   return (
     <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
       <div className="max-w-7xl mx-auto space-y-12">
-        
         {isAuthenticated && (
           <>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-slate-800 pb-12">
+           <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-slate-800 pb-12">
               <div className="flex items-center gap-6">
                 <div className="relative group cursor-pointer" onClick={() => logoUploadRef.current?.click()}>
                   <img src={currentLogo} className="w-16 h-16 object-contain group-hover:opacity-50 transition-opacity" alt="Logo" />
@@ -656,10 +642,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                       if (file) {
                         try {
                           const url = await uploadImageToServer(file);
-                        
                           setCurrentLogo(url);
                           localStorage.setItem('maxbit_logo', url);
-                        
                           window.dispatchEvent(new CustomEvent('logo-updated'));
                         } catch (error) { 
                           console.error("Logo upload failed:", error);
@@ -827,7 +811,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                   Empty Submissions Log
                   </div>
                 ) : (
-              
                   [...submissions].sort((a, b) => b.timestamp - a.timestamp).map(sub => (
                     <div key={sub.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row justify-between gap-8 hover:border-cyan-500/20 transition-all group relative overflow-hidden">
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
@@ -841,7 +824,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                           </h3>
                           <p className="text-xs text-slate-500 font-mono">{sub.userEmail}</p>
                         </div>
-            
                         <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                           <div className="flex items-center gap-2"><span className="text-slate-600 font-black">CPU:</span> {sub.cpu}</div>
                           <div className="flex items-center gap-2"><span className="text-slate-600 font-black">GPU:</span> {sub.gpu}</div>
@@ -856,7 +838,6 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                             <span className="text-[9px] font-black uppercase text-slate-500 block mb-1">Status</span>
                             <span className="text-xs font-black text-white italic uppercase tracking-wider">Awaiting Debrief</span>
                           </div>
-              
                            <button 
                             onClick={async () => { 
                               if(window.confirm('Archive this mission?')) {
@@ -918,7 +899,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                         <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">{order.orderNumber}</h3>
                         <p className="text-xs text-slate-500 font-mono tracking-tight">CUSTOMER: {order.customerEmail}</p>
                       </div>
-          
+      
                       <div className="text-right space-y-3">
                         <div className="text-3xl font-black text-white italic tracking-tighter">${Number(order.amount).toLocaleString()}</div>
                         <div className={`text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border ${order.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'  : 'bg-amber-500/10 text-amber-500 border-amber-500/20' }`}> {order.status}</div>
@@ -992,7 +973,8 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                         labelStyle={{ display: 'none' }}
                         cursor={{ stroke: '#06b6d4', strokeWidth: 1, strokeDasharray: '5 5' }}
                       />
-                      <Area 
+
+                      <Area
                         type="monotone" 
                         dataKey="visits" 
                         stroke="#06b6d4" 
@@ -1099,7 +1081,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                          />
                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
                        </div>
-                    
+                
                        <div className="flex-1 z-10">
                          <div className="flex justify-between items-start mb-4">
                            <div>
@@ -1111,7 +1093,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                                  {item.productName}
                                </div>
                              </div>
-                          
+                  
                              <div className="flex items-center gap-3">
                                <span className="text-sm font-black text-white italic tracking-tight">{item.review.user}</span>
                                <div className="h-1 w-1 bg-slate-700 rounded-full"></div>
@@ -1176,7 +1158,7 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
                    <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl">
                      <div className="inline-flex p-4 rounded-full bg-slate-900 mb-4"><svg className="w-8 h-8 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg></div>
                      <div className="text-slate-500 font-black uppercase tracking-[0.3em] text-sm">No Intel Packets Found</div>
-                  </div>
+                 </div>
                  )}
                </div>  
             </div>
