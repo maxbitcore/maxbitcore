@@ -681,560 +681,506 @@ const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeholder, l
               </div>
             </div>
 
-        {/* CATALOG TAB */}
-        {activeAdminTab === 'catalog' && (
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 animate-fade-in-up">
-                 <div className="lg:col-span-3 mb-4">
-                    <div className="flex gap-4 p-1 bg-slate-900/50 rounded-xl w-fit border border-slate-800">
-                        <button onClick={() => setCatalogMode('products')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'products' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Inventory</button>
-                        <button onClick={() => setCatalogMode('assets')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'assets' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator Assets</button>
-                    </div>
-                </div>
+            {/* CATALOG TAB */}
+            {activeAdminTab === 'catalog' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 animate-fade-in-up">
+                  <div className="lg:col-span-3 mb-4">
+                     <div className="flex gap-4 p-1 bg-slate-900/50 rounded-xl w-fit border border-slate-800">
+                         <button onClick={() => setCatalogMode('products')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'products' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Inventory</button>
+                         <button onClick={() => setCatalogMode('assets')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'assets' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator Assets</button>
+                     </div>
+                  </div>
 
-                {catalogMode === 'products' && (
+                  {catalogMode === 'products' && (
                     <>
-                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl h-fit shadow-2xl">
-                            <h2 className="text-xl font-black text-white italic uppercase mb-8">{editingId ? 'Modify Unit' : 'Create Unit'}</h2>
-                            <form onSubmit={saveProduct} className="space-y-6">
-                                <RichEditor label="Identity (Name)" value={newProductName} onChange={setNewProductName} />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Sector</label>
-                                        <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value as any)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none text-xs font-bold uppercase">
-                                            <option value="Gaming PCs">Systems</option>
-                                            <option value="Components">Components</option>
-                                            <option value="Peripherals">Peripherals</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Status</label>
-                                        <select value={newProductStatus} onChange={e => setNewProductStatus(e.target.value as ProductStatus)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none text-xs font-bold uppercase">
-                                            <option value="In Stock">In Stock</option>
-                                            <option value="Sold Out">Sold Out</option>
-                                            <option value="Pre-Order">Pre-Order</option>
-                                            <option value="Coming Soon">Coming Soon</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Credits (Price)</label>
-                                    <input required value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-mono" />
-                                </div>
-                                <div className="space-y-4">
-                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Visual Evidence</label>
-                                  <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-4 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:border-cyan-500 hover:text-cyan-500 transition-all uppercase font-black text-[10px] bg-slate-950/50">{isProcessing ? 'SCANNING...' : 'Upload Assets (Multi)'}</button>
-                                  <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" accept="image/*" />
-                                    {(newProductImage || newProductGallery.length > 0) && (
-                                        <div className="grid grid-cols-4 gap-2">
-                                          {newProductImage && (
-                                            <div className="col-span-4 relative rounded-xl overflow-hidden aspect-video border-2 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-                                              <img src={newProductImage} className="w-full h-full object-cover" alt="Main" />
-                                              <div className="absolute top-3 left-3 bg-cyan-500 text-slate-950 p-1.5 rounded-lg shadow-xl">
-                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                                              </div>
-                                              <button type="button" onClick={() => setNewProductImage('')} className="absolute top-2 right-2 bg-rose-500 text-white p-1 rounded hover:bg-rose-600"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg></button>
-                                            </div>
-                                          )}
-                                          {newProductGallery.map((img, i) => (
-                                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-950 group">
-                                              <img src={img} className="w-full h-full object-cover" alt="" />
-                                              <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
-                                                  <button 
-                                                    type="button" 
-                                                    onClick={() => setAsMain(i)} 
-                                                    title="Set as Primary"
-                                                    className="w-10 h-10 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center hover:scale-110 transition-transform shadow-lg"
-                                                  >
-                                                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                                                  </button>
-                                                  <button 
-                                                    type="button" 
-                                                    onClick={() => {
-                                                        const updatedGallery = newProductGallery.filter((_, idx) => idx !== i);
-                                                        setNewProductGallery(updatedGallery);
-                                                    }} 
-                                                    className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center hover:scale-110 transition-transform shadow-lg"
-                                                  >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth={2.5} /></svg>
-                                                  </button>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <RichEditor label="Hardware Components" value={newProductComponents} onChange={setNewProductComponents}/>
-                                <RichEditor label="Intel Briefing (Description)" value={newProductDesc} onChange={setNewProductDesc}/>
-                                <button type="submit" disabled={isProcessing} className="w-full py-4 maxbit-gradient text-slate-950 font-black uppercase text-sm rounded-xl shadow-lg hover:opacity-90 transition-all">{isProcessing ? 'COMMITTING...' : (editingId ? 'UPDATE RECORD' : 'SAVE TO ARMORY')}</button>
-                                {editingId && <button type="button" onClick={resetProductForm} className="w-full py-4 bg-slate-800 text-slate-400 font-black uppercase text-xs rounded-xl hover:text-white transition-all">Abort</button>}
-                            </form>
-                        </div>
-                        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
-                            {publishedProducts.map(p => (
-                                <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex gap-6 hover:border-slate-600 transition-all group shadow-xl relative">
-                                    <div className="w-24 h-32 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex-shrink-0"><img src={Array.isArray(p.gallery) && p.gallery.length > 0 ? p.gallery[0] : (p.imageUrl || '')} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" /></div>
-                                    <div className="flex-1 flex flex-col justify-between py-1">
-                                        <div>
-                                            <h3 className="font-black text-white text-sm uppercase leading-tight mb-2 italic tracking-tighter h-10 overflow-hidden line-clamp-2">{(p.name || '').replace(/<[^>]*>/g, '')}</h3>
-                                            <div className="text-sm font-black text-cyan-400 font-mono tracking-tighter">${p.price}</div>
-                                            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">{(p as any).isPublished ? 'DEPLOYED' : 'IN ARMORY'}</div>
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <button onClick={() => startEditProduct(p)} className="text-[10px] font-black text-slate-500 hover:text-cyan-400 uppercase tracking-widest transition-colors">Modify</button>
-                                            <button 
-                                              type="button" 
-                                              onClick={() => togglePublish(p.id)}
-                                              className={`text-[10px] font-black uppercase tracking-widest transition-all ${(p as any).isPublished ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'text-slate-500 hover:text-white'}`}
-                                            >
-                                                {(p as any).isPublished ? 'Withdraw' : 'Deploy'}
-                                            </button>
-                                            <button 
-                                              type="button" 
-                                              onClick={() => handleDeleteProduct(p.id)} 
-                                              className="text-[10px] font-black text-slate-500 hover:text-rose-500 uppercase tracking-widest transition-colors"
-                                            > 
-                                              Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </>
-                )}
-
-                {catalogMode === 'assets' && (
-                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-12 animate-fade-in-up">
-                        <div className="space-y-8">
-                            <h2 className="text-xl font-black text-white italic uppercase pl-2">Configurator Options</h2>
-                            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
-                                {(Object.keys(DEFAULT_CONFIG) as Array<keyof typeof DEFAULT_CONFIG>).map((key) => (
-                                    <div key={key} className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
-                                        <textarea 
-                                            value={config[key as keyof typeof DEFAULT_CONFIG].join(', ')} 
-                                            onChange={(e) => updateConfig(key as keyof typeof DEFAULT_CONFIG, e.target.value)}
-                                            placeholder="Item 1, Item 2..."
-                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-bold uppercase text-[10px] min-h-[80px]"
-                                        />
-                                    </div>
-                                ))}
+                      <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl h-fit shadow-2xl">
+                          <h2 className="text-xl font-black text-white italic uppercase mb-8">{editingId ? 'Modify Unit' : 'Create Unit'}</h2>
+                          <form onSubmit={saveProduct} className="space-y-6">
+                            <RichEditor label="Identity (Name)" value={newProductName} onChange={setNewProductName} />
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Sector</label>
+                                <select value={newProductCategory} onChange={e => setNewProductCategory(e.target.value as any)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none text-xs font-bold uppercase">
+                                  <option value="Gaming PCs">Systems</option>
+                                  <option value="Components">Components</option>
+                                  <option value="Peripherals">Peripherals</option>
+                                </select>
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Status</label>
+                                <select value={newProductStatus} onChange={e => setNewProductStatus(e.target.value as ProductStatus)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none text-xs font-bold uppercase">
+                                  <option value="In Stock">In Stock</option>
+                                  <option value="Sold Out">Sold Out</option>
+                                  <option value="Pre-Order">Pre-Order</option>
+                                  <option value="Coming Soon">Coming Soon</option>
+                                </select>
+                              </div>
                             </div>
-                        </div>
-
-                        <div className="space-y-8">
-                            <h2 className="text-xl font-black text-white italic uppercase pl-2">Case Style Assets</h2>
-                            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-4">Map case types to visual sketches</p>
-                                <div className="grid grid-cols-1 gap-4">
-                                    {config.caseTypes.map((type) => (
-                                        <div key={type} className="flex items-center gap-4 p-4 bg-slate-950 border border-slate-800 rounded-2xl group hover:border-cyan-500/30 transition-all">
-                                            <div className="w-16 h-20 bg-slate-900 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 relative">
-                                                {caseStyles[type] ? (
-                                                    <img src={caseStyles[type]} className="w-full h-full object-cover" alt={type} />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full text-slate-700">
-                                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2">{type}</h4>
-                                                <button 
-                                                    onClick={() => { setActiveAssetCategory(type); assetImageRef.current?.click(); }}
-                                                    className="text-[9px] font-black text-cyan-500 uppercase tracking-widest border border-cyan-500/20 px-3 py-1.5 rounded-lg hover:bg-cyan-500/10 transition-all"
-                                                >
-                                                    Upload Sketch
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <input type="file" ref={assetImageRef} onChange={handleAssetImageUpload} multiple className="hidden" accept="image/*" />
-                                </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Credits (Price)</label>
+                              <input required value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-mono" />
                             </div>
-                        </div>
-                    </div>
-                )}
-             </div>
-        )}
-
-        {/* SUBMISSIONS TAB */}
-        {activeAdminTab === 'submissions' && (
-          <div className="space-y-6">
-            {submissions.length === 0 ? (
-              <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
-              Empty Submissions Log
-              </div>
-            ) : (
-              
-              [...submissions].sort((a, b) => b.timestamp - a.timestamp).map(sub => (
-                <div key={sub.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row justify-between gap-8 hover:border-cyan-500/20 transition-all group relative overflow-hidden">
-          
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-1 block group-hover:text-white">
-                        {sub.purpose} Protocol
-                      </span>
-                      <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">
-                        {sub.userName}
-                      </h3>
-                      <p className="text-xs text-slate-500 font-mono">{sub.userEmail}</p>
-                    </div>
-            
-                    <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">CPU:</span> {sub.cpu}</div>
-                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">GPU:</span> {sub.gpu}</div>
-                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Budget:</span> <span className="text-emerald-500">${sub.budget}</span></div>
-                      <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Deadline:</span> {sub.deadline}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end justify-between text-right">
-                    <div className="flex gap-4">
-                      <div className="bg-slate-950 px-6 py-3 rounded-xl border border-slate-800 shadow-inner">
-                        <span className="text-[9px] font-black uppercase text-slate-500 block mb-1">Status</span>
-                        <span className="text-xs font-black text-white italic uppercase tracking-wider">Awaiting Debrief</span>
+                            <div className="space-y-4">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Visual Evidence</label>
+                              <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-4 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:border-cyan-500 hover:text-cyan-500 transition-all uppercase font-black text-[10px] bg-slate-950/50">{isProcessing ? 'SCANNING...' : 'Upload Assets (Multi)'}</button>
+                              <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" accept="image/*" />
+                              {(newProductImage || newProductGallery.length > 0) && (
+                                <div className="grid grid-cols-4 gap-2">
+                                  {newProductImage && (
+                                    <div className="col-span-4 relative rounded-xl overflow-hidden aspect-video border-2 border-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+                                      <img src={newProductImage} className="w-full h-full object-cover" alt="Main" />
+                                      <div className="absolute top-3 left-3 bg-cyan-500 text-slate-950 p-1.5 rounded-lg shadow-xl">
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                      </div>
+                                      <button type="button" onClick={() => setNewProductImage('')} className="absolute top-2 right-2 bg-rose-500 text-white p-1 rounded hover:bg-rose-600"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                    </div>
+                                  )}
+                                  {newProductGallery.map((img, i) => (
+                                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-800 bg-slate-950 group">
+                                      <img src={img} className="w-full h-full object-cover" alt="" />
+                                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
+                                        <button type="button" onClick={() => setAsMain(i)} title="Set as Primary"className="w-10 h-10 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center hover:scale-110 transition-transform shadow-lg"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>
+                                        <button type="button" onClick={() => {const updatedGallery = newProductGallery.filter((_, idx) => idx !== i);setNewProductGallery(updatedGallery);}} className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center hover:scale-110 transition-transform shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth={2.5} /></svg></button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <RichEditor label="Hardware Components" value={newProductComponents} onChange={setNewProductComponents}/>
+                            <RichEditor label="Intel Briefing (Description)" value={newProductDesc} onChange={setNewProductDesc}/>
+                            <button type="submit" disabled={isProcessing} className="w-full py-4 maxbit-gradient text-slate-950 font-black uppercase text-sm rounded-xl shadow-lg hover:opacity-90 transition-all">{isProcessing ? 'COMMITTING...' : (editingId ? 'UPDATE RECORD' : 'SAVE TO ARMORY')}</button>
+                            {editingId && <button type="button" onClick={resetProductForm} className="w-full py-4 bg-slate-800 text-slate-400 font-black uppercase text-xs rounded-xl hover:text-white transition-all">Abort</button>}
+                          </form>
                       </div>
-              
-                      <button 
-                        onClick={async () => { 
-                          if(window.confirm('Archive this mission?')) {
-                            const updatedSubmissions = submissions.filter(s => s.id !== sub.id);
-                            setSubmissions(updatedSubmissions);
-                             await syncWithServer(updatedSubmissions);
-                          alert("Mission Archived.");   
-                        }  
-                      }}
-                        className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-3 rounded-xl border border-rose-500/20 transition-all flex items-center justify-center"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1">
-                       <span className="text-[9px] font-mono text-slate-700 uppercase">
-                        ID: {sub.id.slice(-8)}
-                      </span>
-                      <span className="text-[9px] font-mono text-slate-500 uppercase font-black">
-                        Logged: {new Date(sub.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ORDERS TAB */}
-        {activeAdminTab === 'orders' && (
-          <div className="space-y-6">
-            {shopOrders.length === 0 ? (
-              <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
-                No Orders Logged
-              </div>
-            ) : (
-              shopOrders.map((order) => (
-                <div 
-                  key={order.id} 
-                  className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex justify-between items-center group hover:border-emerald-500/20 transition-all shadow-xl"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
-                        Transaction Detected
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">
-                      {order.orderNumber}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-mono tracking-tight">
-                      CUSTOMER: {order.customerEmail}
-                    </p>
-                  </div>
-          
-                  <div className="text-right space-y-3">
-                    <div className="text-3xl font-black text-white italic tracking-tighter">
-                      ${Number(order.amount).toLocaleString()}
-                    </div>
-                    <div className={`text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border ${
-                      order.status === 'PAID' 
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
-                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                    }`}>
-                      {order.status}
-                    </div>
-                    <div className="text-[9px] font-mono text-slate-600 block uppercase tracking-widest">
-                      {new Date(order.timestamp).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ANALYTICS TAB */}
-        {activeAdminTab === 'analytics' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
-                <div className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-2">Total Sessions</div>
-                <div className="text-3xl font-black text-white italic">{analytics?.sessions?.length || 0}</div>
-                <div className="text-[9px] text-slate-500 uppercase mt-1">Unique deployments detected</div>
-              </div>
-              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
-                <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Total Revenue</div>
-                <div className="text-3xl font-black text-white italic">${shopOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0).toLocaleString()}</div>
-                <div className="text-[9px] text-slate-500 uppercase mt-1">Confirmed transactions</div>
-              </div>
-              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
-                <div className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-2">Unit Views</div>
-                <div className="text-3xl font-black text-white italic">
-                  {Object.values(analytics?.views || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0)}
-                </div>
-                <div className="text-[9px] text-slate-500 uppercase mt-1">Total product interactions</div>
-              </div>
-              <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
-                <div className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">Conversion</div>
-                <div className="text-3xl font-black text-white italic">
-                  {analytics?.sessions?.length ? ((shopOrders.length / analytics.sessions.length) * 100).toFixed(1) : 0}%
-                </div>
-                <div className="text-[9px] text-slate-500 uppercase mt-1">Visitor to Buyer ratio</div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h3 className="text-white font-black italic uppercase tracking-tighter text-xl">Tactical Traffic Flow</h3>
-                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">Operational cycles: Last 7 Days</p>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
-                  <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_8px_#06b6d4]"></div>
-                  <span className="text-[9px] font-black text-cyan-500 uppercase italic">Live Monitoring</span>
-                </div>
-              </div>
-
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="cyberCyan" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis 
-                      dataKey="displayDate" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{fill: '#475569', fontSize: 10, fontWeight: 'bold'}}
-                      dy={10}
-                    />
-                   <YAxis hide domain={['dataMin', 'dataMax + 5']} />
-                   <Tooltip 
-                     contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '16px' }}
-                     itemStyle={{ color: '#06b6d4', textTransform: 'uppercase', fontWeight: '900', fontSize: '10px' }}
-                     labelStyle={{ display: 'none' }}
-                     cursor={{ stroke: '#06b6d4', strokeWidth: 1, strokeDasharray: '5 5' }}
-                   />
-                   <Area 
-                     type="monotone" 
-                     dataKey="visits" 
-                     stroke="#06b6d4" 
-                     strokeWidth={4}
-                     fillOpacity={1} 
-                     fill="url(#cyberCyan)" 
-                     animationDuration={2500}
-                     dot={{ r: 4, fill: '#0b0f1a', stroke: '#06b6d4', strokeWidth: 2 }}
-                     activeDot={{ r: 6, fill: '#06b6d4', stroke: '0 0 15px #06b6d4' }}
-                   />
-                 </AreaChart>
-               </ResponsiveContainer>
-             </div>
-           </div>
-
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             {/* Most Viewed */}
-             <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
-               <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
-                 <span className="text-cyan-500">●</span> Most Viewed Armory Units
-               </h3>
-               <div className="space-y-4">
-                 {publishedProducts
-                   .map(p => ({
-                     ...p,
-                     viewCount: analytics?.views?.[p.id] || 0
-                   }))
-                   .sort((a, b) => b.viewCount - a.viewCount)
-                   .slice(0, 5)
-                   .map((product, idx) => (
-                     <div key={product.id} className="group flex items-center justify-between p-3 rounded-2xl bg-slate-950/40 border border-slate-800/50 hover:border-cyan-500/30 transition-all">
-                       <div className="flex items-center gap-4">
-                         <div className="text-xs font-black text-slate-700 w-4">{idx + 1}</div>
-                         <img src={product.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-800" />
-                         <div>
-                           <div className="text-[11px] font-black text-white uppercase italic truncate max-w-[150px]">{product.name}</div>
-                           <div className="text-[9px] text-slate-500 font-bold uppercase">{product.category}</div>
-                         </div>
-                       </div>
-                       <div className="text-right">
-                         <div className="text-sm font-black text-cyan-400">{product.viewCount}</div>
-                         <div className="text-[8px] font-black text-slate-600 uppercase">Target Views</div>
-                       </div>
-                     </div>
-                   ))}
-               </div>
-             </div>
-
-             {/* RECENT ACTIVITY */}
-             <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
-               <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
-                 <span className="text-amber-500">●</span> Live Traffic Control
-               </h3>
-               <div className="space-y-4">
-                 {(analytics?.sessions || []).slice(-6).reverse().map((session: any, idx: number) => (
-                   <div key={idx} className="flex items-center justify-between text-[10px] p-3 border-b border-slate-800/50 last:border-0">
-                     <div className="flex items-center gap-3">
-                       <div className="p-1 bg-slate-800 rounded text-slate-400">
-                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                       </div>
-                       <span className="font-mono text-slate-400">User_{session.id.slice(-4)}</span>
-                     </div>
-                     <div className="flex gap-4 items-center">
-                       <span className="px-2 py-0.5 bg-slate-950 text-slate-500 rounded border border-slate-800 font-black">
-                         {session.duration || '0'}s active
-                       </span>
-                       <span className="text-slate-600 font-bold">{new Date(session.timestamp).toLocaleTimeString()}</span>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             </div>
-           </div>
-         </div>
-        )}
-
-        {/* REVIEW MODERATION TAB */}
-        {activeAdminTab === 'comments' && (
-          <div className="space-y-6 animate-fade-in-up">
-             <div className="flex justify-between items-center mb-8 bg-slate-900/20 p-4 rounded-2xl border border-slate-800/50">
-               <div>
-                 <h2 className="text-xs font-bold uppercase tracking-[0.4em] text-slate-500 pl-2">Intel Moderation</h2>
-                 <p className="text-[9px] text-slate-600 uppercase font-black mt-1 pl-2">Field feedback synchronization active</p>
-               </div>
-               <div className="text-right">
-                 <span className="text-xl font-black text-amber-500 italic uppercase tracking-tighter">{allComments.length}</span>
-                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-2">Reports Logged</span>
-               </div>
-             </div>
-
-             <div className="grid gap-4">
-                {allComments.length > 0 ? (
-                  allComments.map((item, idx) => (
-                    <div key={`${item.productId}-${idx}`} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 hover:border-amber-500/30 transition-all group relative overflow-hidden">
-                    {/* Background Accent */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-[50px] pointer-events-none"></div>
-                    
-                    {/* Product Preview Container */}
-                    <div className="w-20 h-24 bg-slate-950 rounded-xl overflow-hidden flex-shrink-0 border border-slate-800 shadow-2xl relative group-hover:border-cyan-500/50 transition-colors">
-                      <img 
-                        src={item.productImage} 
-                        className="w-full h-full object-cover opacity-40 group-hover:opacity-80 transition-opacity duration-500" 
-                        alt="" 
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
-                    </div>
-                    
-                    <div className="flex-1 z-10">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded text-[8px] font-black text-cyan-500 uppercase tracking-tighter">
-                              Unit ID: {item.productId.slice(-6)}
-                            </span>
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[200px]">
-                              {item.productName}
+                      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 h-fit">
+                        {publishedProducts.map(p => (
+                          <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex gap-6 hover:border-slate-600 transition-all group shadow-xl relative">
+                            <div className="w-24 h-32 bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex-shrink-0"><img src={Array.isArray(p.gallery) && p.gallery.length > 0 ? p.gallery[0] : (p.imageUrl || '')} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" /></div>
+                            <div className="flex-1 flex flex-col justify-between py-1">
+                              <div>
+                                <h3 className="font-black text-white text-sm uppercase leading-tight mb-2 italic tracking-tighter h-10 overflow-hidden line-clamp-2">{(p.name || '').replace(/<[^>]*>/g, '')}</h3>
+                                <div className="text-sm font-black text-cyan-400 font-mono tracking-tighter">${p.price}</div>
+                                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">{(p as any).isPublished ? 'DEPLOYED' : 'IN ARMORY'}</div>
+                              </div>
+                              <div className="flex gap-4">
+                                <button onClick={() => startEditProduct(p)} className="text-[10px] font-black text-slate-500 hover:text-cyan-400 uppercase tracking-widest transition-colors">Modify</button>
+                                <button type="button" onClick={() => togglePublish(p.id)}className={`text-[10px] font-black uppercase tracking-widest transition-all ${(p as any).isPublished ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'text-slate-500 hover:text-white'}`}>{(p as any).isPublished ? 'Withdraw' : 'Deploy'}</button>
+                                <button type="button" onClick={() => handleDeleteProduct(p.id)} className="text-[10px] font-black text-slate-500 hover:text-rose-500 uppercase tracking-widest transition-colors"> Delete</button>
+                              </div>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-black text-white italic tracking-tight">{item.review.user}</span>
-                            <div className="h-1 w-1 bg-slate-700 rounded-full"></div>
-                            <span className="text-[9px] font-mono font-bold text-slate-500 uppercase">
-                              {new Date(item.review.date).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-4">
-                          <button 
-                            onClick={async () => {
-                              if (window.confirm("PROTOCOL WARNING: Confirm permanent removal of this intel report?")) {
-                                const updated = publishedProducts.map(p => {
-                                  if (p.id === item.productId) {
-                                    return { 
-                                      ...p, 
-                                      reviews: (p.reviews || []).filter(r => r.date !== item.review.date || r.user !== item.review.user) 
-                                    };
-                                  }
-                                  return p;
-                                });
-
-                                setPublishedProducts(updated);
-                                localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
-
-                                if (typeof syncWithServer === 'function') {
-                                  await syncWithServer(updated);
-                                }
-
-                                notifyUpdate();
-                              }
-                            }} 
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/5 border border-rose-500/10 text-[9px] font-black text-rose-500/60 hover:text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/40 uppercase tracking-widest transition-all"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            Delete Report
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="relative">
-                        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-500/50 to-transparent"></div>
-                        <p className="text-slate-300 text-xs italic leading-relaxed pl-6 py-1 group-hover:text-slate-100 transition-colors">
-                          "{item.review.comment}"
-                        </p>
-                      </div>
-
-                      {/* Star Rating Display */}
-                      <div className="mt-4 flex gap-1 pl-6">
-                        {[...Array(5)].map((_, i) => (
-                          <div 
-                            key={i} 
-                            className={`w-1.5 h-1.5 rounded-full ${i < (item.review.rating || 5) ? 'bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'bg-slate-800'}`}
-                          ></div>
                         ))}
                       </div>
+                    </>
+                  )}
+
+                  {catalogMode === 'assets' && (
+                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-12 animate-fade-in-up">
+                      <div className="space-y-8">
+                        <h2 className="text-xl font-black text-white italic uppercase pl-2">Configurator Options</h2>
+                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
+                          {(Object.keys(DEFAULT_CONFIG) as Array<keyof typeof DEFAULT_CONFIG>).map((key) => (
+                            <div key={key} className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
+                              <textarea value={config[key as keyof typeof DEFAULT_CONFIG].join(', ')} onChange={(e) => updateConfig(key as keyof typeof DEFAULT_CONFIG, e.target.value)} placeholder="Item 1, Item 2..."className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-bold uppercase text-[10px] min-h-[80px]"/>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-8">
+                        <h2 className="text-xl font-black text-white italic uppercase pl-2">Case Style Assets</h2>
+                        <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-4">Map case types to visual sketches</p>
+                          <div className="grid grid-cols-1 gap-4">
+                            {config.caseTypes.map((type) => (
+                              <div key={type} className="flex items-center gap-4 p-4 bg-slate-950 border border-slate-800 rounded-2xl group hover:border-cyan-500/30 transition-all">
+                                <div className="w-16 h-20 bg-slate-900 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 relative">
+                                    {caseStyles[type] ? ( 
+                                       <img src={caseStyles[type]} className="w-full h-full object-cover" alt={type} /> 
+                                    ) : (
+                                       <div className="flex items-center justify-center h-full text-slat-700"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                       </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2">{type}</h4>
+                                  <button onClick={() => { setActiveAssetCategory(type); assetImageRef.current?.click(); }}className="text-[9px] font-black text-cyan-500 uppercase tracking-widest border border-cyan-500/20 px-3 py-1.5 rounded-lg hover:bg-cyan-500/10 transition-all"> Upload Sketch</button>
+                                </div>
+                              </div>
+                            ))}
+                            <input type="file" ref={assetImageRef} onChange={handleAssetImageUpload} multiple className="hidden" accept="image/*" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  )}
+              </div>
+            )}
+
+            {/* SUBMISSIONS TAB */}
+            {activeAdminTab === 'submissions' && (
+              <div className="space-y-6">
+                {submissions.length === 0 ? (
+                  <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
+                  Empty Submissions Log
                   </div>
-                ))
-              ) : (
-                <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl">
-                  <div className="inline-flex p-4 rounded-full bg-slate-900 mb-4">
-                    <svg className="w-8 h-8 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+                ) : (
+              
+                  [...submissions].sort((a, b) => b.timestamp - a.timestamp).map(sub => (
+                    <div key={sub.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row justify-between gap-8 hover:border-cyan-500/20 transition-all group relative overflow-hidden">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
+                        <div className="space-y-4">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-1 block group-hover:text-white">
+                            {sub.purpose} Protocol
+                          </span>
+                          <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">
+                            {sub.userName}
+                          </h3>
+                          <p className="text-xs text-slate-500 font-mono">{sub.userEmail}</p>
+                        </div>
+            
+                        <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">CPU:</span> {sub.cpu}</div>
+                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">GPU:</span> {sub.gpu}</div>
+                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Budget:</span> <span className="text-emerald-500">${sub.budget}</span></div>
+                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Deadline:</span> {sub.deadline}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end justify-between text-right">
+                        <div className="flex gap-4">
+                          <div className="bg-slate-950 px-6 py-3 rounded-xl border border-slate-800 shadow-inner">
+                            <span className="text-[9px] font-black uppercase text-slate-500 block mb-1">Status</span>
+                            <span className="text-xs font-black text-white italic uppercase tracking-wider">Awaiting Debrief</span>
+                          </div>
+              
+                           <button 
+                            onClick={async () => { 
+                              if(window.confirm('Archive this mission?')) {
+                                try {
+                                  const response = await fetch('/api/delete-submission.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: sub.id }) // Отправляем ID серверу
+                                  });
+
+                                  const result = await response.json();
+
+                                  if (result.status === 'success' || result.success) {
+                                    const updated = submissions.filter(s => s.id !== sub.id);
+                                    setSubmissions(updated);
+                                    localStorage.setItem('maxbit_submissions', JSON.stringify(updated));
+                                    alert("Mission Archived.");
+                                  } else {
+                                    alert("Server error: " + (result.message || "Could not delete"));
+                                  }
+                                } catch (e) {
+                                  console.error("Archive failed:", e);
+                                  alert("Network error.");
+                                }
+                              }  
+                            }}
+                            className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-3 rounded-xl border border-rose-500/20 transition-all flex items-center justify-center"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+
+                          <div className="flex flex-col items-end gap-1">
+                             <span className="text-[9px] font-mono text-slate-700 uppercase">ID: {sub.id.slice(-8)}</span>
+                             <span className="text-[9px] font-mono text-slate-500 uppercase font-black">Logged: {new Date(sub.timestamp).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ORDERS TAB */}
+            {activeAdminTab === 'orders' && (
+              <div className="space-y-6">
+                {shopOrders.length === 0 ? (
+                  <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest"> No Orders Logged</div>
+                ) : (
+                  shopOrders.map((order) => (
+                    <div key={order.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex justify-between items-center group hover:border-emerald-500/20 transition-all shadow-xl">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Transaction Detected</span>
+                        </div>
+                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">{order.orderNumber}</h3>
+                        <p className="text-xs text-slate-500 font-mono tracking-tight">CUSTOMER: {order.customerEmail}</p>
+                      </div>
+          
+                      <div className="text-right space-y-3">
+                        <div className="text-3xl font-black text-white italic tracking-tighter">${Number(order.amount).toLocaleString()}</div>
+                        <div className={`text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border ${order.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'  : 'bg-amber-500/10 text-amber-500 border-amber-500/20' }`}> {order.status}</div>
+                        <div className="text-[9px] font-mono text-slate-600 block uppercase tracking-widest">{new Date(order.timestamp).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ANALYTICS TAB */}
+            {activeAdminTab === 'analytics' && (
+              <div className="space-y-8 animate-in fade-in duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                    <div className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-2">Total Sessions</div>
+                    <div className="text-3xl font-black text-white italic">{analytics?.sessions?.length || 0}</div>
+                    <div className="text-[9px] text-slate-500 uppercase mt-1">Unique deployments detected</div>
                   </div>
-                  <div className="text-slate-500 font-black uppercase tracking-[0.3em] text-sm">No Intel Packets Found</div>
-                  <p className="text-[10px] text-slate-700 uppercase mt-2 font-bold tracking-widest">Awaiting field transmissions...</p>
+                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                    <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Total Revenue</div>
+                    <div className="text-3xl font-black text-white italic">${shopOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0).toLocaleString()}</div>
+                    <div className="text-[9px] text-slate-500 uppercase mt-1">Confirmed transactions</div>
+                  </div>
+                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                    <div className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-2">Unit Views</div>
+                    <div className="text-3xl font-black text-white italic"> {Object.values(analytics?.views || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0)} </div>
+                    <div className="text-[9px] text-slate-500 uppercase mt-1">Total product interactions</div>
+                  </div>
+                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                    <div className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">Conversion</div>
+                    <div className="text-3xl font-black text-white italic"> {analytics?.sessions?.length ? ((shopOrders.length / analytics.sessions.length) * 100).toFixed(1) : 0}%</div>
+                    <div className="text-[9px] text-slate-500 uppercase mt-1">Visitor to Buyer ratio</div>
+                  </div>
                 </div>
-              )}
+
+               <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl overflow-hidden shadow-2xl">
+                 <div className="flex justify-between items-center mb-8">
+                   <div>
+                     <h3 className="text-white font-black italic uppercase tracking-tighter text-xl">Tactical Traffic Flow</h3>
+                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">Operational cycles: Last 7 Days</p>
+                   </div>
+                   <div className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full">
+                     <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_8px_#06b6d4]"></div>
+                     <span className="text-[9px] font-black text-cyan-500 uppercase italic">Live Monitoring</span>
+                   </div>
+                 </div>
+
+                 <div className="h-[300px] w-full">
+                   <ResponsiveContainer width="100%" height="100%">
+                     <AreaChart data={chartData}>
+                       <defs>
+                         <linearGradient id="cyberCyan" x1="0" y1="0" x2="0" y2="1">
+                           <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                           <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                         </linearGradient>
+                       </defs>
+                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                       <XAxis 
+                        dataKey="displayDate" 
+                         axisLine={false} 
+                         tickLine={false} 
+                         tick={{fill: '#475569', fontSize: 10, fontWeight: 'bold'}}
+                         dy={10}
+                       />
+                      <YAxis hide domain={['dataMin', 'dataMax + 5']} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '16px' }}
+                        itemStyle={{ color: '#06b6d4', textTransform: 'uppercase', fontWeight: '900', fontSize: '10px' }}
+                        labelStyle={{ display: 'none' }}
+                        cursor={{ stroke: '#06b6d4', strokeWidth: 1, strokeDasharray: '5 5' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="visits" 
+                        stroke="#06b6d4" 
+                        strokeWidth={4}
+                        fillOpacity={1} 
+                        fill="url(#cyberCyan)" 
+                        animationDuration={2500}
+                        dot={{ r: 4, fill: '#0b0f1a', stroke: '#06b6d4', strokeWidth: 2 }}
+                        activeDot={{ r: 6, fill: '#06b6d4', stroke: '0 0 15px #06b6d4' }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Most Viewed */}
+                <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
+                    <span className="text-cyan-500">●</span> Most Viewed Armory Units
+                  </h3>
+                  <div className="space-y-4">
+                    {publishedProducts
+                      .map(p => ({
+                        ...p,
+                        viewCount: analytics?.views?.[p.id] || 0
+                      }))
+                      .sort((a, b) => b.viewCount - a.viewCount)
+                      .slice(0, 5)
+                      .map((product, idx) => (
+                        <div key={product.id} className="group flex items-center justify-between p-3 rounded-2xl bg-slate-950/40 border border-slate-800/50 hover:border-cyan-500/30 transition-all">
+                          <div className="flex items-center gap-4">
+                            <div className="text-xs font-black text-slate-700 w-4">{idx + 1}</div>
+                            <img src={product.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-800" />
+                            <div>
+                              <div className="text-[11px] font-black text-white uppercase italic truncate max-w-[150px]">{product.name}</div>
+                              <div className="text-[9px] text-slate-500 font-bold uppercase">{product.category}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-black text-cyan-400">{product.viewCount}</div>
+                            <div className="text-[8px] font-black text-slate-600 uppercase">Target Views</div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* RECENT ACTIVITY */}
+                <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
+                    <span className="text-amber-500">●</span> Live Traffic Control
+                  </h3>
+                  <div className="space-y-4">
+                    {(analytics?.sessions || []).slice(-6).reverse().map((session: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between text-[10px] p-3 border-b border-slate-800/50 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="p-1 bg-slate-800 rounded text-slate-400">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                          </div>
+                          <span className="font-mono text-slate-400">User_{session.id.slice(-4)}</span>
+                        </div>
+                        <div className="flex gap-4 items-center">
+                          <span className="px-2 py-0.5 bg-slate-950 text-slate-500 rounded border border-slate-800 font-black">
+                            {session.duration || '0'}s active
+                          </span>
+                          <span className="text-slate-600 font-bold">{new Date(session.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+           )}
+
+           {/* REVIEW MODERATION TAB */}
+           {activeAdminTab === 'comments' && (
+             <div className="space-y-6 animate-fade-in-up">
+                <div className="flex justify-between items-center mb-8 bg-slate-900/20 p-4 rounded-2xl border border-slate-800/50">
+                  <div>
+                    <h2 className="text-xs font-bold uppercase tracking-[0.4em] text-slate-500 pl-2">Intel Moderation</h2>
+                    <p className="text-[9px] text-slate-600 uppercase font-black mt-1 pl-2">Field feedback synchronization active</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-black text-amber-500 italic uppercase tracking-tighter">{allComments.length}</span>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-2">Reports Logged</span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                   {allComments.length > 0 ? (
+                     allComments.map((item, idx) => (
+                       <div key={`${item.productId}-${idx}`} className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row gap-6 hover:border-amber-500/30 transition-all group relative overflow-hidden">
+                       {/* Background Accent */}
+                       <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-[50px] pointer-events-none"></div>
+                    
+                       {/* Product Preview Container */}
+                       <div className="w-20 h-24 bg-slate-950 rounded-xl overflow-hidden flex-shrink-0 border border-slate-800 shadow-2xl relative group-hover:border-cyan-500/50 transition-colors">
+                         <img 
+                           src={item.productImage} 
+                           className="w-full h-full object-cover opacity-40 group-hover:opacity-80 transition-opacity duration-500" 
+                           alt="" 
+                         />
+                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
+                       </div>
+                    
+                       <div className="flex-1 z-10">
+                         <div className="flex justify-between items-start mb-4">
+                           <div>
+                             <div className="flex items-center gap-2 mb-1">
+                               <span className="px-1.5 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded text-[8px] font-black text-cyan-500 uppercase tracking-tighter">
+                                 Unit ID: {item.productId.slice(-6)}
+                               </span>
+                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[200px]">
+                                 {item.productName}
+                               </div>
+                             </div>
+                          
+                             <div className="flex items-center gap-3">
+                               <span className="text-sm font-black text-white italic tracking-tight">{item.review.user}</span>
+                               <div className="h-1 w-1 bg-slate-700 rounded-full"></div>
+                               <span className="text-[9px] font-mono font-bold text-slate-500 uppercase">
+                                 {new Date(item.review.date).toLocaleDateString()}
+                               </span>
+                             </div>
+                           </div>
+
+                           <div className="flex gap-4">
+                             <button 
+                               onClick={async () => {
+                                 if (window.confirm("PROTOCOL WARNING: Confirm permanent removal of this intel report?")) {
+                                   const updated = publishedProducts.map(p => {
+                                     if (p.id === item.productId) {
+                                       return { 
+                                         ...p, 
+                                         reviews: (p.reviews || []).filter(r => r.date !== item.review.date || r.user !== item.review.user) 
+                                       };
+                                     }
+                                     return p;
+                                   });
+
+                                   setPublishedProducts(updated);
+                                   localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updated));
+
+                                   if (typeof syncWithServer === 'function') {
+                                     await syncWithServer(updated);
+                                   }
+
+                                   notifyUpdate();
+                                 }
+                               }} 
+                               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/5 border border-rose-500/10 text-[9px] font-black text-rose-500/60 hover:text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/40 uppercase tracking-widest transition-all"
+                             >
+                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                               Delete Report
+                             </button>
+                           </div>
+                         </div>
+
+                         <div className="relative">
+                           <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-amber-500/50 to-transparent"></div>
+                           <p className="text-slate-300 text-xs italic leading-relaxed pl-6 py-1 group-hover:text-slate-100 transition-colors">
+                             "{item.review.comment}"
+                           </p>
+                         </div>
+
+                         {/* Star Rating Display */}
+                         <div className="mt-4 flex gap-1 pl-6">
+                           {[...Array(5)].map((_, i) => (
+                             <div 
+                               key={i} 
+                               className={`w-1.5 h-1.5 rounded-full ${i < (item.review.rating || 5) ? 'bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'bg-slate-800'}`}
+                             ></div>
+                           ))}
+                         </div>
+                       </div>
+                     </div>
+                   ))
+                 ) : (
+                   <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl">
+                     <div className="inline-flex p-4 rounded-full bg-slate-900 mb-4"><svg className="w-8 h-8 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg></div>
+                     <div className="text-slate-500 font-black uppercase tracking-[0.3em] text-sm">No Intel Packets Found</div>
+                  </div>
+                 )}
+               </div>  
+            </div>
+            )}
           </>  
         )}
       </div>
