@@ -89,9 +89,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
               Welcome, <span className="text-slate-400">{currentUser?.firstName || currentUser?.username || 'OPERATOR'}</span>
             </h1>
           </div>
-          <button onClick={onLogout} className="text-[10px] font-black uppercase tracking-widest text-rose-500 border border-rose-500/20 px-6 py-2 rounded-full hover:bg-rose-500 hover:text-white transition-all">
-            Logout
-          </button>
         </div>
 
         {/* DASHBOARD GRID */}
@@ -142,30 +139,37 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
               </div>
               <div className="space-y-4">
                 {wishlist.map((item) => (
-                   <div key={item.id} className="border-l-2 border-slate-800 pl-4 py-1 flex justify-between items-center group hover:border-cyan-500/50 transition-colors">
-                     <div className="flex-1 min-w-0">
-                       <p className="text-[9px] text-slate-500 uppercase font-black mb-1">
-                         {item.category || 'HARDWARE UNIT'}
-                       </p>
-                       <p className="text-sm font-bold uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
-       
-                         {item.name || `Unit ID: ${item.id?.slice(0, 8)}` || 'Unknown Protocol'}
-                       </p>
-                       <p className="text-[9px] font-mono text-cyan-500/50 italic">
-                         {item.price ? `$${item.price}` : 'Price Pending'}
-                       </p>
-                     </div>
-                     <button 
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         handleRemoveFromWishlist(item.id);
-                       }}
-                       className="text-[10px] font-black text-slate-600 hover:text-rose-500 uppercase tracking-widest transition-colors ml-4 shrink-0"
-                     >
-                       Remove
-                     </button>
-                   </div>
-                 ))}
+                  <div 
+                    key={item.id} 
+                    onClick={() => onSelectProduct(item)} 
+                    className="border-l-2 border-slate-800 pl-4 py-3 flex justify-between items-center group hover:border-cyan-500/50 hover:bg-white/5 transition-all cursor-pointer rounded-r-xl"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] text-slate-500 uppercase font-black mb-1">
+                        {item.category || 'HARDWARE UNIT'}
+                      </p>
+      
+                      <h4 
+                        className="text-sm font-bold uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1"
+                        dangerouslySetInnerHTML={{ __html: item.name || 'Unknown Unit' }}
+                      />
+      
+                      <p className="text-[10px] font-black text-cyan-500 font-mono mt-1">
+                        ${item.price || '0.00'}
+                      </p>
+                    </div>
+    
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveFromWishlist(item.id);
+                      }}
+                      className="text-[10px] font-black text-slate-600 hover:text-rose-500 uppercase tracking-widest transition-colors ml-4 p-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))} 
               </div>
             </div>
           </div>
