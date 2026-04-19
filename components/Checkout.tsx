@@ -55,43 +55,48 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
 
   try {
     const stripe = await stripePromise;
-    
-    // Check if stripe is loaded
     if (!stripe) {
-      throw new Error("Stripe script failed to load. Check your API key or internet connection.");
+      throw new Error("Stripe script failed to load.");
     }
 
-      const response = await fetch('/api/create-checkout-session.php', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          items: items.map(item => ({
-            id: item.id,
-            name: item.name.replace(/<[^>]*>?/gm, ''),
-            price:item.price,
-            imageUrl: item.imageUrl
-          })),
-          email: email,
-          shipping: shippingCost,
-          orderId: orderId
-        }),
-      });
+    const idsParam = items.map(item => item.id).join(',');
 
-      const session = await response.json();
-      if (session.error) throw new Error(session.error);
-  
-      if (session.url) {
-        window.location.href = session.url;
-      } else {
-        throw new Error("Failed to create checkout session");
-      }
+    const successUrl = `${window.location.origin}/api/success.php?success=true&orderId=${orderId}&ids=${idsParam}`;
+    const cancelUrl = `${window.location.origin}/checkout?canceled=true`;
 
-    } catch (err: any) {
-      console.error("Payment Error:", err);
-      setStep('details');
-      alert(err.message || "Could not reach the payment gateway.");
+    const response = await fetch('/api/create-checkout-session.php', { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        items: items.map(item => ({
+          id: item.id,
+          name: item.name.replace(/<[^>]*>?/gm, ''),
+          price: item.price,
+          imageUrl: item.imageUrl
+        })),
+        email: email,
+        shipping: shippingCost,
+        orderId: orderId,
+        success_url: successUrl,
+        cancel_url: cancelUrl
+      }),
+    });
+
+    const session = await response.json();
+    if (session.error) throw new Error(session.error);
+
+    if (session.url) {
+      window.location.href = session.url;
+    } else {
+      throw new Error("Failed to create checkout session");
     }
-  };
+
+  } catch (err: any) {
+    console.error("Payment Error:", err);
+    setStep('details');
+    alert(err.message || "Could not reach the payment gateway.");
+  }
+};
 
   if (step === 'processing') {
     return (

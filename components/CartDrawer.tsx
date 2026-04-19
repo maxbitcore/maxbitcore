@@ -75,7 +75,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onRemov
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-white text-sm">{item.name}</h3>
+                        <h3 className="font-bold text-white text-sm">{item.name.replace(/<[^>]*>/g, '')}</h3>
                         <span className="text-sm font-black text-cyan-400">${item.price}</span>
                     </div>
                     <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-1">{item.category}</p>
