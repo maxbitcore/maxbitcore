@@ -4,17 +4,21 @@ import { trackCartAddition, logAction } from '../services/analyticsService';
 import { Product, Review } from '../types';
 import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProductDetailProps {
   product: Product;
   onBack: () => void;
   onAddToCart: (product: Product) => void;
+  openLoginModal?: () => void;
 }
 
-const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToCart }) => {
+const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToCart, openLoginModal }) => {
   const { email, role } = getStoredAuth();
   const [activeImage, setActiveImage] = useState(product.imageUrl);
   const isSoldOut = product.status === 'Sold Out';
+
+  const { currentUser, isAuthenticated } = useAuth()
 
   const [isWishlisted, setIsWishlisted] = useState(() => 
     checkIsWishlisted(product.id, email || '')
@@ -22,13 +26,22 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!email) { 
-        alert("PLEASE INITIALIZE CONNECTION (LOGIN).");
-        return;
+    e.preventDefault();
+
+  if (!isAuthenticated && !currentUser) {
+    if (openLoginModal) {
+      openLoginModal();
+    } else {
+      alert("Please login to access Wishlist protocols."); 
     }
-    const newState = toggleWishlist(product.id, email);
-    setIsWishlisted(newState);
-  };
+    return;
+  }
+
+  const nextState = toggleWishlist(product.id, currentUser?.email || email || '');
+  setIsWishlisted(nextState);
+    
+  logAction('CLICK', `${nextState ? 'Added' : 'Removed'} ${product.name} from Wishlist`);
+};
   
   // Review Form State
   const [reviewName, setReviewName] = useState('');
@@ -38,7 +51,8 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
  
   useEffect(() => {
     setActiveImage(product.imageUrl);
-  }, [product]);
+    setIsWishlisted(checkIsWishlisted(product.id, currentUser?.email || email || ''));
+  }, [product, currentUser, email]);
 
   const handleAddToCart = () => {
     trackCartAddition(product.id);
@@ -59,7 +73,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
       comment: reviewComment.trim()
     };
 
-    product.reviews = [newReview, ...(product.reviews || [])];
+    const updatedReviews = [newReview, ...(product.reviews || [])];
 
     try {
       const res = await fetch('https://www.maxbitcore.com/api/products.php');
@@ -77,21 +91,20 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedProducts)
       });
-      console.log("Intel Report successfully transmitted to Server.");
-
+      
       localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedProducts));
-
+      logAction('CLICK', `Posted Review on ${product.name.replace(/<[^>]*>?/gm, '')}`);
+      
+      setReviewComment('');
+      setReviewName('');
+      setReviewRating(5);
+      // Обновляем локальный объект продукта, чтобы отзыв появился сразу
+      product.reviews = updatedReviews;
     } catch (error) {
-      console.error("Failed to sync report with MaxBit server:", error);
+      console.error("Failed to sync report:", error);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    logAction('CLICK', `Posted Review on ${product.name.replace(/<[^>]*>?/gm, '')}`);
-    
-    // Reset Form
-    setReviewComment('');
-    setReviewName('');
-    setReviewRating(5);
-    setIsSubmitting(false);
   };
 
   const galleryImages = [product.imageUrl, ...(product.gallery || [])].filter(Boolean);
@@ -299,7 +312,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
                         </p>
                     </div>
                 </div>
-
+                
             </div>
         </div>
       </div>

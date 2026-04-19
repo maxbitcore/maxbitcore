@@ -176,11 +176,6 @@ return (
           suppressContentEditableWarning={true}
           className="p-4 min-h-[80px] outline-none text-white text-sm prose prose-invert max-w-none relative z-10"
         ></div>
-        {!value && (
-          <div className="absolute top-[70px] left-4 px-4 py-2 text-slate-800 text-[10px] font-black uppercase pointer-events-none z-0">
-            {placeholder || 'Enter protocol data...'}
-          </div>
-        )}
       </div>
     </div>
   );
