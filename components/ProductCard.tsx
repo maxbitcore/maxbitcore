@@ -29,7 +29,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
       alert("PLEASE INITIALIZE CONNECTION (LOGIN) TO SAVE HARDWARE.");
       return;
     }
-    const newState = toggleWishlist(product.id, currentUser.email);
+    const newState = toggleWishlist(product, currentUser?.email || "");
     setIsWishlisted(newState);
   };
 
