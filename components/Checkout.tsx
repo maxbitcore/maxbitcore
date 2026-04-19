@@ -257,9 +257,9 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           <div className="lg:pl-12 lg:border-l border-slate-800">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] mb-10">Order Summary</h2>
   
-            <div className="space-y-6">
+            <div className="space-y-6 mb-10">
               {items.map((item, idx) => (
-                <div key={item.id} className="flex justify-between items-start">
+                <div key={item.id} className="flex justify-between items-start gap-4">
                   <div className="flex gap-4">
                     <img src={item.imageUrl} className="w-16 h-16 object-cover rounded-xl border border-slate-800" alt="" />
                     <div>
@@ -275,44 +275,44 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               ))}
             </div>
 
-            <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-8 space-y-6">
-              <div className="space-y-3">
-                <div className="flex justify-between text-xs font-bold text-slate-500">
+            <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 md:p-6 space-y-4">
+              <div className="space-y-2.5">
+                <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500">
                   <span className="uppercase tracking-widest">Subtotal</span>
                   <span className="text-white font-mono">${subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-xs font-bold text-slate-500">
+                <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500">
                   <span className="uppercase tracking-widest">Shipping</span>
                   <span className="text-emerald-500 font-black italic">FREE</span>
                 </div> 
-                <div className="flex justify-between text-xs font-bold text-slate-500">
+                <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500">
                   <span className="uppercase tracking-widest">Estimated Tax (Stripe)</span>
                   <span className="text-white font-mono">${estimatedTax.toFixed(2)}</span>
                 </div>
               </div>
                 
-              <p className="text-[9px] text-slate-600 uppercase mt-4 italic">
+              <p className="text-[8px] text-slate-600 uppercase italic leading-tight border-t border-slate-800/50 pt-3">
                 * Final tax will be calculated by Stripe based on your precise jurisdiction.
               </p> 
 
-              <div className="border-t border-slate-800 pt-6">
+              <div className="pt-2">
                   <div className="flex justify-between items-center">
                     <span className="font-black italic text-xl text-white uppercase tracking-tighter">Total</span>
                     <div className="flex items-end gap-1">
                       <span className="text-[10px] text-slate-500 mb-1">USD</span>
-                      <span className="font-black text-4xl text-white tracking-tighter">${total.toFixed(2)}</span>
+                      <span className="font-black text-3xl text-white tracking-tighter">${total.toFixed(2)}</span>
                     </div>
                   </div>
               </div>
             </div>
 
-            <div className="mt-8 p-6 border border-dashed border-slate-800 rounded-2xl flex items-center gap-4">
+            <div className="mt-6 p-4 border border-dashed border-slate-800 rounded-2xl flex items-center gap-4 bg-slate-950/30">
               <div className="text-cyan-500">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Secure encrypted checkout</span>
+            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Secure encrypted checkout</span>
           </div>
           </div>
         </form>

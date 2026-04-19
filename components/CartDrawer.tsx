@@ -36,13 +36,22 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onRemov
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
-          <h2 className="text-xl font-black italic tracking-tighter text-white">YOUR KIT ({items.length})</h2>
+          <h2 className="text-xl font-black italic tracking-tighter text-white">
+            YOUR KIT ({items.length})
+          </h2>
           <button 
             type="button"
             onClick={onClose} 
-            className="text-slate-500 hover:text-white transition-colors"
+            className="text-slate-500 hover:text-white transition-colors p-2"
           >
-            <svg xmlns="https://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              strokeWidth={1.5} 
+              stroke="currentColor" 
+              className="w-6 h-6"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
