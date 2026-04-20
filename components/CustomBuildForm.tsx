@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BuildSubmission } from '../types';
+import { sendBuildRequestEmail } from '../services/emailService';
 
 // Default Data Constants (Fallbacks)
 const DEFAULT_CONFIG = {
@@ -103,6 +104,7 @@ interface CustomBuildFormProps {
 
 const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [status, setStatus] = useState<'idle' | 'success'>('idle');
+  const [isLoading, setIsLoading] = useState(false);
   const [activeSections, setActiveSections] = useState<string[]>([]);
   const [hoveredSize, setHoveredSize] = useState<string | null>(null);
   
@@ -117,14 +119,6 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [targetDeadline, setTargetDeadline] = useState('');
   const [requirements, setRequirements] = useState('');
 
-  useEffect(() => {
-    if (currentUser) {
-      const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ');
-      if (fullName) setUserName(fullName);
-      if (currentUser.email) setUserEmail(currentUser.email);
-    }
-  }, [currentUser]);
-
   // Selections
   const [purpose, setPurpose] = useState('Not Specified');
   const [selectedCPUBrand, setSelectedCPUBrand] = useState('Not Specified');
@@ -135,6 +129,14 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [caseType, setCaseType] = useState('Not Specified');
   const [aesthetic, setAesthetic] = useState('Not Specified');
   const [resolution, setResolution] = useState('Not Specified');
+
+  useEffect(() => {
+    if (currentUser) {
+      const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ');
+      if (fullName) setUserName(fullName);
+      if (currentUser.email) setUserEmail(currentUser.email);
+    }
+  }, [currentUser]);
 
   const loadConfig = () => {
     // Load custom configuration if available
@@ -202,6 +204,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
 
   const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
     const newSubmission: BuildSubmission = {
       id: `PROTOCOL-${Date.now()}`,
@@ -237,10 +240,14 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
      const existing = JSON.parse(localStorage.getItem('maxbit_submissions') || '[]');
      localStorage.setItem('maxbit_submissions', JSON.stringify([newSubmission, ...existing]));
 
+     window.dispatchEvent(new Event('maxbit-update'));
+
+     setIsLoading(false);
      setStatus('success');
      window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
+      setIsLoading(false);
       console.error("Submission failed:", error);
       alert("System Error: Could not deploy build protocol. Please try again.");
     }
@@ -507,7 +514,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
           </div>
 
           <div className="flex justify-center pt-12">
-            <button type="submit" className="w-full md:w-auto px-20 py-6 rounded-2xl font-black uppercase tracking-[0.2em] text-sm hover:opacity-90 transition-all hover:scale-[1.02] shadow-xl bg-[#00c2a8] text-[#1c2d74]">Submit Build Request</button>
+            <button type="submit" disabled={isLoading} className={`w-full md:w-auto px-20 py-6 rounded-2xl font-black uppercase tracking-[0.2em] text-sm transition-all shadow-xl ${isLoading ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-[#00c2a8] text-[#1c2d74] hover:opacity-90 hover:scale-[1.02]'}`}>{isLoading ? 'Deploying Protocol...' : 'Submit Build Request'}</button>
           </div>
         </form>
       </div>

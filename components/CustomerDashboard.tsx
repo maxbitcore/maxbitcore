@@ -13,7 +13,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
   const [isLoading, setIsLoading] = useState(true);
   const [wishlist, setWishlist] = useState<any[]>([]);
 
-  // 1. ДИАГНОСТИКА (проверь консоль браузера!)
   useEffect(() => {
     console.log("DASHBOARD_DEBUG: Current User Data ->", currentUser);
   }, [currentUser]);
@@ -34,28 +33,44 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
 
   //  SUBMISSIONS
   useEffect(() => {
-    const fetchSubmissions = async () => {
+    const loadSubmissions = () => {
       if (!currentUser?.email) return;
+
+      setIsLoading(true);
       try {
-        const response = await fetch('https://www.maxbitcore.com/api/submissions.json');
-        if (!response.ok) throw new Error('Failed to fetch');
-        const allSubmissions = await response.json();
-        const filteredSubmissions = allSubmissions.filter(
+        const localData = localStorage.getItem('maxbit_submissions');
+        const allSubmissions = localData ? JSON.parse(localData) : [];
+
+        const filtered = allSubmissions.filter(
           (sub: any) => sub.userEmail === currentUser.email
         );
-        setUserSubmissions(filteredSubmissions);
+
+        setUserSubmissions(filtered);
       } catch (error) {
-        console.error("Error loading submissions:", error);
+        console.error("CRITICAL ERROR: Failed to parse submissions log", error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchSubmissions();
+
+    loadSubmissions();
+
+    window.addEventListener('maxbit-update', loadSubmissions);
+    return () => window.removeEventListener('maxbit-update', loadSubmissions);
   }, [currentUser?.email]);
 
   const handleDeleteSubmission = async (submissionId: string) => {
     if (!window.confirm('Are you sure you want to terminate this build protocol?')) return;
+
     setUserSubmissions(prev => prev.filter(sub => sub.id !== submissionId));
+
+    const localData = localStorage.getItem('maxbit_submissions');
+    if (localData) {
+      const submissions = JSON.parse(localData);
+      const updated = submissions.filter((sub: any) => sub.id !== submissionId);
+      localStorage.setItem('maxbit_submissions', JSON.stringify(updated));
+    }
+
     try {
       await fetch('https://www.maxbitcore.com/api/delete-submission.php', {
         method: 'POST',
