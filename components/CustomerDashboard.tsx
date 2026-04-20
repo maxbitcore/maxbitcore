@@ -236,7 +236,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                        <div className="space-y-1">
                          <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Profile</p>
                          <div className="text-xs font-bold text-white uppercase italic">Purpose: {sub.purpose}</div>
-                         <div className="text-sm font-black text-cyan-400 font-mono mt-1">${sub.budget}</div>
                        </div>
 
                        {/* 02 // Core Hardware */}

@@ -585,6 +585,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     }
   };
 
+  const handleDeleteSubmission = async (id: string) => {
+    if (!window.confirm('PROTOCOL WARNING: Confirm permanent removal of this mission?')) return;
+    try {
+      const response = await fetch('https://www.maxbitcore.com/api/delete-submission.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }) 
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setSubmissions(prev => prev.filter(s => s.id !== id));
+        notifyUpdate();
+        alert("Mission Terminated.");
+      }
+    } catch (e) {
+      alert("Network error.");
+    }
+  };
+
   // Asset Management Helpers
   const updateConfig = (key: keyof typeof DEFAULT_CONFIG, value: string) => {
     const newConfig = { ...config, [key]: value.split(',').map(s => s.trim()).filter(Boolean) };
@@ -846,7 +865,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                     submissions
                       .filter(s => filter === 'all' ? true : (s.status || 'pending') === filter)
                       .sort((a, b) => b.timestamp - a.timestamp)
-                      .map(sub => (
+                      .map((sub: BuildSubmission) => (
                         <div key={sub.id} className={`bg-slate-900/40 border ${sub.status === 'completed' ? 'border-emerald-500/30' : 'border-slate-800'} p-8 rounded-3xl group relative overflow-hidden transition-all hover:bg-slate-900/60`}>
                           
                           <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sub.status === 'completed' ? 'bg-emerald-500' : 'bg-cyan-500'} shadow-[0_0_15px_rgba(6,182,212,0.3)]`}></div>
@@ -879,7 +898,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                                 <div className="space-y-1">
                                   <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">01 // Mission Profile</p>
                                   <div className="text-xs font-bold text-white uppercase italic">Purpose: {sub.purpose}</div>
-                                  <div className="text-sm font-black text-emerald-400 font-mono mt-1">${sub.budget}</div>
                                 </div> 
                                 {/* 2. CPU & Graphics (GPU) */}
                                 <div className="space-y-1">

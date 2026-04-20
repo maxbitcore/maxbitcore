@@ -270,18 +270,29 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
 
   if (status === 'success') {
     return (
-      <section className="py-24 px-6 text-center bg-[#0b0f1a]">
-        <div className="max-w-2xl mx-auto p-12 rounded-3xl border border-[#00c2a8]/30 bg-[#0f172a]/40 shadow-2xl animate-fade-in-up">
-          <div className="w-16 h-16 bg-[#00c2a8] rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(0,194,168,0.4)]">
-            <svg className="w-8 h-8 text-[#1c2d74]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <section className="min-h-[600px] w-full py-24 px-6 text-center bg-[#0b0f1a] flex items-center justify-center">
+        <div className="max-w-2xl w-full p-12 rounded-3xl border border-cyan-500/30 bg-[#0f172a]/40 shadow-2xl animate-fade-in-up">
+          <div className="w-16 h-16 bg-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+            <svg className="w-8 h-8 text-[#0f172a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-3xl font-black text-[#00c2a8] uppercase italic mb-4 tracking-tighter">Mission Deployed</h2>
-          <p className="text-slate-400 font-medium uppercase tracking-widest text-sm leading-relaxed">
-            Your build request has been logged. Our specialists will contact you shortly.
+          
+          <h2 className="text-3xl font-black text-white uppercase italic mb-4 tracking-tighter">
+            Mission <span className="text-cyan-500">Deployed</span>
+          </h2>
+          
+          <p className="text-slate-400 font-medium uppercase tracking-widest text-xs leading-relaxed mb-8">
+            Your build protocol has been logged. Our specialists in Everett will contact you shortly.
           </p>
-          <button onClick={() => setStatus('idle')} className="mt-8 text-[10px] font-black uppercase tracking-[0.3em] text-[#00c2a8] hover:text-white transition-colors underline underline-offset-4">
+
+          <button 
+            onClick={() => {
+              setIsLoading(false);
+              setStatus('idle');
+            }} 
+            className="px-10 py-4 bg-transparent border border-cyan-500/50 text-cyan-500 text-[10px] font-black uppercase tracking-[0.3em] rounded-xl hover:bg-cyan-500 hover:text-black transition-all"
+          >
             New Build Request
           </button>
         </div>
