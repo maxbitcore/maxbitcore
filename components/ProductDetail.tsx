@@ -98,7 +98,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
       setReviewComment('');
       setReviewName('');
       setReviewRating(5);
-      // Обновляем локальный объект продукта, чтобы отзыв появился сразу
       product.reviews = updatedReviews;
     } catch (error) {
       console.error("Failed to sync report:", error);

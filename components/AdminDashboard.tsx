@@ -319,8 +319,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
         try {
           const subRes = await fetch(`/api/get-submissions.php?v=${Date.now()}`);
-          const text = await subRes.text(); // Сначала берем как текст
-          if (text && text.trim().startsWith('[')) { // Проверяем, что это похоже на массив JSON
+          const text = await subRes.text(); 
+          if (text && text.trim().startsWith('[')) { 
             const subData = JSON.parse(text);
             setSubmissions(subData);
           } else {
@@ -573,7 +573,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       });
 
       if (response.ok) {
-        // Обновляем состояние локально
         setSubmissions(prev => prev.map(sub => 
           sub.id === id ? { ...sub, status: newStatus } : sub
         ));
@@ -821,10 +820,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
               </div>
             )}
 
-            {/* SUBMISSIONS TAB — ОБНОВЛЕННАЯ ВЕРСИЯ */}
+            {/* SUBMISSIONS TAB */}
             {activeAdminTab === 'submissions' && (
               <div className="space-y-8 animate-fade-in-up">
-                {/* ПАНЕЛЬ ФИЛЬТРОВ */}
                 <div className="flex justify-between items-center bg-slate-900/20 p-2 rounded-2xl border border-slate-800/50 w-fit">
                   {(['pending', 'completed', 'all'] as const).map((f) => (
                     <button
@@ -851,12 +849,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                       .map(sub => (
                         <div key={sub.id} className={`bg-slate-900/40 border ${sub.status === 'completed' ? 'border-emerald-500/30' : 'border-slate-800'} p-8 rounded-3xl group relative overflow-hidden transition-all hover:bg-slate-900/60`}>
                           
-                          {/* Индикатор статуса */}
                           <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sub.status === 'completed' ? 'bg-emerald-500' : 'bg-cyan-500'} shadow-[0_0_15px_rgba(6,182,212,0.3)]`}></div>
 
                           <div className="flex flex-col lg:flex-row justify-between gap-8">
                             <div className="flex-1 space-y-6">
-                              {/* Верхняя часть: Имя и Основное */}
                               <div className="flex flex-wrap justify-between items-start gap-4">
                                 <div>
                                   <div className="flex items-center gap-2 mb-2">
@@ -877,31 +873,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                                 </div>
                               </div>
 
-                              {/* СЕТКА ХАРАКТЕРИСТИК (Теперь всё видно!) */}
+                              {/* HARDWARE SELECTION */}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-y border-white/5">
-                                <div>
-                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Hardware Core</p>
-                                  <p className="text-xs font-bold text-white uppercase italic">{sub.cpu} / {sub.gpu}</p>
-                                  <p className="text-[10px] text-slate-500 uppercase">{sub.manufacturer}</p>
+                                {/* 1. Target Purpose & Budget */}
+                                <div className="space-y-1">
+                                  <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">01 // Mission Profile</p>
+                                  <div className="text-xs font-bold text-white uppercase italic">Purpose: {sub.purpose}</div>
+                                  <div className="text-sm font-black text-emerald-400 font-mono mt-1">${sub.budget}</div>
+                                </div> 
+                                {/* 2. CPU & Graphics (GPU) */}
+                                <div className="space-y-1">
+                                  <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">02 // Core Hardware</p>
+                                  <div className="text-xs font-bold text-white uppercase italic">CPU: {sub.cpu}</div>
+                                  <div className="text-xs font-bold text-cyan-400 uppercase italic">GPU: {sub.gpu}</div>
+                                  <p className="text-[10px] text-slate-500 font-mono uppercase italic">{sub.manufacturer}</p>
                                 </div>
-                                <div>
-                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Style & Case</p>
-                                  <p className="text-xs font-bold text-white uppercase italic">{sub.caseSize} / {sub.caseType}</p>
-                                  <p className="text-[10px] text-slate-500 uppercase">{sub.aesthetic}</p>
+                                {/* 3. Storage & Resolution */}
+                                <div className="space-y-1">
+                                  <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">03 // Data & Output</p>
+                                  <div className="text-xs font-bold text-white uppercase italic">Storage: {sub.ssd}</div>
+                                  <div className="text-xs font-bold text-white uppercase italic">Target Res: {sub.resolution}</div>
                                 </div>
-                                <div>
-                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Deployment</p>
-                                  <p className="text-xs font-bold text-white uppercase italic">{sub.deadline}</p>
-                                  <p className="text-[10px] text-slate-500 uppercase">{sub.resolution}</p>
+                                {/* 4. Case Details & Aesthetic */}
+                                <div className="space-y-1">
+                                  <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">04 // Visual Design</p>
+                                  <div className="text-xs font-bold text-white uppercase italic">Case: {sub.caseSize} / {sub.caseType}</div>
+                                  <div className="text-[10px] text-cyan-500/80 font-black uppercase tracking-tighter italic">Style: {sub.aesthetic}</div>
                                 </div>
-                                <div>
-                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Log Date</p>
-                                  <p className="text-xs font-bold text-white uppercase italic">{new Date(sub.timestamp).toLocaleDateString()}</p>
-                                  <p className="text-[10px] text-slate-500 uppercase">{sub.ssd} Storage</p>
+                                {/* 5. Logistics (Deadline) */}
+                                <div className="space-y-1">
+                                  <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">05 // Timeline</p>
+                                  <div className="text-xs font-bold text-white uppercase italic">Deadline: {sub.deadline}</div>
+                                  <p className="text-[10px] text-slate-500 font-mono">{new Date(sub.timestamp).toLocaleDateString()}</p>
                                 </div>
                               </div>
 
-                              {/* ТРЕБОВАНИЯ */}
+                              {/* Requirements */}
                               {sub.requirements && (
                                 <div className="bg-black/20 p-4 rounded-2xl border border-white/5">
                                   <p className="text-[9px] text-slate-600 uppercase font-black mb-2">Operational Requirements:</p>
@@ -910,7 +917,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               )}
                             </div>
 
-                            {/* КНОПКИ ДЕЙСТВИЯ */}
                             <div className="flex flex-row lg:flex-col justify-end gap-3 min-w-[180px]">
                               {sub.status !== 'completed' ? (
                                 <button 
@@ -931,7 +937,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               <button 
                                 onClick={async () => {
                                   if(window.confirm('PROTOCOL WARNING: Delete record?')) {
-                                     // Твоя существующая логика удаления...
                                   }
                                 }}
                                 className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500 hover:text-white transition-all"

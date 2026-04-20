@@ -728,7 +728,7 @@ function App() {
               </div>
             </div>
 
-           {/* Security Key (если нужен) */}
+           {/* Security Key */}
            {email.includes('@maxbitcore.com') && (
              <div className="space-y-1 text-left mt-4">
                <label className="text-[9px] font-black text-cyan-500 uppercase ml-2 tracking-[0.2em]">

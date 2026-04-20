@@ -115,7 +115,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-6">User Parameters</h3>
               <div className="space-y-6">
                 
-                {/* FULL NAME (Фикс здесь) */}
+                {/* FULL NAME */}
                 <div className="border-l-2 border-cyan-500/30 pl-4">
                   <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Full Name</p>
                   <p className="text-sm font-bold uppercase italic text-white">
@@ -159,7 +159,6 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                       onClick={() => onSelectProduct(item)}
                       className="group flex items-center gap-4 p-3 bg-slate-950/30 border border-white/5 rounded-2xl hover:border-cyan-500/30 hover:bg-white/5 transition-all cursor-pointer mb-3"
                     >
-                      {/* ФОТО ТОВАРА */}
                       <div className="w-16 h-16 bg-slate-900 rounded-xl overflow-hidden border border-white/10 shrink-0 shadow-lg">
                         <img 
                         src={item.imageUrl || 'https://via.placeholder.com/150'} 
@@ -231,39 +230,52 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                         </div>
                      </div>
 
-                     {/* GRID: All Specs */}
-                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 border-t border-white/5 pt-6">
-                       <div>
-                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Core Config</p>
-                         <p className="text-[11px] text-white font-bold uppercase italic">{sub.cpu} + {sub.gpu}</p>
-                         <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.manufacturer || 'Reference'}</p>
+                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6 py-6 border-y border-white/5 mt-6">
+  
+                       {/* 01 // Mission Profile */}
+                       <div className="space-y-1">
+                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Profile</p>
+                         <div className="text-xs font-bold text-white uppercase italic">Purpose: {sub.purpose}</div>
+                         <div className="text-sm font-black text-cyan-400 font-mono mt-1">${sub.budget}</div>
                        </div>
 
-                       <div>
-                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Deployment Target</p>
-                         <p className="text-[11px] text-white font-bold uppercase italic">{sub.deadline}</p>
-                         <p className="text-[10px] text-slate-500 font-mono uppercase">Priority Queue</p>
+                       {/* 02 // Core Hardware */}
+                       <div className="space-y-1">
+                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Core</p>
+                         <div className="text-xs font-bold text-white uppercase italic">CPU: {sub.cpu}</div>
+                         <div className="text-xs font-bold text-cyan-400 uppercase italic">GPU: {sub.gpu}</div>
+                         <p className="text-[10px] text-slate-500 font-mono uppercase italic">{sub.manufacturer}</p>
                        </div>
 
-                       <div>
-                          <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Chassis & Visuals</p>
-                          <p className="text-[11px] text-white font-bold uppercase italic">{sub.caseSize} / {sub.caseType}</p>
-                          <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.aesthetic}</p>
+                       {/* 03 // Data & Output */}
+                       <div className="space-y-1">
+                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Specs</p>
+                         <div className="text-xs font-bold text-white uppercase italic">Storage: {sub.ssd}</div>
+                         <div className="text-xs font-bold text-white uppercase italic">Resolution: {sub.resolution}</div>
                        </div>
 
-                       <div>
-                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Storage / Res</p>
-                         <p className="text-[11px] text-white font-bold uppercase italic">{sub.ssd} Storage</p>
-                         <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.resolution}</p>
+                       {/* 04 // Visual Design */}
+                       <div className="space-y-1">
+                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Aesthetic</p>
+                         <div className="text-xs font-bold text-white uppercase italic">{sub.caseSize} / {sub.caseType}</div>
+                         <div className="text-[10px] text-cyan-500/80 font-black uppercase tracking-tighter italic">Style: {sub.aesthetic}</div>
                        </div>
 
-                       <div className="col-span-2 sm:col-span-2">
-                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Operational Requirements</p>
-                         <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
-                           {sub.requirements || "NO ADDITIONAL PROTOCOLS SPECIFIED"}
-                         </p>
+                       {/* 05 // Logistics */}
+                       <div className="space-y-1">
+                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Timeline</p>
+                         <div className="text-xs font-bold text-white uppercase italic">Priority: {sub.deadline}</div>
+                         <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.status === 'completed' ? 'Deployed' : 'In Progress'}</p>
                        </div>
                       </div>
+
+                      {/* Requirements */}
+                      {sub.requirements && (
+                        <div className="mt-6 p-4 bg-slate-950/50 rounded-2xl border border-white/5">
+                          <p className="text-[9px] text-slate-600 uppercase font-black mb-2 tracking-widest">Special Instructions:</p>
+                          <p className="text-xs text-slate-400 italic leading-relaxed">{sub.requirements}</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* ACTIONS */}
