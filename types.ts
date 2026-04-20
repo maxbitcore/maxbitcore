@@ -45,6 +45,7 @@ export interface BuildSubmission {
   aesthetic: string;
   resolution: string;
   requirements: string;
+  status?: string;
 }
 
 export interface JournalArticle {

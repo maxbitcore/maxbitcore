@@ -42,7 +42,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
         const allSubmissions = localData ? JSON.parse(localData) : [];
 
         const filtered = allSubmissions.filter(
-          (sub: any) => sub.userEmail === currentUser.email
+          (sub: any) => sub.userEmail === currentUser?.email
         );
 
         setUserSubmissions(filtered);
@@ -211,13 +211,78 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-6">Operational Log</h3>
             <div className="space-y-4">
               {userSubmissions.map((sub) => (
-                <div key={sub.id} className="bg-slate-900/40 border border-white/5 p-6 rounded-3xl flex justify-between items-center backdrop-blur-sm">
-                  <div>
-                    <p className="text-[10px] font-black uppercase text-cyan-500">ID: {sub.id}</p>
-                    <h3 className="text-white font-bold uppercase text-xl italic">{sub.purpose} SYSTEM</h3>
-                    <p className="text-slate-400 text-[11px] font-mono mt-2">{sub.cpu} &bull; {sub.gpu}</p>
+                <div key={sub.id} className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm relative overflow-hidden group">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/30 group-hover:bg-cyan-500 transition-colors" />
+                  <div className="flex flex-col md:flex-row justify-between gap-8">
+                    <div className="flex-1 space-y-6">
+                      {/* HEADER: ID & Purpose */}
+                      <div className="flex flex-wrap items-center gap-4">
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-cyan-500 tracking-widest mb-1">Status: Active Protocol</p>
+                          <h3 className="text-white font-black uppercase text-2xl italic leading-none">{sub.purpose} SYSTEM</h3>
+                          <p className="text-slate-500 text-[10px] font-mono mt-2 uppercase tracking-tighter">ID: {sub.id}</p>
+                        </div>
+          
+                        <div className="h-10 w-px bg-white/5 hidden md:block" />
+          
+                        <div>
+                          <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Target Budget</p>
+                          <p className="text-xl font-mono font-black text-cyan-400">${sub.budget}</p>
+                        </div>
+                     </div>
+
+                     {/* GRID: All Specs */}
+                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 border-t border-white/5 pt-6">
+                       <div>
+                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Core Config</p>
+                         <p className="text-[11px] text-white font-bold uppercase italic">{sub.cpu} + {sub.gpu}</p>
+                         <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.manufacturer || 'Reference'}</p>
+                       </div>
+
+                       <div>
+                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Deployment Target</p>
+                         <p className="text-[11px] text-white font-bold uppercase italic">{sub.deadline}</p>
+                         <p className="text-[10px] text-slate-500 font-mono uppercase">Priority Queue</p>
+                       </div>
+
+                       <div>
+                          <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Chassis & Visuals</p>
+                          <p className="text-[11px] text-white font-bold uppercase italic">{sub.caseSize} / {sub.caseType}</p>
+                          <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.aesthetic}</p>
+                       </div>
+
+                       <div>
+                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Storage / Res</p>
+                         <p className="text-[11px] text-white font-bold uppercase italic">{sub.ssd} Storage</p>
+                         <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.resolution}</p>
+                       </div>
+
+                       <div className="col-span-2 sm:col-span-2">
+                         <p className="text-[8px] text-slate-600 uppercase font-black mb-1">Operational Requirements</p>
+                         <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                           {sub.requirements || "NO ADDITIONAL PROTOCOLS SPECIFIED"}
+                         </p>
+                       </div>
+                      </div>
+                    </div>
+
+                    {/* ACTIONS */}
+                    <div className="flex flex-col justify-between items-end border-l border-white/5 pl-8">
+                       <div className="text-right">
+                          <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Logged At</p>
+                          <p className="text-[10px] text-white font-mono">
+                             {sub.timestamp ? new Date(sub.timestamp).toLocaleDateString() : 'N/A'}
+                          </p>
+                       </div>
+         
+                       <button 
+                         onClick={() => handleDeleteSubmission(sub.id)} 
+                         className="mt-4 text-rose-500 text-[10px] font-black uppercase border border-rose-500/20 px-6 py-3 rounded-xl hover:bg-rose-500 hover:text-white transition-all shadow-lg hover:shadow-rose-500/20"
+                       >
+                         Terminate Protocol
+                       </button>
+                    </div>
                   </div>
-                  <button onClick={() => handleDeleteSubmission(sub.id)} className="text-rose-500 text-[10px] font-black uppercase border border-rose-500/30 px-6 py-3 rounded-xl hover:bg-rose-500 hover:text-white transition-all">Terminate</button>
                 </div>
               ))}
             </div>

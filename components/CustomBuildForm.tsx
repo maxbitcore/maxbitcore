@@ -291,11 +291,9 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
 
   useEffect(() => {
     if (currentUser) {
-      // Собираем полное имя из firstName и lastName
       const fullName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
       
-      // Заполняем поля, если они еще пустые
-      if (fullName) setUserName(fullName.toUpperCase()); // Ты любишь капс в стиле MaxBit
+      if (fullName) setUserName(fullName.toUpperCase()); 
       if (currentUser.email) setUserEmail(currentUser.email.toLowerCase());
     }
   }, [currentUser]);

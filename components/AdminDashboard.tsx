@@ -211,6 +211,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
  
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -563,6 +564,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const response = await fetch('https://www.maxbitcore.com/api/update_status.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus })
+      });
+
+      if (response.ok) {
+        // Обновляем состояние локально
+        setSubmissions(prev => prev.map(sub => 
+          sub.id === id ? { ...sub, status: newStatus } : sub
+        ));
+        notifyUpdate();
+      } else {
+        alert("Server communication failed.");
+      }
+    } catch (error) {
+      console.error("Status Update Error:", error);
+    }
+  };
+
   // Asset Management Helpers
   const updateConfig = (key: keyof typeof DEFAULT_CONFIG, value: string) => {
     const newConfig = { ...config, [key]: value.split(',').map(s => s.trim()).filter(Boolean) };
@@ -798,83 +821,131 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
               </div>
             )}
 
-            {/* SUBMISSIONS TAB */}
+            {/* SUBMISSIONS TAB — ОБНОВЛЕННАЯ ВЕРСИЯ */}
             {activeAdminTab === 'submissions' && (
-              <div className="space-y-6">
-                {submissions.length === 0 ? (
-                  <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
-                  Empty Submissions Log
-                  </div>
-                ) : (
-                  [...submissions].sort((a, b) => b.timestamp - a.timestamp).map(sub => (
-                    <div key={sub.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row justify-between gap-8 hover:border-cyan-500/20 transition-all group relative overflow-hidden">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
-                        <div className="space-y-4">
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500 mb-1 block group-hover:text-white">
-                            {sub.purpose} Protocol
-                          </span>
-                          <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase">
-                            {sub.userName}
-                          </h3>
-                          <p className="text-xs text-slate-500 font-mono">{sub.userEmail}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">CPU:</span> {sub.cpu}</div>
-                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">GPU:</span> {sub.gpu}</div>
-                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Budget:</span> <span className="text-emerald-500">${sub.budget}</span></div>
-                          <div className="flex items-center gap-2"><span className="text-slate-600 font-black">Deadline:</span> {sub.deadline}</div>
-                        </div>
-                      </div>
+              <div className="space-y-8 animate-fade-in-up">
+                {/* ПАНЕЛЬ ФИЛЬТРОВ */}
+                <div className="flex justify-between items-center bg-slate-900/20 p-2 rounded-2xl border border-slate-800/50 w-fit">
+                  {(['pending', 'completed', 'all'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        filter === f ? 'bg-cyan-500 text-slate-950' : 'text-slate-500 hover:text-white'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
 
-                      <div className="flex flex-col items-end justify-between text-right">
-                        <div className="flex gap-4">
-                          <div className="bg-slate-950 px-6 py-3 rounded-xl border border-slate-800 shadow-inner">
-                            <span className="text-[9px] font-black uppercase text-slate-500 block mb-1">Status</span>
-                            <span className="text-xs font-black text-white italic uppercase tracking-wider">Awaiting Debrief</span>
-                          </div>
-                           <button 
-                            onClick={async () => { 
-                              if(window.confirm('Archive this mission?')) {
-                                try {
-                                  const response = await fetch('/api/delete-submission.php', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ id: sub.id }) // Отправляем ID серверу
-                                  });
-
-                                  const result = await response.json();
-
-                                  if (result.status === 'success' || result.success) {
-                                    const updated = submissions.filter(s => s.id !== sub.id);
-                                    setSubmissions(updated);
-                                    localStorage.setItem('maxbit_submissions', JSON.stringify(updated));
-                                    alert("Mission Archived.");
-                                  } else {
-                                    alert("Server error: " + (result.message || "Could not delete"));
-                                  }
-                                } catch (e) {
-                                  console.error("Archive failed:", e);
-                                  alert("Network error.");
-                                }
-                              }  
-                            }}
-                            className="bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white p-3 rounded-xl border border-rose-500/20 transition-all flex items-center justify-center"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-
-                          <div className="flex flex-col items-end gap-1">
-                             <span className="text-[9px] font-mono text-slate-700 uppercase">ID: {sub.id.slice(-8)}</span>
-                             <span className="text-[9px] font-mono text-slate-500 uppercase font-black">Logged: {new Date(sub.timestamp).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
+                <div className="space-y-6">
+                  {submissions.filter(s => filter === 'all' ? true : (s.status || 'pending') === filter).length === 0 ? (
+                    <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest">
+                      No protocols found in this sector
                     </div>
-                  ))
-                )}
+                  ) : (
+                    submissions
+                      .filter(s => filter === 'all' ? true : (s.status || 'pending') === filter)
+                      .sort((a, b) => b.timestamp - a.timestamp)
+                      .map(sub => (
+                        <div key={sub.id} className={`bg-slate-900/40 border ${sub.status === 'completed' ? 'border-emerald-500/30' : 'border-slate-800'} p-8 rounded-3xl group relative overflow-hidden transition-all hover:bg-slate-900/60`}>
+                          
+                          {/* Индикатор статуса */}
+                          <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sub.status === 'completed' ? 'bg-emerald-500' : 'bg-cyan-500'} shadow-[0_0_15px_rgba(6,182,212,0.3)]`}></div>
+
+                          <div className="flex flex-col lg:flex-row justify-between gap-8">
+                            <div className="flex-1 space-y-6">
+                              {/* Верхняя часть: Имя и Основное */}
+                              <div className="flex flex-wrap justify-between items-start gap-4">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${sub.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-cyan-500/10 text-cyan-500'}`}>
+                                      {sub.status === 'completed' ? 'Protocol Finished' : 'Operational Pending'}
+                                    </span>
+                                    <span className="text-[9px] font-mono text-slate-600">ID: {sub.id}</span>
+                                  </div>
+                                  <h3 className="text-3xl font-black text-white italic tracking-tighter uppercase leading-none">
+                                    {sub.userName}
+                                  </h3>
+                                  <p className="text-sm text-cyan-400 font-mono mt-1">{sub.userEmail}</p>
+                                </div>
+
+                                <div className="text-right">
+                                  <p className="text-[9px] font-black text-slate-600 uppercase mb-1">Target Budget</p>
+                                  <p className="text-3xl font-black text-white italic font-mono">${sub.budget}</p>
+                                </div>
+                              </div>
+
+                              {/* СЕТКА ХАРАКТЕРИСТИК (Теперь всё видно!) */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-y border-white/5">
+                                <div>
+                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Hardware Core</p>
+                                  <p className="text-xs font-bold text-white uppercase italic">{sub.cpu} / {sub.gpu}</p>
+                                  <p className="text-[10px] text-slate-500 uppercase">{sub.manufacturer}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Style & Case</p>
+                                  <p className="text-xs font-bold text-white uppercase italic">{sub.caseSize} / {sub.caseType}</p>
+                                  <p className="text-[10px] text-slate-500 uppercase">{sub.aesthetic}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Deployment</p>
+                                  <p className="text-xs font-bold text-white uppercase italic">{sub.deadline}</p>
+                                  <p className="text-[10px] text-slate-500 uppercase">{sub.resolution}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Log Date</p>
+                                  <p className="text-xs font-bold text-white uppercase italic">{new Date(sub.timestamp).toLocaleDateString()}</p>
+                                  <p className="text-[10px] text-slate-500 uppercase">{sub.ssd} Storage</p>
+                                </div>
+                              </div>
+
+                              {/* ТРЕБОВАНИЯ */}
+                              {sub.requirements && (
+                                <div className="bg-black/20 p-4 rounded-2xl border border-white/5">
+                                  <p className="text-[9px] text-slate-600 uppercase font-black mb-2">Operational Requirements:</p>
+                                  <p className="text-xs text-slate-400 italic leading-relaxed">{sub.requirements}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* КНОПКИ ДЕЙСТВИЯ */}
+                            <div className="flex flex-row lg:flex-col justify-end gap-3 min-w-[180px]">
+                              {sub.status !== 'completed' ? (
+                                <button 
+                                  onClick={() => handleUpdateStatus(sub.id, 'completed')}
+                                  className="flex-1 bg-emerald-500 text-slate-950 font-black uppercase text-[10px] tracking-widest py-4 rounded-xl hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                                >
+                                  Complete Build
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleUpdateStatus(sub.id, 'pending')}
+                                  className="flex-1 bg-slate-800 text-slate-400 font-black uppercase text-[10px] tracking-widest py-4 rounded-xl hover:text-white transition-all"
+                                >
+                                  Re-Open
+                                </button>
+                              )}
+                              
+                              <button 
+                                onClick={async () => {
+                                  if(window.confirm('PROTOCOL WARNING: Delete record?')) {
+                                     // Твоя существующая логика удаления...
+                                  }
+                                }}
+                                className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
+                              >
+                                <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
               </div>
             )}
 
