@@ -240,7 +240,14 @@ const paymentStatusHandler = async (req, res) => {
     const metadataOrderId = cleanText((session && session.metadata && session.metadata.orderId) || '');
     const queryOrderId = cleanText((req.query && req.query.orderId) || '');
     const orderId = metadataOrderId || queryOrderId;
-    const paid = session.payment_status === 'paid' || session.status === 'complete';
+    const paymentStatus = session.payment_status || 'unpaid';
+    const checkoutStatus = session.status || 'open';
+    const paid = paymentStatus === 'paid' || checkoutStatus === 'complete';
+    const totalDetails = session.total_details || {};
+    const amountTax = Number(totalDetails.amount_tax || 0);
+    const amountShipping = Number(totalDetails.amount_shipping || 0);
+    const amountSubtotal = Number(session.amount_subtotal || 0);
+    const amountTotal = Number(session.amount_total || 0);
 
     if (orderId && paid) {
       const store = readPaymentsStore();
@@ -249,7 +256,10 @@ const paymentStatusHandler = async (req, res) => {
         paidAt: new Date().toISOString(),
         stripeSessionId: session.id,
         paymentIntentId: session.payment_intent || null,
-        amountTotal: session.amount_total || 0,
+        amountSubtotal,
+        amountTax,
+        amountShipping,
+        amountTotal,
         currency: session.currency || 'usd',
         customerEmail: session.customer_email || null,
       };
@@ -258,9 +268,15 @@ const paymentStatusHandler = async (req, res) => {
 
     return res.json({
       paid,
+      livemode: !!session.livemode,
+      paymentStatus: paymentStatus,
+      checkoutStatus: checkoutStatus,
       orderId: orderId || null,
       email: session.customer_email || null,
-      amountTotal: session.amount_total || 0,
+      amountSubtotal,
+      amountTax,
+      amountShipping,
+      amountTotal,
       currency: session.currency || 'usd',
     });
   } catch (error) {

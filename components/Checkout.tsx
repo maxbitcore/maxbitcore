@@ -24,6 +24,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   const [country, setCountry] = useState('');
+  const [verifiedTax, setVerifiedTax] = useState<number | null>(null);
   
   const TAX_RATE = 0.0995; // 9.95%
   const checkoutItems = items.filter(
@@ -55,10 +56,19 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
         if (data && data.paid) {
           if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
           if (typeof data.email === 'string' && data.email) setEmail(data.email);
+          if (typeof data.amountTax === 'number') setVerifiedTax(data.amountTax / 100);
+          const safeOrder = typeof data.orderId === 'string' && data.orderId ? data.orderId : urlOrderId;
+          if (safeOrder) {
+            const clean = new URL(window.location.href);
+            clean.search = `?verified=true&orderId=${encodeURIComponent(safeOrder)}`;
+            window.history.replaceState({}, '', clean.toString());
+          }
           setStep('success');
           return;
         }
-        throw new Error('Payment is not confirmed yet.');
+        throw new Error(
+          `Payment is not confirmed yet (${data?.paymentStatus || 'unknown'} / ${data?.checkoutStatus || 'unknown'}).`
+        );
       } catch (error: any) {
         setStep('details');
         alert(error?.message || 'Could not verify payment status.');
@@ -334,7 +344,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 </div> 
                 <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500">
                   <span className="uppercase tracking-widest">Estimated Tax (Stripe)</span>
-                  <span className="text-white font-mono">${estimatedTax.toFixed(2)}</span>
+                  <span className="text-white font-mono">${(verifiedTax ?? estimatedTax).toFixed(2)}</span>
                 </div>
               </div>
                 
