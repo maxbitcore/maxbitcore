@@ -184,15 +184,15 @@ const createCheckoutSession = async (req, res) => {
         quantity: 1,
       });
     }
-
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items,
       mode: 'payment',
       customer_email: String(email).trim().toLowerCase(),
+      billing_address_collection: 'required',
       // Stripe Tax must be enabled in Dashboard + origin address; otherwise sessions.create fails.
       ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
-      success_url: `${allowedOrigins[0]}/checkout?success=true&orderId=${encodeURIComponent(safeOrderId)}`,
+      success_url: `${allowedOrigins[0]}/checkout?success=true&session_id={CHECKOUT_SESSION_ID}&orderId=${encodeURIComponent(safeOrderId)}`,
       cancel_url: `${allowedOrigins[0]}/checkout`,
       metadata: {
         orderId: safeOrderId,
@@ -224,6 +224,53 @@ const createCheckoutSession = async (req, res) => {
 
 ['/create-checkout-session', '/server/create-checkout-session'].forEach((path) => {
   app.post(path, createCheckoutSession);
+});
+
+const paymentStatusHandler = async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe is not configured.' });
+    }
+    const sessionId = cleanText((req.query && req.query.session_id) || '');
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Missing session_id.' });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const metadataOrderId = cleanText((session && session.metadata && session.metadata.orderId) || '');
+    const queryOrderId = cleanText((req.query && req.query.orderId) || '');
+    const orderId = metadataOrderId || queryOrderId;
+    const paid = session.payment_status === 'paid' || session.status === 'complete';
+
+    if (orderId && paid) {
+      const store = readPaymentsStore();
+      store.paidOrders[orderId] = {
+        paid: true,
+        paidAt: new Date().toISOString(),
+        stripeSessionId: session.id,
+        paymentIntentId: session.payment_intent || null,
+        amountTotal: session.amount_total || 0,
+        currency: session.currency || 'usd',
+        customerEmail: session.customer_email || null,
+      };
+      writePaymentsStore(store);
+    }
+
+    return res.json({
+      paid,
+      orderId: orderId || null,
+      email: session.customer_email || null,
+      amountTotal: session.amount_total || 0,
+      currency: session.currency || 'usd',
+    });
+  } catch (error) {
+    console.error('Payment status check failed:', error);
+    return res.status(500).json({ error: formatStripeCaughtError(error) });
+  }
+};
+
+['/payment-status', '/server/payment-status'].forEach((path) => {
+  app.get(path, paymentStatusHandler);
 });
 
 // cPanel + Passenger: often request path is /server/...; local dev is /...

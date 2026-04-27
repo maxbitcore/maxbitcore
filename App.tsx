@@ -166,15 +166,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-  const params = new URLSearchParams(location.search);
-  if (params.get('success') === 'true') {
-    const orderId = params.get('orderId') || 'CONFIRMED';
-    setCurrentOrderId(orderId);
-    setShowSuccessAlert(true);
-    if (cartItems.length > 0) {
-      setCartItems([]); 
-      localStorage.removeItem('cart');
-    }
+    const params = new URLSearchParams(location.search);
+    if (params.get('verified') === 'true') {
+      const orderId = params.get('orderId') || 'CONFIRMED';
+      setCurrentOrderId(orderId);
+      setShowSuccessAlert(true);
+      if (cartItems.length > 0) {
+        setCartItems([]);
+        localStorage.removeItem('cart');
+      }
       navigate(location.pathname, { replace: true });
     }
   }, [location.search, navigate, cartItems.length]);

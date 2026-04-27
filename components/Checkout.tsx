@@ -36,17 +36,36 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
-  
-    if (query.get("success") === "true") {
-      // Switch state to success screen
-      setStep("success");
-    
-      // Sync the Order ID from the URL to the state
-      const urlOrderId = query.get("orderId");
-      if (urlOrderId) {
-        setOrderId(urlOrderId);
+
+    const verifyStripePayment = async () => {
+      if (query.get('success') !== 'true') return;
+      const sessionId = query.get('session_id') || '';
+      const urlOrderId = query.get('orderId') || '';
+      if (urlOrderId) setOrderId(urlOrderId);
+      if (!sessionId) return;
+
+      try {
+        const params = new URLSearchParams({ session_id: sessionId });
+        if (urlOrderId) params.set('orderId', urlOrderId);
+        const response = await fetch(`${apiBaseUrl}/payment-status?${params.toString()}`);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error((data && data.error) || 'Could not verify payment status.');
+        }
+        if (data && data.paid) {
+          if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
+          if (typeof data.email === 'string' && data.email) setEmail(data.email);
+          setStep('success');
+          return;
+        }
+        throw new Error('Payment is not confirmed yet.');
+      } catch (error: any) {
+        setStep('details');
+        alert(error?.message || 'Could not verify payment status.');
       }
-    }
+    };
+
+    verifyStripePayment();
   }, []);
 
   useEffect(() => {
