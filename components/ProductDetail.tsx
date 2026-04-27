@@ -5,6 +5,7 @@ import { Product, Review } from '../types';
 import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 import { useAuth } from '../contexts/AuthContext';
+import { sanitizeHtml } from '../services/sanitizeHtml';
 
 interface ProductDetailProps {
   product: Product;
@@ -81,7 +82,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
 
       const updatedProducts = freshProducts.map((p: Product) => {
         if (p.id === product.id) {
-          return { ...p, reviews: product.reviews };
+          return { ...p, reviews: updatedReviews };
         }
         return p; 
       });
@@ -167,7 +168,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
                  <span className="text-xs font-black text-cyan-500 uppercase tracking-[0.5em] mb-4 block opacity-70">Sector // {product.category}</span>
                  <h1 
                    className="text-5xl md:text-7xl font-black italic tracking-tighter text-white mb-8 uppercase leading-[0.85]"
-                   dangerouslySetInnerHTML={{ __html: product.name }}
+                   dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.name) }}
                  />
                  <span className="text-6xl font-black text-white font-mono tracking-tighter">${product.price}</span>
               </div>
@@ -178,7 +179,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
                     <div 
                       className="text-slate-300 text-sm font-bold uppercase tracking-wide leading-relaxed prose prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{ __html: product.components }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.components) }}
                     />
                   </div>
                </div>
@@ -186,7 +187,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
              
              <div 
                className="text-slate-400 leading-relaxed font-bold text-xl mb-12 border-b border-slate-800/50 pb-12 max-w-xl uppercase tracking-wide prose prose-invert max-w-none"
-               dangerouslySetInnerHTML={{ __html: product.description }}
+               dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
              />
 
              <button 

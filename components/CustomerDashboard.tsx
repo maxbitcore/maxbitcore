@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { sanitizeHtml } from '../services/sanitizeHtml';
 
 interface CustomerDashboardProps {
   currentUser: any;
@@ -178,7 +179,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       
                       <h4 
                          className="text-sm font-black uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1 leading-tight"
-                         dangerouslySetInnerHTML={{ __html: item.name || 'Unknown Unit' }}
+                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name || 'Unknown Unit') }}
                       />
       
                       <p className="text-xs font-black text-cyan-500 font-mono mt-1">

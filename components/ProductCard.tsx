@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
+import { sanitizeHtml } from '../services/sanitizeHtml';
 
 interface ProductCardProps {
   product: Product;
@@ -79,12 +80,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
         
         <h3 
           className="text-xl font-black text-white mb-3 group-hover:text-cyan-400 transition-colors uppercase tracking-tighter leading-none italic"
-          dangerouslySetInnerHTML={{ __html: product.name }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.name) }}
         />
         
         <div 
           className="text-slate-500 text-[11px] mb-8 line-clamp-2 leading-relaxed font-bold uppercase tracking-widest opacity-80 prose prose-invert prose-xs max-w-none"
-          dangerouslySetInnerHTML={{ __html: product.description }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
         />
         
         <div className="mt-auto flex items-center justify-between">

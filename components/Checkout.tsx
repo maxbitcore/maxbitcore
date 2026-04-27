@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { loadStripe } from '@stripe/stripe-js';
+import { sanitizeHtml } from '../services/sanitizeHtml';
 
-const stripePromise = loadStripe('pk_test_51Sm3CG3BK91l745A0VN63NLnemQi9vl3HWGTDT18c4hLpZfroanzl50rgKu1VtWFGBzhvNqvKcNYFL0kH0KnRDOS00MznZ24qk');
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : Promise.resolve(null);
+const apiBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4242').replace(/\/+$/, '');
 
 interface CheckoutProps {
   items: Product[];
@@ -56,15 +59,10 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
   try {
     const stripe = await stripePromise;
     if (!stripe) {
-      throw new Error("Stripe script failed to load.");
+      throw new Error("Stripe publishable key is missing. Set VITE_STRIPE_PUBLISHABLE_KEY.");
     }
 
-    const idsParam = items.map(item => item.id).join(',');
-
-    const successUrl = `${window.location.origin}/api/success.php?success=true&orderId=${orderId}&ids=${idsParam}`;
-    const cancelUrl = `${window.location.origin}/checkout?canceled=true`;
-
-    const response = await fetch('/api/create-checkout-session.php', { 
+    const response = await fetch(`${apiBaseUrl}/create-checkout-session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -76,20 +74,22 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
         })),
         email: email,
         shipping: shippingCost,
-        orderId: orderId,
-        success_url: successUrl,
-        cancel_url: cancelUrl
+        orderId: orderId
       }),
     });
 
+    if (!response.ok) {
+      throw new Error("Payment gateway rejected the request.");
+    }
+
     const session = await response.json();
     if (session.error) throw new Error(session.error);
-
-    if (session.url) {
-      window.location.href = session.url;
-    } else {
+    if (!session.id) {
       throw new Error("Failed to create checkout session");
     }
+
+    const { error } = await stripe.redirectToCheckout({ sessionId: session.id });
+    if (error) throw new Error(error.message || "Stripe redirect failed.");
 
   } catch (err: any) {
     console.error("Payment Error:", err);
@@ -270,7 +270,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     <div>
                       <div 
                         className="text-sm font-black uppercase tracking-tighter text-white"
-                        dangerouslySetInnerHTML={{ __html: item.name }} 
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }} 
                       />
                       <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
                     </div>

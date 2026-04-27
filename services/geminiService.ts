@@ -2,6 +2,14 @@ import { GoogleGenAI } from "@google/genai";
 import { Product } from '../types';
 import { AnalyticsData } from './analyticsService';
 
+const stripHtml = (value: unknown): string =>
+  String(value ?? '').replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+
+const limitText = (value: unknown, max = 220): string => {
+  const normalized = stripHtml(value);
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+};
+
 // --- KNOWLEDGE BASE ---
 const POLICIES = `
 SHIPPING (Armor-Crate Protocol):
@@ -65,18 +73,20 @@ const getContextData = () => {
 
 const buildSystemInstruction = () => {
   const { products, orders } = getContextData();
+  const contextProducts = products.slice(0, 80);
+  const contextOrders = orders.slice(0, 120);
 
   // Format Products for AI
-  const productContext = products.length > 0 
-    ? products.map(p => 
-        `ID: ${p.id} | Name: ${p.name} | Price: $${p.price} | Status: ${p.status} | Category: ${p.category} | Desc: ${p.description}`
+  const productContext = contextProducts.length > 0 
+    ? contextProducts.map(p => 
+        `ID: ${stripHtml(p.id)} | Name: ${limitText(p.name, 90)} | Price: $${Number(p.price || 0).toLocaleString()} | Status: ${stripHtml(p.status)} | Category: ${stripHtml(p.category)} | Desc: ${limitText(p.description, 180)}`
       ).join('\n')
     : "No products currently visible in catalog.";
 
   // Format Orders for AI (Simplified for privacy/tokens, focused on ID and Status)
-  const orderContext = orders.length > 0
-    ? orders.map(o => 
-        `Order ID: ${o.id} | Status: ${o.status} | Total: $${o.total} | Items: ${o.items.length}`
+  const orderContext = contextOrders.length > 0
+    ? contextOrders.map(o => 
+        `Order ID: ${stripHtml(o.id)} | Status: ${stripHtml(o.status)} | Total: $${Number(o.total || 0).toLocaleString()} | Items: ${Array.isArray(o.items) ? o.items.length : 0}`
       ).join('\n')
     : "No active orders in database.";
 
@@ -105,14 +115,23 @@ const buildSystemInstruction = () => {
   3. If asked about shipping, returns, or warranty, refer to the Operational Protocols.
   4. If the user asks "What is this website?", explain that MaxBit is a premium custom PC builder.
   5. If asked about stock that is "Sold Out", recommend checking back in 48 hours for a supply drop.
+  6. If information is unavailable in context, explicitly say you do not have verified data instead of guessing.
+  7. Keep answers short (3-6 bullet points max) and prioritize factual data from inventory/orders.
   `;
 };
 
 export const sendMessageToGemini = async (history: {role: 'user' | 'model', text: string}[], newMessage: string): Promise<string> => {
   try {
-    if (!process.env.API_) return "CRITICAL ERROR: API Key missing. Neural link severed.";
+    const apiKey =
+      (import.meta as any)?.env?.VITE_GEMINI_API_KEY ||
+      process.env.API_KEY ||
+      '';
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+      return "CRITICAL ERROR: Gemini API key is missing. Set VITE_GEMINI_API_KEY in .env.local and restart dev server.";
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     
     // We rebuild the system instruction every time to ensure fresh data (new orders/products)
     const dynamicInstruction = buildSystemInstruction();

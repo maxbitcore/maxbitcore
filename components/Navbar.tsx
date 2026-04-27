@@ -20,7 +20,7 @@ interface NavbarProps {
   onOpenRegister: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, resetRegForm, currentUser, onLogout, onLoginSuccess, onOpenRegister }) => {
+const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOpenCart, onSearch, allProducts = [], resetRegForm, currentUser, onLogout, onLoginSuccess, onOpenRegister }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,6 +40,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -61,12 +62,20 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (localQuery.trim()) {
-      onSearch(localQuery); 
-      onTabChange('home');  
-      navigate('/');    
-    }
+    onSearch(localQuery);
+    setShowSuggestions(false);
   };
+
+  const normalizedQuery = localQuery.trim().toLowerCase();
+  const searchSuggestions = normalizedQuery
+    ? allProducts
+        .filter((product: any) => {
+          const name = String(product?.name || '').toLowerCase();
+          const category = String(product?.category || '').toLowerCase();
+          return name.includes(normalizedQuery) || category.includes(normalizedQuery);
+        })
+        .slice(0, 6)
+    : [];
 
   const validateForm = () => {
     if (authStep === 'credentials') {
@@ -305,7 +314,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         <div className="flex-1 hidden xl:flex justify-center">
           <form 
             onSubmit={handleSearchSubmit} 
-            className="flex items-center bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden focus-within:border-cyan-500 transition-all shadow-lg w-full max-w-md"
+            className="relative flex items-center bg-slate-900/50 border border-slate-800 rounded-xl overflow-visible focus-within:border-cyan-500 transition-all shadow-lg w-full max-w-md"
           >
             <div className="flex items-center pl-4 text-slate-500">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -316,7 +325,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
               type="text" 
               placeholder="SEARCH HARDWARE..." 
               value={localQuery}
-              onChange={(e) => setLocalQuery(e.target.value)}
+              onChange={(e) => {
+                setLocalQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 120);
+              }}
               className="bg-transparent px-4 py-2 text-[10px] font-bold text-white placeholder-slate-600 outline-none flex-1 uppercase tracking-[0.2em]"
             />
             <button 
@@ -325,6 +341,49 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
             >
               Search
             </button>
+            {showSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-[calc(100%+8px)] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                {searchSuggestions.map((product: any) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setLocalQuery(String(product.name || '').replace(/<[^>]*>?/gm, ''));
+                      setShowSuggestions(false);
+                      navigate(`/product/${product.id}`);
+                    }}
+                    className="w-full text-left px-4 py-3 border-b border-slate-800 last:border-b-0 hover:bg-slate-800/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 flex-shrink-0">
+                        {product.imageUrl ? (
+                          <img
+                            src={product.imageUrl}
+                            alt={String(product.name || 'Product').replace(/<[^>]*>?/gm, '')}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-600">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-black uppercase text-white tracking-wide truncate">
+                          {String(product.name || 'Unknown Unit').replace(/<[^>]*>?/gm, '')}
+                        </div>
+                        <div className="text-[9px] text-cyan-500 uppercase font-bold tracking-widest mt-1">
+                          {product.category || 'Uncategorized'}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
         </div>
         
@@ -336,8 +395,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                     onClick={() => openAuthModal('login')}
                     className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-white hover:text-cyan-400 transition-colors border border-slate-700 hover:border-cyan-500/50 rounded-lg px-3 py-1.5 md:px-4 md:py-2 bg-slate-900/50 whitespace-nowrap"
                 >
-                    <span className="md:hidden">Login</span>
-                    <span className="hidden md:inline">Login / Register</span>
+                    Login / Register
                 </button>
             ) : (
                 <div className="flex items-center gap-2 md:gap-3">
@@ -387,6 +445,108 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                 </div>
             </button>
         </div>
+      </div>
+
+      {/* Mobile Top Menu */}
+      <div className="lg:hidden max-w-[1800px] mx-auto px-4 md:px-12 pb-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => onTabChange('home')}
+            className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-2 rounded-lg border whitespace-nowrap transition-all ${
+              activeTab === 'home'
+                ? 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10'
+                : 'text-slate-400 border-slate-700 bg-slate-900/50'
+            }`}
+          >
+            Home
+          </button>
+          <button
+            onClick={() => onTabChange('configurator')}
+            className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-2 rounded-lg border whitespace-nowrap transition-all ${
+              activeTab === 'configurator'
+                ? 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10'
+                : 'text-slate-400 border-slate-700 bg-slate-900/50'
+            }`}
+          >
+            Configurator
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Search */}
+      <div className="xl:hidden max-w-[1800px] mx-auto px-4 md:px-12 pb-3">
+        <form onSubmit={handleSearchSubmit} className="relative max-w-sm">
+          <div className="flex items-center bg-slate-900/60 border border-slate-800 rounded-xl overflow-visible focus-within:border-cyan-500 transition-all">
+            <div className="flex items-center pl-4 text-slate-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="SEARCH HARDWARE..."
+              value={localQuery}
+              onChange={(e) => {
+                setLocalQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 120);
+              }}
+              className="bg-transparent px-3 py-2 text-[10px] font-bold text-white placeholder-slate-600 outline-none flex-1 uppercase tracking-[0.15em]"
+            />
+            <button
+              type="submit"
+              className="bg-slate-800 px-3 py-2 text-[9px] font-black text-cyan-400 uppercase tracking-widest hover:bg-cyan-500 hover:text-slate-950 transition-all border-l border-slate-800"
+            >
+              Search
+            </button>
+          </div>
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
+              {searchSuggestions.map((product: any) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setLocalQuery(String(product.name || '').replace(/<[^>]*>?/gm, ''));
+                    setShowSuggestions(false);
+                    navigate(`/product/${product.id}`);
+                  }}
+                  className="w-full text-left px-4 py-3 border-b border-slate-800 last:border-b-0 hover:bg-slate-800/70 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 flex-shrink-0">
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={String(product.name || 'Product').replace(/<[^>]*>?/gm, '')}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-black uppercase text-white tracking-wide truncate">
+                        {String(product.name || 'Unknown Unit').replace(/<[^>]*>?/gm, '')}
+                      </div>
+                      <div className="text-[9px] text-cyan-500 uppercase font-bold tracking-widest mt-1">
+                        {product.category || 'Uncategorized'}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </form>
       </div>
     </nav>
 

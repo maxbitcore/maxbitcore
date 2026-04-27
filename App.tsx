@@ -4,7 +4,6 @@ import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 're
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Contact from './components/Contact';
-import Assistant from './components/Assistant';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import Checkout from './components/Checkout';
@@ -269,16 +268,18 @@ function App() {
     setSearchQuery(lowerQuery);
 
     if (!lowerQuery) {
-      setFilteredProducts(publishedProducts); 
+      setFilteredProducts(publishedProducts);
+    } else {
       const filtered = publishedProducts.filter((p: any) => {
         if (!p) return false;
         const name = p.name?.toLowerCase() || '';
         const desc = p.description?.toLowerCase() || '';
         const comps = typeof p.components === 'string' ? p.components.toLowerCase() : '';
-      
+
         return name.includes(lowerQuery) || desc.includes(lowerQuery) || comps.includes(lowerQuery);
       });
       setFilteredProducts(filtered);
+      trackSearch(lowerQuery);
     }
     navigate('/gaming-pcs');
   };
@@ -480,8 +481,6 @@ function App() {
       </main>
       
       <Footer onTabChange={handleTabChange} />
-      
-      <Assistant />
       
       <CartDrawer 
         isOpen={isCartOpen}

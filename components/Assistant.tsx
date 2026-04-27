@@ -22,7 +22,7 @@ const Assistant: React.FC = () => {
   }, [messages, isOpen, isThinking]);
 
   const handleSend = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isThinking) return;
     
     const userText = inputValue;
     setInputValue(''); // Clear input immediately
@@ -98,7 +98,12 @@ const Assistant: React.FC = () => {
               <input 
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
                 placeholder="Ask about orders, specs, or support..." 
                 className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs md:text-sm text-white outline-none focus:border-cyan-500 transition-colors placeholder-slate-600"
               />

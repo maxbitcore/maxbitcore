@@ -204,6 +204,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   // Configurator Assets State
   const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [configDrafts, setConfigDrafts] = useState<Record<string, string>>({});
   const [caseStyles, setCaseStyles] = useState<Record<string, string>>({});
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
@@ -212,6 +213,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [isLoading, setIsLoading] = useState(true);
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
+  const [trafficRange, setTrafficRange] = useState<'recent' | 'month'>('recent');
  
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -374,7 +376,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       loadAllData();
     }
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
-    if (storedConfig) setConfig(JSON.parse(storedConfig));
+    const parsedConfig = storedConfig ? JSON.parse(storedConfig) : DEFAULT_CONFIG;
+    setConfig(parsedConfig);
+    setConfigDrafts((Object.keys(DEFAULT_CONFIG) as Array<keyof typeof DEFAULT_CONFIG>).reduce((acc, key) => {
+      acc[key] = '';
+      return acc;
+    }, {} as Record<string, string>));
 
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
     if (storedCaseStyles) setCaseStyles(JSON.parse(storedCaseStyles));
@@ -605,11 +612,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   };
 
   // Asset Management Helpers
-  const updateConfig = (key: keyof typeof DEFAULT_CONFIG, value: string) => {
-    const newConfig = { ...config, [key]: value.split(',').map(s => s.trim()).filter(Boolean) };
+  const updateConfigList = (key: keyof typeof DEFAULT_CONFIG, values: string[]) => {
+    const normalizedValues = values
+      .map(v => String(v || '').trim())
+      .filter(Boolean);
+    const newConfig = { ...config, [key]: normalizedValues };
     setConfig(newConfig);
     localStorage.setItem('maxbit_configurator_options', JSON.stringify(newConfig));
     notifyUpdate();
+  };
+
+  const addConfigOption = (key: keyof typeof DEFAULT_CONFIG) => {
+    const draftValue = (configDrafts[key] || '').trim();
+    if (!draftValue) return;
+    if (config[key].includes(draftValue)) return;
+    updateConfigList(key, [...config[key], draftValue]);
+    setConfigDrafts(prev => ({ ...prev, [key]: '' }));
+  };
+
+  const removeConfigOption = (key: keyof typeof DEFAULT_CONFIG, item: string) => {
+    updateConfigList(key, config[key].filter(v => v !== item));
   };
 
   const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -655,6 +677,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       visits: (analytics?.sessions || []).filter((s: any) => s.date === date).length
     }));
   }, [analytics?.sessions]);
+
+  const trafficBreakdown = useMemo(() => {
+    const sessions = analytics?.sessions || [];
+    let guests = 0;
+    let admins = 0;
+    let registered = 0;
+
+    sessions.forEach((session: any) => {
+      const identity = String(session?.user || '').trim().toLowerCase();
+      if (!identity || identity === 'guest') {
+        guests += 1;
+      } else if (identity === 'admin') {
+        admins += 1;
+      } else {
+        registered += 1;
+      }
+    });
+
+    return { guests, admins, registered, total: sessions.length };
+  }, [analytics?.sessions]);
+
+  const trafficSessions = useMemo(() => {
+    const sessions = (analytics?.sessions || []).slice().sort((a: any, b: any) => {
+      const aTime = Number(a?.lastActive || a?.startTime || 0);
+      const bTime = Number(b?.lastActive || b?.startTime || 0);
+      return bTime - aTime;
+    });
+
+    if (trafficRange === 'month') {
+      const monthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      return sessions.filter((session: any) => Number(session?.lastActive || session?.startTime || 0) >= monthAgo);
+    }
+
+    return sessions.slice(0, 6);
+  }, [analytics?.sessions, trafficRange]);
 
   return (
     <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
@@ -803,7 +860,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                           {(Object.keys(DEFAULT_CONFIG) as Array<keyof typeof DEFAULT_CONFIG>).map((key) => (
                             <div key={key} className="space-y-2">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
-                              <textarea value={config[key as keyof typeof DEFAULT_CONFIG].join(', ')} onChange={(e) => updateConfig(key as keyof typeof DEFAULT_CONFIG, e.target.value)} placeholder="Item 1, Item 2..."className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-bold uppercase text-[10px] min-h-[80px]"/>
+                              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-3">
+                                <div className="flex flex-wrap gap-2 min-h-[34px]">
+                                  {config[key].map((item) => (
+                                    <span key={`${key}-${item}`} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[9px] font-black uppercase tracking-widest text-white">
+                                      {item}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeConfigOption(key, item)}
+                                        className="text-slate-400 hover:text-rose-400 transition-colors"
+                                        aria-label={`Remove ${item}`}
+                                      >
+                                        x
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="flex gap-2">
+                                  <input
+                                    value={configDrafts[key] || ''}
+                                    onChange={(e) => setConfigDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addConfigOption(key);
+                                      }
+                                    }}
+                                    placeholder="Add option and press Enter"
+                                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[10px] font-bold uppercase text-white outline-none focus:border-cyan-500"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => addConfigOption(key)}
+                                    className="px-3 py-2 rounded-lg bg-cyan-500 text-slate-950 text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -955,6 +1049,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               <button 
                                 onClick={async () => {
                                   if(window.confirm('PROTOCOL WARNING: Delete record?')) {
+                                    await handleDeleteSubmission(sub.id);
                                   }
                                 }}
                                 className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
@@ -1005,13 +1100,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
               <div className="space-y-8 animate-in fade-in duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
-                    <div className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-2">Total Sessions</div>
-                    <div className="text-3xl font-black text-white italic">{analytics?.sessions?.length || 0}</div>
-                    <div className="text-[9px] text-slate-500 uppercase mt-1">Unique deployments detected</div>
+                    <div className="text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-2">Traffic Segments</div>
+                    <div className="text-3xl font-black text-white italic">{trafficBreakdown.total}</div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[9px] font-black uppercase tracking-widest">
+                      <div className="text-emerald-400">Users: {trafficBreakdown.registered}</div>
+                      <div className="text-rose-400">Admins: {trafficBreakdown.admins}</div>
+                      <div className="text-amber-400">Guests: {trafficBreakdown.guests}</div>
+                    </div>
                   </div>
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                     <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Total Revenue</div>
-                    <div className="text-3xl font-black text-white italic">${shopOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0).toLocaleString()}</div>
+                    <div className="text-3xl font-black text-white italic">${shopOrders.reduce((sum, o) => sum + (Number(o.total ?? o.amount) || 0), 0).toLocaleString()}</div>
                     <div className="text-[9px] text-slate-500 uppercase mt-1">Confirmed transactions</div>
                   </div>
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
@@ -1099,7 +1198,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                             <div className="text-xs font-black text-slate-700 w-4">{idx + 1}</div>
                             <img src={product.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-800" />
                             <div>
-                              <div className="text-[11px] font-black text-white uppercase italic truncate max-w-[150px]">{product.name}</div>
+                              <div className="text-[11px] font-black text-white uppercase italic truncate max-w-[150px]">
+                                {String(product.name || 'Unknown Unit').replace(/<[^>]*>?/gm, '')}
+                              </div>
                               <div className="text-[9px] text-slate-500 font-bold uppercase">{product.category}</div>
                             </div>
                           </div>
@@ -1114,26 +1215,84 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
                 {/* RECENT ACTIVITY */}
                 <div className="bg-slate-900/30 border border-slate-800 rounded-3xl p-8">
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest mb-6 italic flex items-center gap-2">
-                    <span className="text-amber-500">●</span> Live Traffic Control
-                  </h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-sm font-black text-white uppercase tracking-widest italic flex items-center gap-2">
+                      <span className="text-amber-500">●</span> Live Traffic Control
+                    </h3>
+                    <div className="flex gap-2 bg-slate-950/60 border border-slate-800 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setTrafficRange('recent')}
+                        className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          trafficRange === 'recent'
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-500 hover:text-white'
+                        }`}
+                      >
+                        Recent
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTrafficRange('month')}
+                        className={`px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${
+                          trafficRange === 'month'
+                            ? 'bg-cyan-500 text-slate-950'
+                            : 'text-slate-500 hover:text-white'
+                        }`}
+                      >
+                        Month
+                      </button>
+                    </div>
+                  </div>
                   <div className="space-y-4">
-                    {(analytics?.sessions || []).slice(-6).reverse().map((session: any, idx: number) => (
+                    {trafficSessions.map((session: any, idx: number) => (
+                      (() => {
+                        const identity = String(session?.user || '').trim();
+                        const normalized = identity.toLowerCase();
+                        const isAdmin = normalized === 'admin';
+                        const isGuest = !normalized || normalized === 'guest';
+                        const label = isAdmin
+                          ? 'Admin'
+                          : isGuest
+                            ? 'Guest'
+                            : 'Registered User';
+                        const badgeClass = isAdmin
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : isGuest
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                        const displayIdentity = isGuest || isAdmin
+                          ? label
+                          : identity.includes('@')
+                            ? identity
+                            : `${identity}`;
+
+                        return (
                       <div key={idx} className="flex items-center justify-between text-[10px] p-3 border-b border-slate-800/50 last:border-0">
                         <div className="flex items-center gap-3">
                           <div className="p-1 bg-slate-800 rounded text-slate-400">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                           </div>
-                          <span className="font-mono text-slate-400">User_{session.id.slice(-4)}</span>
+                          <span className="font-mono text-slate-300 max-w-[170px] truncate">{displayIdentity}</span>
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${badgeClass}`}>
+                            {label}
+                          </span>
                         </div>
                         <div className="flex gap-4 items-center">
                           <span className="px-2 py-0.5 bg-slate-950 text-slate-500 rounded border border-slate-800 font-black">
                             {session.duration || '0'}s active
                           </span>
-                          <span className="text-slate-600 font-bold">{new Date(session.timestamp).toLocaleTimeString()}</span>
+                          <span className="text-slate-600 font-bold">{new Date(session.lastActive || session.startTime || Date.now()).toLocaleTimeString()}</span>
                         </div>
                       </div>
+                        );
+                      })()
                     ))}
+                    {trafficSessions.length === 0 && (
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border border-dashed border-slate-800 rounded-xl p-4 text-center">
+                        No sessions in selected period
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

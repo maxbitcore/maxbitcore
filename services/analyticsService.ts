@@ -80,15 +80,24 @@ const getDeviceInfo = () => {
 const getCurrentUserIdentity = (): string => {
     const role = localStorage.getItem('maxbit_role');
     const token = localStorage.getItem('maxbit_token');
-    
-    // If it's an admin, we might want to return a special flag or handle it in logAction
+    const rawCurrentUser = localStorage.getItem('maxbit_currentUser') || localStorage.getItem('maxbit_user');
+
     if (role === 'admin') return 'ADMIN';
-    
-    // In this simulation, if we have a token but no explicit email stored in a separate 'current_user' key,
-    // we'd normally decode the JWT. For now, let's look at the users DB if possible or just return a placeholder
-    // If you have a specific way you store the logged in user's email, use it here.
-    // For now, we'll try to find an email associated with a session or just return "Guest"
-    return "Guest"; 
+
+    if (rawCurrentUser) {
+      try {
+        const currentUser = JSON.parse(rawCurrentUser);
+        if (currentUser?.role === 'admin') return 'ADMIN';
+        if (currentUser?.email) return String(currentUser.email).toLowerCase();
+      } catch (e) {
+        // Keep fallback behavior when stored profile is corrupted.
+      }
+    }
+
+    // Token without user profile still means authenticated session.
+    if (token && role && role !== 'admin') return 'REGISTERED_USER';
+
+    return 'Guest';
 };
 
 const getCurrentSession = (data: AnalyticsData): VisitorSession | null => {
