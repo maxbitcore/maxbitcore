@@ -199,7 +199,7 @@ const createCheckoutSession = async (req, res) => {
       },
     });
 
-    res.json({ id: session.id });
+    res.json({ id: session.id, url: session.url || null });
   } catch (error) {
     console.error('Stripe Error:', error);
     res.status(500).json({ error: formatStripeCaughtError(error) });

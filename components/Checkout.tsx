@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { loadStripe } from '@stripe/stripe-js';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : Promise.resolve(null);
 const apiBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4242').replace(/\/+$/, '');
 
 interface CheckoutProps {
@@ -64,8 +62,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       throw new Error('Your cart is empty. Add at least one item before checkout.');
     }
 
-    const stripe = await stripePromise;
-    if (!stripe) {
+    if (!stripePublishableKey) {
       throw new Error("Stripe publishable key is missing. Set VITE_STRIPE_PUBLISHABLE_KEY.");
     }
 
@@ -111,12 +108,11 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
     }
 
     if (session.error) throw new Error(session.error);
-    if (!session.id) {
-      throw new Error("Failed to create checkout session");
+    if (session.url && typeof session.url === 'string') {
+      window.location.assign(session.url);
+      return;
     }
-
-    const { error } = await stripe.redirectToCheckout({ sessionId: session.id });
-    if (error) throw new Error(error.message || "Stripe redirect failed.");
+    throw new Error('Checkout URL was not returned by the payment gateway.');
 
   } catch (err: any) {
     console.error("Payment Error:", err);
