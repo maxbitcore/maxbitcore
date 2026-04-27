@@ -121,14 +121,18 @@ const webhookHandler = (req, res) => {
   app.post(p, express.raw({ type: 'application/json' }), webhookHandler);
 });
 
+// Never pass Error into cors callback — Express treats it as an unhandled error → HTML 500.
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      console.warn('CORS blocked Origin:', origin, 'allowed:', allowedOrigins.join(', ') || '(none)');
+      return callback(null, false);
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+  })
+);
 app.use(express.json({ limit: '100kb' }));
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'POST', 'OPTIONS'],
-}));
 
 const createCheckoutSession = async (req, res) => {
   try {
@@ -212,6 +216,13 @@ const healthHandler = (req, res) => {
 };
 app.get('/healthz', healthHandler);
 app.get('/server/healthz', healthHandler);
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  if (res.headersSent) return next(err);
+  const status = typeof err.status === 'number' ? err.status : 500;
+  res.status(status).json({ error: err.message || 'Internal Server Error' });
+});
 
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
