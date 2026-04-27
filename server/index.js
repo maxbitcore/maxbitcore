@@ -51,8 +51,16 @@ const writePaymentsStore = (store) => {
   fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(store, null, 2));
 };
 
+const formatStripeCaughtError = (error) => {
+  if (!error) return 'Failed to create checkout session.';
+  if (typeof error.message === 'string' && error.message.trim()) return error.message.trim();
+  if (error.raw && typeof error.raw.message === 'string') return error.raw.message.trim();
+  if (typeof error.detail === 'string') return error.detail.trim();
+  return 'Failed to create checkout session.';
+};
+
 // Stripe webhook must use raw body for signature verification.
-app.post('/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+const webhookHandler = (req, res) => {
   if (!stripe || !webhookSecret) {
     return res.status(500).send('Webhook is not configured.');
   }
@@ -107,6 +115,10 @@ app.post('/stripe/webhook', express.raw({ type: 'application/json' }), (req, res
   writePaymentsStore(store);
 
   return res.status(200).json({ received: true });
+};
+
+['/stripe/webhook', '/server/stripe/webhook'].forEach((p) => {
+  app.post(p, express.raw({ type: 'application/json' }), webhookHandler);
 });
 
 app.use(express.json({ limit: '100kb' }));
@@ -118,7 +130,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
 }));
 
-app.post('/create-checkout-session', async (req, res) => {
+const createCheckoutSession = async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({ error: 'Stripe is not configured.' });
@@ -186,14 +198,12 @@ app.post('/create-checkout-session', async (req, res) => {
     res.json({ id: session.id });
   } catch (error) {
     console.error('Stripe Error:', error);
-    const msg =
-      error && error.message
-        ? String(error.message)
-        : error && error.raw && error.raw.message
-          ? String(error.raw.message)
-          : 'Failed to create checkout session.';
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: formatStripeCaughtError(error) });
   }
+};
+
+['/create-checkout-session', '/server/create-checkout-session'].forEach((path) => {
+  app.post(path, createCheckoutSession);
 });
 
 // cPanel + Passenger: often request path is /server/...; local dev is /...

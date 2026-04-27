@@ -78,15 +78,29 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       }),
     });
 
-    const session = await response.json().catch(() => ({}));
+    const rawText = await response.text();
+    let session: { id?: string; error?: string } = {};
+    try {
+      session = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      session = {};
+    }
+
     if (!response.ok) {
-      const detail =
+      const fromJson =
         typeof session.error === 'string'
           ? session.error
-          : session.error && typeof session.error === 'object' && session.error.message
-            ? session.error.message
+          : session.error && typeof session.error === 'object' && (session.error as { message?: string }).message
+            ? String((session.error as { message?: string }).message)
             : '';
-      throw new Error(detail || `Payment gateway error (${response.status}).`);
+      const snippet = rawText.trim().startsWith('{')
+        ? ''
+        : rawText.replace(/\s+/g, ' ').slice(0, 180);
+      throw new Error(
+        fromJson ||
+          snippet ||
+          `Payment gateway error (${response.status}). API: ${apiBaseUrl}`
+      );
     }
 
     if (session.error) throw new Error(session.error);
