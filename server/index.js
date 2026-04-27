@@ -115,7 +115,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'));
   },
-  methods: ['POST'],
+  methods: ['GET', 'POST', 'OPTIONS'],
 }));
 
 app.post('/create-checkout-session', async (req, res) => {
@@ -174,7 +174,8 @@ app.post('/create-checkout-session', async (req, res) => {
       line_items,
       mode: 'payment',
       customer_email: String(email).trim().toLowerCase(),
-      automatic_tax: { enabled: true },
+      // Stripe Tax must be enabled in Dashboard + origin address; otherwise sessions.create fails.
+      ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
       success_url: `${allowedOrigins[0]}/checkout?success=true&orderId=${encodeURIComponent(safeOrderId)}`,
       cancel_url: `${allowedOrigins[0]}/checkout`,
       metadata: {
@@ -185,7 +186,13 @@ app.post('/create-checkout-session', async (req, res) => {
     res.json({ id: session.id });
   } catch (error) {
     console.error('Stripe Error:', error);
-    res.status(500).json({ error: 'Failed to create checkout session.' });
+    const msg =
+      error && error.message
+        ? String(error.message)
+        : error && error.raw && error.raw.message
+          ? String(error.raw.message)
+          : 'Failed to create checkout session.';
+    res.status(500).json({ error: msg });
   }
 });
 

@@ -78,11 +78,17 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       }),
     });
 
+    const session = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error("Payment gateway rejected the request.");
+      const detail =
+        typeof session.error === 'string'
+          ? session.error
+          : session.error && typeof session.error === 'object' && session.error.message
+            ? session.error.message
+            : '';
+      throw new Error(detail || `Payment gateway error (${response.status}).`);
     }
 
-    const session = await response.json();
     if (session.error) throw new Error(session.error);
     if (!session.id) {
       throw new Error("Failed to create checkout session");
