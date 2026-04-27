@@ -28,7 +28,10 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const [country, setCountry] = useState('');
   
   const TAX_RATE = 0.0995; // 9.95%
-  const subtotal = items.reduce((sum, item) => sum + item.price, 0);
+  const checkoutItems = items.filter(
+    (item) => item && Number.isFinite(Number(item.price)) && Number(item.price) > 0
+  );
+  const subtotal = checkoutItems.reduce((sum, item) => sum + item.price, 0);
   const shippingCost = 0;
   const estimatedTax = subtotal * TAX_RATE; 
   const total = subtotal + estimatedTax;
@@ -57,6 +60,10 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
   setStep('processing');
 
   try {
+    if (!checkoutItems.length) {
+      throw new Error('Your cart is empty. Add at least one item before checkout.');
+    }
+
     const stripe = await stripePromise;
     if (!stripe) {
       throw new Error("Stripe publishable key is missing. Set VITE_STRIPE_PUBLISHABLE_KEY.");
@@ -66,7 +73,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json'},
       body: JSON.stringify({
-        items: items.map(item => ({
+        items: checkoutItems.map(item => ({
           id: item.id,
           name: item.name.replace(/<[^>]*>?/gm, ''),
           price: item.price,
