@@ -199,7 +199,23 @@ const createCheckoutSession = async (req, res) => {
       },
     });
 
-    res.json({ id: session.id, url: session.url || null });
+    let checkoutUrl = session.url || null;
+    if (!checkoutUrl && session.id) {
+      try {
+        const refreshed = await stripe.checkout.sessions.retrieve(session.id);
+        checkoutUrl = refreshed && refreshed.url ? refreshed.url : null;
+      } catch (retrieveError) {
+        console.error('Stripe session retrieve failed:', retrieveError);
+      }
+    }
+
+    if (!checkoutUrl) {
+      return res.status(500).json({
+        error: 'Stripe did not return a checkout URL. Verify account mode/API version and restart server.',
+      });
+    }
+
+    res.json({ id: session.id, url: checkoutUrl });
   } catch (error) {
     console.error('Stripe Error:', error);
     res.status(500).json({ error: formatStripeCaughtError(error) });
