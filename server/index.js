@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
@@ -8,6 +9,7 @@ const stripe = stripeSecret ? require('stripe')(stripeSecret) : null;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const app = express();
+app.set('trust proxy', 1);
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
   .split(',')
   .map((origin) => origin.trim())
@@ -134,6 +136,14 @@ app.use(
 );
 app.use(express.json({ limit: '100kb' }));
 
+const checkoutSessionLimiter = rateLimit({
+  windowMs: Number(process.env.CHECKOUT_RATE_WINDOW_MS || 15 * 60 * 1000),
+  max: Number(process.env.CHECKOUT_RATE_MAX || 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many checkout attempts. Try again later.' },
+});
+
 const createCheckoutSession = async (req, res) => {
   try {
     if (!stripe) {
@@ -222,122 +232,71 @@ const createCheckoutSession = async (req, res) => {
   }
 };
 
-['/create-checkout-session', '/server/create-checkout-session'].forEach((path) => {
-  app.post(path, createCheckoutSession);
-});
-
 const paymentStatusHandler = async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({ error: 'Stripe is not configured.' });
     }
     const sessionId = cleanText((req.query && req.query.session_id) || '');
-    if (!sessionId) {
-      return res.status(400).json({ error: 'Missing session_id.' });
+    if (!sessionId || !sessionId.startsWith('cs_')) {
+      return res.status(400).json({ error: 'Missing or invalid session_id.' });
     }
 
     const session = await stripe.checkout.sessions.retrieve(sessionId);
-    const metadataOrderId = cleanText((session && session.metadata && session.metadata.orderId) || '');
+    const metaOrderId = cleanText((session.metadata && session.metadata.orderId) || '');
     const queryOrderId = cleanText((req.query && req.query.orderId) || '');
-    const orderId = metadataOrderId || queryOrderId;
+    if (queryOrderId && metaOrderId && queryOrderId !== metaOrderId) {
+      return res.status(400).json({ error: 'Order does not match payment session.' });
+    }
+
     const paymentStatus = session.payment_status || 'unpaid';
     const checkoutStatus = session.status || 'open';
-    const paid = paymentStatus === 'paid' || checkoutStatus === 'complete';
+    const paid = paymentStatus === 'paid';
     const totalDetails = session.total_details || {};
-    const amountTax = Number(totalDetails.amount_tax || 0);
-    const amountShipping = Number(totalDetails.amount_shipping || 0);
-    const amountSubtotal = Number(session.amount_subtotal || 0);
-    const amountTotal = Number(session.amount_total || 0);
+    const orderId = metaOrderId || queryOrderId || null;
 
     if (orderId && paid) {
+      const email = String(
+        (session.customer_details && session.customer_details.email) || session.customer_email || ''
+      )
+        .trim()
+        .toLowerCase();
       const store = readPaymentsStore();
       store.paidOrders[orderId] = {
         paid: true,
         paidAt: new Date().toISOString(),
         stripeSessionId: session.id,
         paymentIntentId: session.payment_intent || null,
-        amountSubtotal,
-        amountTax,
-        amountShipping,
-        amountTotal,
+        amountTotal: session.amount_total || 0,
         currency: session.currency || 'usd',
-        customerEmail: session.customer_email || null,
+        customerEmail: email || null,
       };
       writePaymentsStore(store);
     }
 
     return res.json({
       paid,
-      livemode: !!session.livemode,
-      paymentStatus: paymentStatus,
-      checkoutStatus: checkoutStatus,
-      orderId: orderId || null,
+      paymentStatus,
+      checkoutStatus,
+      orderId,
       email: session.customer_email || null,
-      amountSubtotal,
-      amountTax,
-      amountShipping,
-      amountTotal,
+      amountTotal: Number(session.amount_total || 0),
+      amountTax: Number((totalDetails && totalDetails.amount_tax) || 0),
       currency: session.currency || 'usd',
+      livemode: !!session.livemode,
     });
   } catch (error) {
-    console.error('Payment status check failed:', error);
+    console.error('payment-status:', error);
     return res.status(500).json({ error: formatStripeCaughtError(error) });
   }
 };
 
-['/payment-status', '/server/payment-status'].forEach((path) => {
-  app.get(path, paymentStatusHandler);
+['/create-checkout-session', '/server/create-checkout-session'].forEach((routePath) => {
+  app.post(routePath, checkoutSessionLimiter, createCheckoutSession);
 });
 
-const stripeDiagnosticsHandler = async (req, res) => {
-  try {
-    if (!stripe) {
-      return res.status(500).json({ error: 'Stripe is not configured.' });
-    }
-
-    const base = {
-      ok: true,
-      stripeConfigured: true,
-      hasWebhookSecret: Boolean(webhookSecret),
-      automaticTaxEnabled: process.env.STRIPE_AUTOMATIC_TAX === 'true',
-      allowedOrigins,
-      secretKeyMode: stripeSecret && stripeSecret.startsWith('sk_live_') ? 'live' : 'test',
-    };
-
-    const account = await stripe.accounts.retrieve().catch(() => null);
-    const sessionId = cleanText((req.query && req.query.session_id) || '');
-
-    if (!sessionId) {
-      return res.json({
-        ...base,
-        accountId: account && account.id ? account.id : null,
-      });
-    }
-
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-    const totalDetails = session.total_details || {};
-    return res.json({
-      ...base,
-      accountId: account && account.id ? account.id : null,
-      sessionId: session.id,
-      livemode: !!session.livemode,
-      paymentStatus: session.payment_status || 'unpaid',
-      checkoutStatus: session.status || 'open',
-      amountSubtotal: Number(session.amount_subtotal || 0),
-      amountTax: Number(totalDetails.amount_tax || 0),
-      amountShipping: Number(totalDetails.amount_shipping || 0),
-      amountTotal: Number(session.amount_total || 0),
-      currency: session.currency || 'usd',
-      automaticTax: session.automatic_tax || null,
-    });
-  } catch (error) {
-    console.error('Stripe diagnostics failed:', error);
-    return res.status(500).json({ error: formatStripeCaughtError(error) });
-  }
-};
-
-['/stripe-diagnostics', '/server/stripe-diagnostics'].forEach((path) => {
-  app.get(path, stripeDiagnosticsHandler);
+['/payment-status', '/server/payment-status'].forEach((routePath) => {
+  app.get(routePath, paymentStatusHandler);
 });
 
 // cPanel + Passenger: often request path is /server/...; local dev is /...

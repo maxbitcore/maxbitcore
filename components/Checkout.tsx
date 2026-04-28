@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 
@@ -10,9 +11,10 @@ interface CheckoutProps {
   onBack: () => void;
 }
 
-type CheckoutStep = 'details' | 'processing' | 'success';
+type CheckoutStep = 'details' | 'processing' | 'verifying' | 'success';
 
 const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>('details');
   const [orderId, setOrderId] = useState('');
   
@@ -24,8 +26,6 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
   const [country, setCountry] = useState('');
-  const [verifiedTax, setVerifiedTax] = useState<number | null>(null);
-  
   const TAX_RATE = 0.0995; // 9.95%
   const checkoutItems = items.filter(
     (item) => item && Number.isFinite(Number(item.price)) && Number(item.price) > 0
@@ -36,51 +36,64 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const total = subtotal + estimatedTax;
 
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
+    const q = new URLSearchParams(window.location.search);
 
-    const verifyStripePayment = async () => {
-      if (query.get('success') !== 'true') return;
-      const sessionId = query.get('session_id') || '';
-      const urlOrderId = query.get('orderId') || '';
+    const verifyReturn = async () => {
+      if (q.get('success') !== 'true') {
+        setOrderId(
+          `MAX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`
+        );
+        return;
+      }
+
+      const sessionId = q.get('session_id') || '';
+      const urlOrderId = q.get('orderId') || '';
+      if (!sessionId.startsWith('cs_')) {
+        setStep('details');
+        alert('Invalid payment return. Please start checkout again.');
+        return;
+      }
+
       if (urlOrderId) setOrderId(urlOrderId);
-      if (!sessionId) return;
+      setStep('verifying');
 
-      try {
-        const params = new URLSearchParams({ session_id: sessionId });
-        if (urlOrderId) params.set('orderId', urlOrderId);
-        const response = await fetch(`${apiBaseUrl}/payment-status?${params.toString()}`);
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error((data && data.error) || 'Could not verify payment status.');
-        }
-        if (data && data.paid) {
-          if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
-          if (typeof data.email === 'string' && data.email) setEmail(data.email);
-          if (typeof data.amountTax === 'number') setVerifiedTax(data.amountTax / 100);
-          const safeOrder = typeof data.orderId === 'string' && data.orderId ? data.orderId : urlOrderId;
-          if (safeOrder) {
-            const clean = new URL(window.location.href);
-            clean.search = `?verified=true&orderId=${encodeURIComponent(safeOrder)}`;
-            window.history.replaceState({}, '', clean.toString());
+      const params = new URLSearchParams({ session_id: sessionId });
+      if (urlOrderId) params.set('orderId', urlOrderId);
+
+      const attempts = 5;
+      const delayMs = 900;
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const response = await fetch(`${apiBaseUrl}/payment-status?${params.toString()}`);
+          const data = await response.json().catch(() => ({}));
+          if (response.status === 429) {
+            throw new Error('Too many requests. Wait a minute and refresh this page.');
           }
-          setStep('success');
+          if (!response.ok) {
+            throw new Error(typeof data.error === 'string' ? data.error : 'Could not verify payment.');
+          }
+          if (data.paid) {
+            if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
+            if (typeof data.email === 'string' && data.email) setEmail(data.email);
+            setStep('success');
+            const oid = String(data.orderId || urlOrderId || '').trim();
+            navigate(`/checkout?verified=true&orderId=${encodeURIComponent(oid)}`, { replace: true });
+            return;
+          }
+        } catch (e: any) {
+          setStep('details');
+          alert(e?.message || 'Payment verification failed.');
           return;
         }
-        throw new Error(
-          `Payment is not confirmed yet (${data?.paymentStatus || 'unknown'} / ${data?.checkoutStatus || 'unknown'}).`
-        );
-      } catch (error: any) {
-        setStep('details');
-        alert(error?.message || 'Could not verify payment status.');
+        await new Promise((r) => setTimeout(r, delayMs));
       }
+
+      setStep('details');
+      alert('Payment could not be confirmed. If you were charged, contact support with your order ID.');
     };
 
-    verifyStripePayment();
-  }, []);
-
-  useEffect(() => {
-    setOrderId(`MAX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`);
-  }, []);
+    verifyReturn();
+  }, [navigate]);
 
 const handlePlaceOrder = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -119,6 +132,10 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       session = {};
     }
 
+    if (response.status === 429) {
+      throw new Error('Too many checkout attempts. Please wait a few minutes and try again.');
+    }
+
     if (!response.ok) {
       const fromJson =
         typeof session.error === 'string'
@@ -149,6 +166,28 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
     alert(err.message || "Could not reach the payment gateway.");
   }
 };
+
+  if (step === 'verifying') {
+    return (
+      <div className="min-h-screen bg-[#0b0f1a] flex flex-col items-center justify-center p-6 text-center">
+        <div className="relative w-24 h-24 mb-12">
+          <div className="absolute inset-0 border-4 border-cyan-500/20 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-cyan-500 rounded-full border-t-transparent animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <svg className="w-10 h-10 text-cyan-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+        </div>
+        <h2 className="text-2xl font-black italic text-white uppercase tracking-widest mb-4">
+          Verifying payment
+        </h2>
+        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">
+          Confirming with Stripe…
+        </p>
+      </div>
+    );
+  }
 
   if (step === 'processing') {
     return (
@@ -344,7 +383,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 </div> 
                 <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500">
                   <span className="uppercase tracking-widest">Estimated Tax (Stripe)</span>
-                  <span className="text-white font-mono">${(verifiedTax ?? estimatedTax).toFixed(2)}</span>
+                  <span className="text-white font-mono">${estimatedTax.toFixed(2)}</span>
                 </div>
               </div>
                 
