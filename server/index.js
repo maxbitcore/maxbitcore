@@ -289,6 +289,57 @@ const paymentStatusHandler = async (req, res) => {
   app.get(path, paymentStatusHandler);
 });
 
+const stripeDiagnosticsHandler = async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe is not configured.' });
+    }
+
+    const base = {
+      ok: true,
+      stripeConfigured: true,
+      hasWebhookSecret: Boolean(webhookSecret),
+      automaticTaxEnabled: process.env.STRIPE_AUTOMATIC_TAX === 'true',
+      allowedOrigins,
+      secretKeyMode: stripeSecret && stripeSecret.startsWith('sk_live_') ? 'live' : 'test',
+    };
+
+    const account = await stripe.accounts.retrieve().catch(() => null);
+    const sessionId = cleanText((req.query && req.query.session_id) || '');
+
+    if (!sessionId) {
+      return res.json({
+        ...base,
+        accountId: account && account.id ? account.id : null,
+      });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const totalDetails = session.total_details || {};
+    return res.json({
+      ...base,
+      accountId: account && account.id ? account.id : null,
+      sessionId: session.id,
+      livemode: !!session.livemode,
+      paymentStatus: session.payment_status || 'unpaid',
+      checkoutStatus: session.status || 'open',
+      amountSubtotal: Number(session.amount_subtotal || 0),
+      amountTax: Number(totalDetails.amount_tax || 0),
+      amountShipping: Number(totalDetails.amount_shipping || 0),
+      amountTotal: Number(session.amount_total || 0),
+      currency: session.currency || 'usd',
+      automaticTax: session.automatic_tax || null,
+    });
+  } catch (error) {
+    console.error('Stripe diagnostics failed:', error);
+    return res.status(500).json({ error: formatStripeCaughtError(error) });
+  }
+};
+
+['/stripe-diagnostics', '/server/stripe-diagnostics'].forEach((path) => {
+  app.get(path, stripeDiagnosticsHandler);
+});
+
 // cPanel + Passenger: often request path is /server/...; local dev is /...
 const healthHandler = (req, res) => {
   res.json({ ok: true, service: 'maxbit-stripe' });
