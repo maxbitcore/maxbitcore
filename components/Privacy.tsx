@@ -13,7 +13,7 @@ const Privacy: React.FC = () => {
           <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest border-l-2 border-cyan-500 pl-4">1. Information Collection</h2>
           <div className="text-slate-400 leading-loose space-y-4">
             <p>We only collect information essential for the fulfillment of your hardware orders. This includes your name, shipping address, and email for build status updates. We do not profile your gaming behavior or share your data with third-party advertising networks.</p>
-            <p>Collected automatically when you access our Site using cookies, log files, web beacons, tags, or pixels.</p>
+            <p>We also collect certain information automatically when you access our Site—for example, through cookies, log files, web beacons, tags, or pixels.</p>
           </div>
         </section>
 

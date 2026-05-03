@@ -192,6 +192,14 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    const full = getFullNameForConfigurator(currentUser);
+    if (full) setUserName(full.toUpperCase());
+    const em = String(currentUser.email ?? '').trim();
+    if (em) setUserEmail(em.toLowerCase());
+  }, [currentUser]);
+
   // Validation Logic
   const handleInvalid = (e: React.FormEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.');
@@ -221,7 +229,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     (e.target as HTMLInputElement).setCustomValidity('');
   };
 
-  const handleSubmit = async(e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -242,45 +250,58 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
       placement: 'Not Specified',
       aesthetic,
       resolution,
-      requirements
+      requirements,
     };
 
-    try {
-      const existing = JSON.parse(localStorage.getItem('maxbit_submissions') || '[]');
-      localStorage.setItem('maxbit_submissions', JSON.stringify([newSubmission, ...existing]));
-      window.dispatchEvent(
-        new CustomEvent('maxbit-update', { detail: { scope: 'submissions' } }),
-      );
-
-      setIsLoading(false);
-      setStatus('success');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      const controller = new AbortController();
-      const timeoutMs = 12000;
-      const tid = window.setTimeout(() => controller.abort(), timeoutMs);
-      void (async () => {
+    const persistAndFinish = () => {
+      try {
+        const raw = localStorage.getItem('maxbit_submissions') || '[]';
+        let existing: unknown[] = [];
         try {
-          const response = await fetch('https://www.maxbitcore.com/api/submit-build.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newSubmission),
-            signal: controller.signal,
-          });
-          if (!response.ok) {
-            console.warn('submit-build.php:', response.status, await response.text().catch(() => ''));
-          }
-        } catch (err) {
-          console.warn('Build saved on this device; server sync failed or timed out.', err);
-        } finally {
-          window.clearTimeout(tid);
+          const parsed = JSON.parse(raw);
+          existing = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          existing = [];
         }
-      })();
-    } catch (error) {
-      setIsLoading(false);
-      console.error('Submission failed:', error);
-      alert('Could not save your request locally. Please try again.');
-    }
+        const merged = [newSubmission, ...existing].slice(0, 250);
+        localStorage.setItem('maxbit_submissions', JSON.stringify(merged));
+        window.dispatchEvent(new Event('maxbit-submissions-updated'));
+
+        setIsLoading(false);
+        setStatus('success');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        const controller = new AbortController();
+        const timeoutMs = 12000;
+        const tid = window.setTimeout(() => controller.abort(), timeoutMs);
+        void (async () => {
+          try {
+            const response = await fetch('https://www.maxbitcore.com/api/submit-build.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newSubmission),
+              signal: controller.signal,
+            });
+            if (!response.ok) {
+              console.warn('submit-build.php:', response.status, await response.text().catch(() => ''));
+            }
+          } catch (err) {
+            console.warn('Build saved on this device; server sync failed or timed out.', err);
+          } finally {
+            window.clearTimeout(tid);
+          }
+        })();
+      } catch (error) {
+        setIsLoading(false);
+        console.error('Submission failed:', error);
+        alert('Could not save your request locally. Please try again.');
+      }
+    };
+
+    // Let the browser paint "Deploying…" before heavy localStorage work (avoids a frozen-looking UI).
+    requestAnimationFrame(() => {
+      requestAnimationFrame(persistAndFinish);
+    });
   }; 
 
   const toggleSection = (section: string) => {
@@ -329,14 +350,6 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
       </section>
     );
   }
-
-  useEffect(() => {
-    if (!currentUser) return;
-    const full = getFullNameForConfigurator(currentUser);
-    if (full) setUserName(full.toUpperCase());
-    const em = String(currentUser.email ?? '').trim();
-    if (em) setUserEmail(em.toLowerCase());
-  }, [currentUser]);
 
   return (
     <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] flex flex-col items-center border-t border-slate-900 relative">

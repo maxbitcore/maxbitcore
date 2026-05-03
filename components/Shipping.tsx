@@ -19,26 +19,45 @@ const Shipping: React.FC = () => {
         </div>
         <div className="relative">
           <div className="absolute inset-0 bg-cyan-500/20 blur-[100px] rounded-full"></div>
-          <div className="relative aspect-video rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl">
-            <img 
-              src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaad5b?auto=format&fit=crop&q=80&w=1000" 
-              alt="Packaging System" 
-              className="w-full h-full object-cover opacity-60"
+          <div className="relative aspect-video rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl flex flex-col">
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent z-[1] pointer-events-none" />
+            <img
+              src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaad5b?auto=format&fit=crop&q=80&w=1000"
+              alt="MaxBit PC packed for transit: reinforced carton and internal cushioning"
+              className="absolute inset-0 w-full h-full object-cover opacity-50"
             />
+            <div className="relative z-[2] mt-auto p-6 md:p-8 space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-500 mb-2">Visual reference</p>
+                <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-tight italic leading-tight">
+                  Packaging system
+                </h2>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed max-w-md">
+                  Illustrates how finished rigs leave the lab: cushioned interior, braced GPU bay, and outer shell sized to survive carrier handling—not
+                  loose retail boxes tossed in a mailbag.
+                </p>
+              </div>
+              <ul className="flex flex-wrap gap-2">
+                {['Instapak-style cradle', 'GPU lock bracket', 'Moisture barrier wrap'].map((label) => (
+                  <li
+                    key={label}
+                    className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full bg-slate-950/80 border border-white/10 text-slate-300"
+                  >
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Re-integrated 3-Point Details */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
+      {/* Re-integrated feature cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-24">
         {[
           {
             title: "Domestic Logistics",
-            desc: "For all North American orders, we utilize FedEx Ground and UPS Express. All shipments are fully insured for the total retail value of the system. A signature is mandatory for all PC deliveries."
-          },
-          {
-            title: "Global Deployment",
-            desc: "We ship to Europe and the UK via DHL Express. Please note that customers are responsible for local import duties and VAT. Rigs are double-boxed for international journeys."
+            desc: "For all USA orders, we utilize FedEx Ground and UPS Express. All shipments are fully insured for the total retail value of the system. A signature is mandatory for all PC deliveries."
           },
           {
             title: "Real-Time Tracking",

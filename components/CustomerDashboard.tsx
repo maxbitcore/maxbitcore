@@ -1,7 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState, useEffect, useMemo } from 'react';
 import { sanitizeHtml } from '../services/sanitizeHtml';
+import { getAnalytics } from '../services/analyticsService';
 import { CoverImage } from './CoverImage';
+
+interface UserPurchaseLog {
+  id: string;
+  orderNumber?: string;
+  total: number;
+  timestamp: number;
+  status: string;
+  items: { id: string; name: string; price: number }[];
+  source: 'local' | 'api';
+}
 
 interface CustomerDashboardProps {
   currentUser: any;
@@ -12,6 +22,7 @@ interface CustomerDashboardProps {
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUser, onLogout, allProducts, onSelectProduct }) => {
   const [userSubmissions, setUserSubmissions] = useState<any[]>([]);
+  const [userPurchases, setUserPurchases] = useState<UserPurchaseLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wishlist, setWishlist] = useState<any[]>([]);
 
@@ -33,33 +44,135 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
     return () => window.removeEventListener('wishlist-updated', loadWishlist);
   }, [currentUser?.email]);
 
-  //  SUBMISSIONS
+  //  SUBMISSIONS + PURCHASES (operational log)
   useEffect(() => {
-    const loadSubmissions = () => {
-      if (!currentUser?.email) return;
+    const email = currentUser?.email;
+    if (!email) {
+      setUserSubmissions([]);
+      setUserPurchases([]);
+      setIsLoading(false);
+      return;
+    }
 
-      setIsLoading(true);
+    const loadSubmissions = () => {
       try {
         const localData = localStorage.getItem('maxbit_submissions');
         const allSubmissions = localData ? JSON.parse(localData) : [];
-
-        const filtered = allSubmissions.filter(
-          (sub: any) => sub.userEmail === currentUser?.email
-        );
-
+        const filtered = allSubmissions.filter((sub: any) => sub.userEmail === email);
         setUserSubmissions(filtered);
       } catch (error) {
         console.error("CRITICAL ERROR: Failed to parse submissions log", error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    loadSubmissions();
+    const loadPurchases = async () => {
+      const em = email.toLowerCase().trim();
+      const byId = new Map<string, UserPurchaseLog>();
 
-    window.addEventListener('maxbit-update', loadSubmissions);
-    return () => window.removeEventListener('maxbit-update', loadSubmissions);
+      try {
+        const data = getAnalytics();
+        for (const o of data.orders || []) {
+          const mail = String(o.customer?.email || '').toLowerCase();
+          if (mail !== em) continue;
+          const id = String(o.id || '').trim() || `local-${o.timestamp}`;
+          const key = id.toLowerCase();
+          byId.set(key, {
+            id,
+            orderNumber: id,
+            total: Number(o.total) || 0,
+            timestamp: Number(o.timestamp) || 0,
+            status: String(o.status || 'Processing'),
+            items: Array.isArray(o.items) ? o.items : [],
+            source: 'local',
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        const res = await fetch('https://www.maxbitcore.com/api/get-orders.php');
+        if (res.ok) {
+          const arr = await res.json();
+          if (Array.isArray(arr)) {
+            for (const ord of arr) {
+              const mail = String(
+                ord.customerEmail || ord.customer_email || ord.customer?.email || ''
+              ).toLowerCase();
+              if (mail !== em) continue;
+              const id = String(ord.id || ord.orderNumber || '').trim() || `api-${ord.timestamp}`;
+              const key = id.toLowerCase();
+              const amount = Number(ord.amount ?? ord.total ?? 0) || 0;
+              const ts = Number(ord.timestamp) || 0;
+              const items = Array.isArray(ord.items)
+                ? ord.items.map((item: any) => ({
+                    id: String(item.id || 'n/a'),
+                    name: String(item.name || 'Item'),
+                    price: Number(item.price) || 0,
+                  }))
+                : [];
+              byId.set(key, {
+                id,
+                orderNumber: ord.orderNumber || id,
+                total: amount,
+                timestamp: ts,
+                status: String(ord.status || 'PAID'),
+                items,
+                source: 'api',
+              });
+            }
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+
+      setUserPurchases(Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp));
+    };
+
+    const loadAll = async () => {
+      setIsLoading(true);
+      loadSubmissions();
+      await loadPurchases();
+      setIsLoading(false);
+    };
+
+    void loadAll();
+
+    const refreshLog = () => {
+      loadSubmissions();
+      void loadPurchases();
+    };
+
+    window.addEventListener('maxbit-submissions-updated', refreshLog);
+    window.addEventListener('maxbit-update', refreshLog);
+    return () => {
+      window.removeEventListener('maxbit-submissions-updated', refreshLog);
+      window.removeEventListener('maxbit-update', refreshLog);
+    };
   }, [currentUser?.email]);
+
+  const operationalLogItems = useMemo(() => {
+    type Row =
+      | { kind: 'purchase'; ts: number; key: string; purchase: UserPurchaseLog }
+      | { kind: 'build'; ts: number; key: string; sub: any };
+    const rows: Row[] = [
+      ...userPurchases.map((p) => ({
+        kind: 'purchase' as const,
+        ts: p.timestamp || 0,
+        key: `purchase-${p.id}-${p.source}`,
+        purchase: p,
+      })),
+      ...userSubmissions.map((sub) => ({
+        kind: 'build' as const,
+        ts: sub.timestamp || 0,
+        key: `build-${sub.id}`,
+        sub,
+      })),
+    ];
+    rows.sort((a, b) => b.ts - a.ts);
+    return rows;
+  }, [userPurchases, userSubmissions]);
 
   const handleDeleteSubmission = async (submissionId: string) => {
     if (!window.confirm('Are you sure you want to terminate this build protocol?')) return;
@@ -72,6 +185,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       const updated = submissions.filter((sub: any) => sub.id !== submissionId);
       localStorage.setItem('maxbit_submissions', JSON.stringify(updated));
     }
+    window.dispatchEvent(new Event('maxbit-submissions-updated'));
 
     try {
       await fetch('https://www.maxbitcore.com/api/delete-submission.php', {
@@ -213,93 +327,190 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
           <div className="lg:col-span-2">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-6">Operational Log</h3>
             <div className="space-y-4">
-              {userSubmissions.map((sub) => (
-                <div key={sub.id} className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm relative overflow-hidden group">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/30 group-hover:bg-cyan-500 transition-colors" />
-                  <div className="flex flex-col md:flex-row justify-between gap-8">
-                    <div className="flex-1 space-y-6">
-                      {/* HEADER: ID & Purpose */}
-                      <div className="flex flex-wrap items-center gap-4">
-                        <div>
-                          <p className="text-[9px] font-black uppercase text-cyan-500 tracking-widest mb-1">Status: Active Protocol</p>
-                          <h3 className="text-white font-black uppercase text-2xl italic leading-none">{sub.purpose} SYSTEM</h3>
-                          <p className="text-slate-500 text-[10px] font-mono mt-2 uppercase tracking-tighter">ID: {sub.id}</p>
+              {!isLoading && operationalLogItems.length === 0 && (
+                <div className="py-16 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest text-[10px]">
+                  No build requests or purchases linked to this account yet
+                </div>
+              )}
+              {operationalLogItems.map((row) =>
+                row.kind === 'purchase' ? (
+                  <div
+                    key={row.key}
+                    className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm relative overflow-hidden group"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/30 group-hover:bg-emerald-500 transition-colors" />
+                    <div className="flex flex-col md:flex-row justify-between gap-8">
+                      <div className="flex-1 space-y-6">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div>
+                            <p className="text-[9px] font-black uppercase text-emerald-500 tracking-widest mb-1">
+                              Store purchase
+                            </p>
+                            <h3 className="text-white font-black uppercase text-2xl italic leading-none">
+                              Order {row.purchase.orderNumber || row.purchase.id}
+                            </h3>
+                            <p className="text-slate-500 text-[10px] font-mono mt-2 uppercase tracking-tighter">
+                              ID: {row.purchase.id}
+                            </p>
+                          </div>
+                          <div className="h-10 w-px bg-white/5 hidden md:block" />
+                          <div>
+                            <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Total</p>
+                            <p className="text-xl font-mono font-black text-emerald-400">
+                              ${Number(row.purchase.total).toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Status</p>
+                            <p className="text-sm font-black text-white uppercase tracking-tight">
+                              {row.purchase.status}
+                            </p>
+                          </div>
                         </div>
-          
-                        <div className="h-10 w-px bg-white/5 hidden md:block" />
-          
-                        <div>
-                          <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Target Budget</p>
-                          <p className="text-xl font-mono font-black text-cyan-400">${sub.budget}</p>
-                        </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6 py-6 border-y border-white/5 mt-6">
-  
-                       {/* 01 // Mission Profile */}
-                       <div className="space-y-1">
-                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Profile</p>
-                         <div className="text-xs font-bold text-white uppercase italic">Purpose: {sub.purpose}</div>
-                       </div>
-
-                       {/* 02 // Core Hardware */}
-                       <div className="space-y-1">
-                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Core</p>
-                         <div className="text-xs font-bold text-white uppercase italic">CPU: {sub.cpu}</div>
-                         <div className="text-xs font-bold text-cyan-400 uppercase italic">GPU: {sub.gpu}</div>
-                         <p className="text-[10px] text-slate-500 font-mono uppercase italic">{sub.manufacturer}</p>
-                       </div>
-
-                       {/* 03 // Data & Output */}
-                       <div className="space-y-1">
-                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Specs</p>
-                         <div className="text-xs font-bold text-white uppercase italic">Storage: {sub.ssd}</div>
-                         <div className="text-xs font-bold text-white uppercase italic">Resolution: {sub.resolution}</div>
-                       </div>
-
-                       {/* 04 // Visual Design */}
-                       <div className="space-y-1">
-                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Aesthetic</p>
-                         <div className="text-xs font-bold text-white uppercase italic">{sub.caseSize} / {sub.caseType}</div>
-                         <div className="text-[10px] text-cyan-500/80 font-black uppercase tracking-tighter italic">Style: {sub.aesthetic}</div>
-                       </div>
-
-                       {/* 05 // Logistics */}
-                       <div className="space-y-1">
-                         <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Timeline</p>
-                         <div className="text-xs font-bold text-white uppercase italic">Priority: {sub.deadline}</div>
-                         <p className="text-[10px] text-slate-500 font-mono uppercase">{sub.status === 'completed' ? 'Deployed' : 'In Progress'}</p>
-                       </div>
+                        {row.purchase.items.length > 0 && (
+                          <div className="mt-2 py-6 border-y border-white/5">
+                            <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest mb-4">
+                              Line items
+                            </p>
+                            <ul className="space-y-3">
+                              {row.purchase.items.map((line) => (
+                                <li
+                                  key={`${row.key}-${line.id}-${line.name}`}
+                                  className="flex justify-between gap-4 text-xs font-bold text-white"
+                                >
+                                  <span
+                                    className="uppercase italic line-clamp-2 min-w-0"
+                                    dangerouslySetInnerHTML={{
+                                      __html: sanitizeHtml(line.name || 'Item'),
+                                    }}
+                                  />
+                                  <span className="font-mono text-emerald-400 shrink-0">
+                                    ${Number(line.price).toLocaleString()}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Requirements */}
-                      {sub.requirements && (
-                        <div className="mt-6 p-4 bg-slate-950/50 rounded-2xl border border-white/5">
-                          <p className="text-[9px] text-slate-600 uppercase font-black mb-2 tracking-widest">Special Instructions:</p>
-                          <p className="text-xs text-slate-400 italic leading-relaxed">{sub.requirements}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ACTIONS */}
-                    <div className="flex flex-col justify-between items-end border-l border-white/5 pl-8">
-                       <div className="text-right">
-                          <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Logged At</p>
+                      <div className="flex flex-col justify-end border-l border-white/5 pl-8 md:min-w-[140px]">
+                        <div className="text-right md:text-right">
+                          <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Logged at</p>
                           <p className="text-[10px] text-white font-mono">
-                             {sub.timestamp ? new Date(sub.timestamp).toLocaleDateString() : 'N/A'}
+                            {row.purchase.timestamp
+                              ? new Date(row.purchase.timestamp).toLocaleString()
+                              : 'N/A'}
                           </p>
-                       </div>
-         
-                       <button 
-                         onClick={() => handleDeleteSubmission(sub.id)} 
-                         className="mt-4 text-rose-500 text-[10px] font-black uppercase border border-rose-500/20 px-6 py-3 rounded-xl hover:bg-rose-500 hover:text-white transition-all shadow-lg hover:shadow-rose-500/20"
-                       >
-                         Terminate Protocol
-                       </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <div
+                    key={row.key}
+                    className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm relative overflow-hidden group"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500/30 group-hover:bg-cyan-500 transition-colors" />
+                    <div className="flex flex-col md:flex-row justify-between gap-8">
+                      <div className="flex-1 space-y-6">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div>
+                            <p className="text-[9px] font-black uppercase text-cyan-500 tracking-widest mb-1">
+                              Status: Active Protocol
+                            </p>
+                            <h3 className="text-white font-black uppercase text-2xl italic leading-none">
+                              {row.sub.purpose} SYSTEM
+                            </h3>
+                            <p className="text-slate-500 text-[10px] font-mono mt-2 uppercase tracking-tighter">
+                              ID: {row.sub.id}
+                            </p>
+                          </div>
+
+                          <div className="h-10 w-px bg-white/5 hidden md:block" />
+
+                          <div>
+                            <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Target Budget</p>
+                            <p className="text-xl font-mono font-black text-cyan-400">${row.sub.budget}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6 py-6 border-y border-white/5 mt-6">
+                          <div className="space-y-1">
+                            <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Profile</p>
+                            <div className="text-xs font-bold text-white uppercase italic">
+                              Purpose: {row.sub.purpose}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Core</p>
+                            <div className="text-xs font-bold text-white uppercase italic">CPU: {row.sub.cpu}</div>
+                            <div className="text-xs font-bold text-cyan-400 uppercase italic">GPU: {row.sub.gpu}</div>
+                            <p className="text-[10px] text-slate-500 font-mono uppercase italic">
+                              {row.sub.manufacturer}
+                            </p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Specs</p>
+                            <div className="text-xs font-bold text-white uppercase italic">
+                              Storage: {row.sub.ssd}
+                            </div>
+                            <div className="text-xs font-bold text-white uppercase italic">
+                              Resolution: {row.sub.resolution}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Aesthetic</p>
+                            <div className="text-xs font-bold text-white uppercase italic">
+                              {row.sub.caseSize} / {row.sub.caseType}
+                            </div>
+                            <div className="text-[10px] text-cyan-500/80 font-black uppercase tracking-tighter italic">
+                              Style: {row.sub.aesthetic}
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Timeline</p>
+                            <div className="text-xs font-bold text-white uppercase italic">
+                              Priority: {row.sub.deadline}
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-mono uppercase">
+                              {row.sub.status === 'completed' ? 'Deployed' : 'In Progress'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {row.sub.requirements && (
+                          <div className="mt-6 p-4 bg-slate-950/50 rounded-2xl border border-white/5">
+                            <p className="text-[9px] text-slate-600 uppercase font-black mb-2 tracking-widest">
+                              Special Instructions:
+                            </p>
+                            <p className="text-xs text-slate-400 italic leading-relaxed">{row.sub.requirements}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col justify-between items-end border-l border-white/5 pl-8">
+                        <div className="text-right">
+                          <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Logged At</p>
+                          <p className="text-[10px] text-white font-mono">
+                            {row.sub.timestamp ? new Date(row.sub.timestamp).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteSubmission(row.sub.id)}
+                          className="mt-4 text-rose-500 text-[10px] font-black uppercase border border-rose-500/20 px-6 py-3 rounded-xl hover:bg-rose-500 hover:text-white transition-all shadow-lg hover:shadow-rose-500/20"
+                        >
+                          Terminate Protocol
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </div>

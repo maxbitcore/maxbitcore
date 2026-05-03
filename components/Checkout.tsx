@@ -12,6 +12,7 @@ import {
   type ParsedPlaceAddress,
 } from '../services/addressSearch';
 import { CoverImage } from './CoverImage';
+import { trackOrder } from '../services/analyticsService';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
@@ -209,8 +210,21 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
           if (data.paid) {
             if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
             if (typeof data.email === 'string' && data.email) setEmail(data.email);
-            setStep('success');
             const oid = String(data.orderId || urlOrderId || '').trim();
+            const paidEmail =
+              (typeof data.email === 'string' && data.email.trim()) || email.trim();
+            if (oid && checkoutItems.length > 0 && paidEmail) {
+              const nameFromForm = [firstName, lastName].filter(Boolean).join(' ').trim();
+              const street = [address.trim(), addressUnit.trim()].filter(Boolean).join(' ').trim();
+              const cityLine = [city.trim(), [usState, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+              const fullAddress = [street, cityLine, countryLabel].filter(Boolean).join(', ') || '—';
+              trackOrder(oid, checkoutItems, total, {
+                name: nameFromForm || 'Customer',
+                email: paidEmail,
+                address: fullAddress,
+              });
+            }
+            setStep('success');
             navigate(`/checkout?verified=true&orderId=${encodeURIComponent(oid)}`, { replace: true });
             return;
           }

@@ -199,6 +199,10 @@ export const trackOrder = (
   customerData: { name: string, email: string, address: string }
 ) => {
   const data = getAnalytics();
+  if (!orderId.trim()) return;
+  if (data.orders.some((o) => o.id === orderId)) {
+    return;
+  }
   const record: OrderRecord = {
     id: orderId,
     total,

@@ -22,6 +22,32 @@ const FAQ: React.FC = () => {
           a: "Absolutely not. We provide a clean installation of Windows 11 Pro with only the necessary drivers and hardware control software (like RGB sync) pre-installed and optimized." 
         }
       ]
+    },
+    {
+      title: "Shipping & Delivery",
+      items: [
+        {
+          q: "How are PCs shipped in the USA?",
+          a: "USA orders ship via FedEx Ground or UPS Express. Shipments are fully insured for the retail value of your system, and delivery requires a signature. Rigs are packed under our Armor-Crate Protocol—high-density Instapak-style foam, GPU-locking support for large cards, and reinforced internal bracing where needed."
+        },
+        {
+          q: "What if my system arrives damaged?",
+          a: "Contact us immediately. If you see broken glass or obvious case damage, do not power the system on—photos and a quick description help us start a damage claim faster. For DOA or transit damage, our return policy requires you to reach out within 48 hours of delivery so we can arrange inspection, repair, or replacement."
+        }
+      ]
+    },
+    {
+      title: "Returns, Warranty & Support",
+      items: [
+        {
+          q: "Can I return a PC if I change my mind?",
+          a: "You may request a return within 7 calendar days of confirmed delivery, provided the PC is in the same condition as received with all original boxes, foam, accessories, cables, and manuals. Return shipping is your responsibility, and refunds are issued only after inspection—never send a unit back without written return authorization."
+        },
+        {
+          q: "How do I reach MaxBit for sales or technical help?",
+          a: "Email info@maxbitcore.com or call +1 (425) 270-5500. For return authorization, submit your request in writing to support@maxbitcore.com before shipping anything back. You can also follow updates on our Facebook community (@maxbit)."
+        }
+      ]
     }
   ];
 

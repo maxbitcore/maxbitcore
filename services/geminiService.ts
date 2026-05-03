@@ -13,13 +13,13 @@ const limitText = (value: unknown, max = 220): string => {
 // --- KNOWLEDGE BASE ---
 const POLICIES = `
 SHIPPING (Armor-Crate Protocol):
-- Domestic (NA): FedEx Ground / UPS Express. Fully insured. Signature required.
+- USA: FedEx Ground / UPS Express. Fully insured. Signature required.
 - International: DHL Express. Customer responsible for Import Duties/VAT.
 - Packaging: High-density 'Instapak' foam, GPU-locking brackets.
 - Handling: 24-48h processing for in-stock items. Custom builds take 7-10 days.
 
 RETURNS:
-- Window: 14 days from delivery.
+- Window: 7 calendar days from confirmed delivery (change-of-mind returns; see site policy).
 - Fees: 15% restocking fee on custom systems (covers labor/testing).
 - Condition: Must be original packaging. Shipping costs non-refundable.
 - Non-returnable: Software keys, used coolants, user-damaged hardware, custom paint/engraving.
