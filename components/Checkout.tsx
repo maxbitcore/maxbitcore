@@ -1,10 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { sanitizeHtml } from '../services/sanitizeHtml';
+import { US_STATES } from '../data/usStates';
+import {
+  resolveUsStateCode,
+  searchPhotonAddresses,
+  searchPhotonCities,
+  type AddressSuggestion,
+  type CitySuggestion,
+  type ParsedPlaceAddress,
+} from '../services/addressSearch';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-const apiBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4242').replace(/\/+$/, '');
+
+/** Same-origin /server in prod if VITE_API_URL was omitted at build time (common deploy mistake). */
+function resolveApiBaseUrl(): string {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (typeof fromEnv === 'string' && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/+$/, '');
+  }
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    return `${window.location.origin.replace(/\/+$/, '')}/server`;
+  }
+  return 'http://localhost:4242';
+}
+
+const apiBaseUrl = resolveApiBaseUrl();
 
 interface CheckoutProps {
   items: Product[];
@@ -23,9 +45,111 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [address, setAddress] = useState('');
+  const [addressUnit, setAddressUnit] = useState('');
   const [city, setCity] = useState('');
   const [zip, setZip] = useState('');
-  const [country, setCountry] = useState('');
+  /** US state / territory code when country is US */
+  const [usState, setUsState] = useState('');
+
+  const countryCode = 'US';
+  const countryLabel = 'United States';
+
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [addressSuggestOpen, setAddressSuggestOpen] = useState(false);
+  const addressWrapRef = useRef<HTMLDivElement>(null);
+  const skipAddressSearchUntilRef = useRef(0);
+
+  const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([]);
+  const [citySuggestOpen, setCitySuggestOpen] = useState(false);
+  const cityWrapRef = useRef<HTMLDivElement>(null);
+  const skipCitySearchUntilRef = useRef(0);
+
+  const applyParsedAddress = (p: ParsedPlaceAddress) => {
+    setAddress(p.street);
+    setCity(p.city);
+    setZip(p.postal);
+    if (p.countryCode === 'US' || !p.countryCode) {
+      setUsState(resolveUsStateCode(p.regionRaw));
+    }
+  };
+
+  useEffect(() => {
+    if (step !== 'details') return;
+    if (Date.now() < skipAddressSearchUntilRef.current) return;
+
+    const q = address.trim();
+    if (q.length < 3) {
+      setAddressSuggestions([]);
+      setAddressSuggestOpen(false);
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const list = await searchPhotonAddresses(q, {
+            countryCode,
+            usStateCode: usState || undefined,
+            city: city || undefined,
+            postal: zip || undefined,
+          });
+          setAddressSuggestions(list);
+          setAddressSuggestOpen(list.length > 0);
+        } catch {
+          setAddressSuggestions([]);
+          setAddressSuggestOpen(false);
+        }
+      })();
+    }, 380);
+
+    return () => window.clearTimeout(handle);
+  }, [address, step]);
+
+  useEffect(() => {
+    if (step !== 'details') return;
+    if (Date.now() < skipCitySearchUntilRef.current) return;
+
+    const q = city.trim();
+    if (q.length < 2) {
+      setCitySuggestions([]);
+      setCitySuggestOpen(false);
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const list = await searchPhotonCities(q, {
+            countryCode,
+            usStateCode: usState || undefined,
+          });
+          setCitySuggestions(list);
+          setCitySuggestOpen(list.length > 0);
+        } catch {
+          setCitySuggestions([]);
+          setCitySuggestOpen(false);
+        }
+      })();
+    }, 380);
+
+    return () => window.clearTimeout(handle);
+  }, [city, usState, step]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof Node)) return;
+      if (addressWrapRef.current && !addressWrapRef.current.contains(t)) {
+        setAddressSuggestOpen(false);
+      }
+      if (cityWrapRef.current && !cityWrapRef.current.contains(t)) {
+        setCitySuggestOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [addressSuggestOpen, citySuggestOpen]);
+
   const TAX_RATE = 0.0995; // 9.95%
   const checkoutItems = items.filter(
     (item) => item && Number.isFinite(Number(item.price)) && Number(item.price) > 0
@@ -60,8 +184,10 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
       const params = new URLSearchParams({ session_id: sessionId });
       if (urlOrderId) params.set('orderId', urlOrderId);
 
-      const attempts = 5;
-      const delayMs = 900;
+      const attempts = 15;
+      const delayMs = 1000;
+      let lastError: string | null = null;
+
       for (let i = 0; i < attempts; i++) {
         try {
           const response = await fetch(`${apiBaseUrl}/payment-status?${params.toString()}`);
@@ -70,7 +196,14 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
             throw new Error('Too many requests. Wait a minute and refresh this page.');
           }
           if (!response.ok) {
-            throw new Error(typeof data.error === 'string' ? data.error : 'Could not verify payment.');
+            lastError =
+              typeof data.error === 'string' ? data.error : `Verification failed (${response.status}).`;
+            // Transient server errors — retry
+            if (response.status >= 500 && i < attempts - 1) {
+              await new Promise((r) => setTimeout(r, delayMs));
+              continue;
+            }
+            throw new Error(lastError);
           }
           if (data.paid) {
             if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
@@ -80,16 +213,34 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
             navigate(`/checkout?verified=true&orderId=${encodeURIComponent(oid)}`, { replace: true });
             return;
           }
+          lastError =
+            typeof data.paymentStatus === 'string'
+              ? `Payment status: ${data.paymentStatus}`
+              : 'Payment not confirmed yet.';
         } catch (e: any) {
+          const msg = e?.message || 'Payment verification failed.';
+          // Network failure — retry unless last attempt
+          const isNetwork =
+            e instanceof TypeError ||
+            /fetch|network|failed to fetch|load failed/i.test(String(msg));
+          if (isNetwork && i < attempts - 1) {
+            lastError = msg;
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
           setStep('details');
-          alert(e?.message || 'Payment verification failed.');
+          alert(
+            `${msg}\n\nAPI: ${apiBaseUrl}\nIf this persists, check VITE_API_URL at build time and CLIENT_URL on the server (must match this site’s exact URL, including www).`
+          );
           return;
         }
         await new Promise((r) => setTimeout(r, delayMs));
       }
 
       setStep('details');
-      alert('Payment could not be confirmed. If you were charged, contact support with your order ID.');
+      alert(
+        `Payment could not be confirmed after several tries (${lastError || 'unknown'}). If you were charged, contact support with your order ID: ${urlOrderId || '—'}.`
+      );
     };
 
     verifyReturn();
@@ -270,7 +421,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       <div className="max-w-6xl mx-auto px-6 pt-32 pb-24">
         <button 
           onClick={onBack}
-          className="group flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-cyan-400 transition-colors mb-12"
+          className="group flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-cyan-400 transition-colors mt-6 sm:mt-0 mb-12"
         >
           <svg xmlns="https://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 group-hover:-translate-x-1 transition-transform">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -294,31 +445,181 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                   Contact Information
                 </h2>
                 <div className="space-y-4">
-                   <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="EMAIL ADDRESS" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
+                   <input
+                    id="checkout-email"
+                    name="email"
+                    autoComplete="email"
+                    required
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="EMAIL ADDRESS"
+                    className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                   <input required type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="FIRST NAME" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
-                   <input required type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="LAST NAME" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
+                   <input
+                    id="checkout-given-name"
+                    name="given-name"
+                    autoComplete="given-name"
+                    required
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="FIRST NAME"
+                    className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                   />
+                   <input
+                    id="checkout-family-name"
+                    name="family-name"
+                    autoComplete="family-name"
+                    required
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="LAST NAME"
+                    className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                   />
                 </div>
               </div>
 
-              {/* Shipping Address */}
+              {/* Shipping information: address only; name comes from Contact above */}
               <div className="space-y-6">
                 <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] flex items-center gap-4">
                   <span className="w-8 h-px bg-slate-800"></span>
-                  Shipping Address
+                  Shipping Information
                 </h2>
+                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                  Deliver to {firstName || '…'} {lastName || ''}
+                  {countryLabel ? ` · ${countryLabel}` : ''}
+                </p>
                 <div className="space-y-4">
-                   <div className="grid grid-cols-2 gap-4">
-                      <input required type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="FIRST NAME" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
-                      <input required type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="LAST NAME" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
+                   <input type="hidden" name="shipping-country" value="US" />
+                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <select
+                        id="checkout-shipping-state"
+                        name="shipping-region"
+                        autoComplete="shipping address-level1"
+                        required
+                        value={usState}
+                        onChange={(e) => setUsState(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white outline-none focus:border-cyan-500 transition-colors [&>option]:bg-slate-900 [&>option]:text-white"
+                      >
+                        <option value="">STATE</option>
+                        {US_STATES.map(({ code, name }) => (
+                          <option key={code} value={code}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <div ref={cityWrapRef} className="relative w-full sm:col-span-1">
+                        <input
+                          id="checkout-shipping-city"
+                          name="shipping-city"
+                          autoComplete="shipping address-level2"
+                          required
+                          type="text"
+                          value={city}
+                          onChange={(e) => {
+                            setCity(e.target.value);
+                            setCitySuggestOpen(true);
+                          }}
+                          onFocus={() => {
+                            if (citySuggestions.length > 0) setCitySuggestOpen(true);
+                          }}
+                          placeholder="CITY — type to search"
+                          className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                        />
+                        {citySuggestOpen && citySuggestions.length > 0 && (
+                          <ul
+                            role="listbox"
+                            className="absolute z-40 mt-1 max-h-48 w-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
+                          >
+                            {citySuggestions.map((s) => (
+                              <li key={s.id} role="option">
+                                <button
+                                  type="button"
+                                  className="w-full px-4 py-2.5 text-left text-xs text-slate-200 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    skipCitySearchUntilRef.current = Date.now() + 800;
+                                    setCity(s.cityName);
+                                    setCitySuggestions([]);
+                                    setCitySuggestOpen(false);
+                                  }}
+                                >
+                                  {s.label}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <input
+                        id="checkout-shipping-zip"
+                        name="shipping-postal-code"
+                        autoComplete="shipping postal-code"
+                        required
+                        type="text"
+                        value={zip}
+                        onChange={(e) => setZip(e.target.value)}
+                        placeholder="ZIP CODE"
+                        className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                      />
                    </div>
-                   <input required type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="STREET ADDRESS" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
-                   <div className="grid grid-cols-2 gap-4">
-                      <input required type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="CITY" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
-                      <input required type="text" value={zip} onChange={(e) => setZip(e.target.value)} placeholder="POSTAL / ZIP CODE" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
+                   <div ref={addressWrapRef} className="relative">
+                    <input
+                      id="checkout-shipping-address"
+                      name="shipping-address-line1"
+                      autoComplete="shipping street-address"
+                      required
+                      type="text"
+                      value={address}
+                      onChange={(e) => {
+                        setAddress(e.target.value);
+                        setAddressSuggestOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (addressSuggestions.length > 0) setAddressSuggestOpen(true);
+                      }}
+                      placeholder="STREET ADDRESS — type to search (OpenStreetMap)"
+                      className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                    />
+                    <input
+                      id="checkout-shipping-address-unit"
+                      name="shipping-address-line2"
+                      autoComplete="shipping address-line2"
+                      type="text"
+                      value={addressUnit}
+                      onChange={(e) => setAddressUnit(e.target.value)}
+                      placeholder="APT / UNIT (OPTIONAL)"
+                      className="mt-3 w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                    />
+                    {addressSuggestOpen && addressSuggestions.length > 0 && (
+                      <ul
+                        role="listbox"
+                        className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
+                      >
+                        {addressSuggestions.map((s) => (
+                          <li key={s.id} role="option">
+                            <button
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left text-xs text-slate-200 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                skipAddressSearchUntilRef.current = Date.now() + 800;
+                                applyParsedAddress(s.parsed);
+                                setAddressSuggestions([]);
+                                setAddressSuggestOpen(false);
+                              }}
+                            >
+                              {s.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                    </div>
-                   <input required type="text" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="COUNTRY" className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors" />
                 </div>
               </div>
 

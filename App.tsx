@@ -22,6 +22,7 @@ import { trackVisit, trackProductView, trackPageNav, trackSearch } from './servi
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { sendRegistrationEmail } from './services/emailService';
+import { pickJoinedFromAuthPayload } from './services/authService';
 import DatePicker from "react-datepicker";
 import 'react-datepicker/dist/react-datepicker.css';
 import { enUS } from 'date-fns/locale';
@@ -306,9 +307,9 @@ function App() {
         newProducts={newProducts} 
         onProductClick={(p) => {navigate(`/product/${p.id}`);}}
       />
-      <section className="py-24 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
+      <section className="pt-10 pb-16 md:pt-12 md:pb-20 px-6 md:px-12 bg-[#0b0f1a] border-t border-slate-900">
         <div className="max-w-[1800px] mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
             <div>
               <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Hardware Collection</h2>
             </div>
@@ -537,16 +538,32 @@ function App() {
 
                 if (data.success === true || data.message?.includes("success") || response.ok) {
 
-                    setShowRegister(false); 
-                    setCurrentUser(userData);
+                    setShowRegister(false);
+                    const joined =
+                      pickJoinedFromAuthPayload(data) || new Date().toISOString();
+                    const userWithJoined = { ...userData, joined };
 
-                sendRegistrationEmail(userData)
+                    setCurrentUser(userWithJoined);
+
+                sendRegistrationEmail(userWithJoined)
                     .then(() => console.log("Email sent via EmailJS")) 
                     .catch(err => console.error("Email delay", err));    
-                
+    
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
-                localStorage.setItem('maxbit_customers', JSON.stringify([...users, userData]));
-                localStorage.setItem('maxbit_user', JSON.stringify(userData));
+                localStorage.setItem('maxbit_customers', JSON.stringify([...users, userWithJoined]));
+                localStorage.setItem('maxbit_user', JSON.stringify(userWithJoined));
+                localStorage.setItem(
+                  'maxbit_currentUser',
+                  JSON.stringify({
+                    id: userWithJoined.id,
+                    email: userWithJoined.email,
+                    role: userWithJoined.role,
+                    firstName: userWithJoined.firstName,
+                    lastName: userWithJoined.lastName,
+                    username: userWithJoined.username,
+                    joined: userWithJoined.joined,
+                  }),
+                );
                 
                    
                 setShowRegSuccess(true); 

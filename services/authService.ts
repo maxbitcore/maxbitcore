@@ -2,19 +2,94 @@ export interface AuthResponse {
   token: string;
   role: 'admin' | 'user';
   user?: {
-    username: string;
+    username?: string;
     email: string;
     firstName?: string;
     lastName?: string;
+    id?: string | number;
+    joined?: string;
+    created_at?: string;
   };
   error?: string;
   message?: string;
   success?: boolean;
   requiresAdminCode?: boolean;
   email: string | null;
+  joined?: string;
+  created_at?: string;
+  createdAt?: string;
+  id?: string | number;
+  user_id?: string | number;
 }
 
 const API_URL = "https://www.maxbitcore.com/api";
+
+/** Normalize registration / account creation time from API payloads (PHP field names vary). */
+export function pickJoinedFromAuthPayload(data: any): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+
+  const tryDate = (v: unknown): string | undefined => {
+    if (v == null || v === '') return undefined;
+    if (typeof v === 'number') {
+      const ms = v < 1e12 ? v * 1000 : v;
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+    }
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (!s) return undefined;
+      if (/^\d+$/.test(s)) {
+        const n = Number(s);
+        const ms = n < 1e12 ? n * 1000 : n;
+        const d = new Date(ms);
+        return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+      }
+      const t = Date.parse(s);
+      if (!Number.isNaN(t)) return new Date(t).toISOString();
+    }
+    return undefined;
+  };
+
+  const keys = [
+    'joined',
+    'created_at',
+    'createdAt',
+    'registration_date',
+    'registrationDate',
+    'date_joined',
+    'signup_date',
+    'account_created',
+    'registered_at',
+  ];
+
+  const buckets = [data, data.user];
+  for (const bucket of buckets) {
+    if (!bucket || typeof bucket !== 'object') continue;
+    for (const k of keys) {
+      const parsed = tryDate((bucket as any)[k]);
+      if (parsed) return parsed;
+    }
+  }
+  return undefined;
+}
+
+/** Prefer API date; if missing, keep previously stored joined for the same email (survives authService overwrite). */
+export function mergeResolvedJoined(
+  email: string | undefined,
+  fromApi: string | undefined,
+): string | undefined {
+  if (fromApi) return fromApi;
+  if (!email) return undefined;
+  try {
+    const raw = localStorage.getItem('maxbit_currentUser');
+    if (!raw) return undefined;
+    const prev = JSON.parse(raw);
+    if (prev?.email === email && prev?.joined) return prev.joined;
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
 
 const handleResponse = async (response: Response) => {
   const data = await response.json();
@@ -33,14 +108,19 @@ export const registerUser = async (username: string, email: string, password: st
   
   const data = await handleResponse(response);
 
-if (data.token) {
+  if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
+    const emailVal = data.user?.email || email;
+    const joined = mergeResolvedJoined(emailVal, pickJoinedFromAuthPayload(data));
     const userToSave = {
-      email: data.user?.email || email, 
+      id: data.user?.id ?? data.id ?? data.user_id,
+      email: emailVal,
       firstName: data.user?.firstName || '',
       lastName: data.user?.lastName || '',
-      role: data.role
+      username: data.user?.username,
+      role: data.role,
+      ...(joined ? { joined } : {}),
     };
     localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
   }
@@ -62,15 +142,19 @@ export const loginUser = async (username: string, password: string, adminCode?: 
   if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
-  if (data.user?.email)
-    localStorage.setItem('maxbit_email', data.user.email);
-  const userToSave = {
-    email: data.user?.email || '',
-    firstName: data.user?.firstName || '',
-    lastName: data.user?.lastName || '',
-    role: data.role
-  };
-  localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
+    if (data.user?.email) localStorage.setItem('maxbit_email', data.user.email);
+    const emailVal = data.user?.email || '';
+    const joined = mergeResolvedJoined(emailVal || undefined, pickJoinedFromAuthPayload(data));
+    const userToSave = {
+      id: data.user?.id ?? data.id ?? data.user_id,
+      email: emailVal,
+      firstName: data.user?.firstName || '',
+      lastName: data.user?.lastName || '',
+      username: data.user?.username,
+      role: data.role,
+      ...(joined ? { joined } : {}),
+    };
+    localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
   }
   return data;
 };

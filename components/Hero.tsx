@@ -6,7 +6,7 @@ interface HeroProps {
 
 const Hero: React.FC<HeroProps> = ({ onExplore }) => {
   return (
-    <section className="relative w-full h-[60vh] min-h-[500px] overflow-hidden bg-[#0b0f1a] flex items-center">
+    <section className="relative w-full h-[42vh] min-h-[320px] md:min-h-[380px] overflow-hidden bg-[#0b0f1a] flex items-center py-6 md:py-8">
       
       {/* Dynamic Background */}
       <div className="absolute inset-0 w-full h-full">
@@ -21,18 +21,18 @@ const Hero: React.FC<HeroProps> = ({ onExplore }) => {
       </div>
 
       <div className="relative z-10 px-8 md:px-24 max-w-7xl mx-auto w-full">
-        <div className="animate-fade-in-up">
-          <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight mb-4 leading-[1.0]">
-            Built for <span className="maxbit-text-gradient block md:inline">Victory</span>
+        <div className="animate-fade-in-up w-full max-w-4xl lg:max-w-5xl">
+          <h1 className="font-black text-white tracking-tight mb-3 leading-[1.05] whitespace-nowrap text-[clamp(1.15rem,3.8vw+0.6rem,4.5rem)]">
+            Built for <span className="maxbit-text-gradient">Victory</span>
           </h1>
-          <p className="max-w-lg text-base md:text-lg text-slate-400 font-medium leading-relaxed mb-8">
+          <p className="max-w-xl text-base md:text-lg text-slate-400 font-medium leading-relaxed mb-5">
             Precision-engineered high-performance hardware. 
             Deployed for absolute dominance.
           </p>
           
           <button 
             onClick={onExplore}
-            className="maxbit-gradient px-10 py-4 rounded-xl text-slate-900 font-extrabold uppercase tracking-widest hover:opacity-90 transition-all hover:scale-105 shadow-[0_0_15px_rgba(34,211,238,0.2)] text-sm"
+            className="maxbit-gradient px-4 py-2 rounded-md text-slate-900 font-bold uppercase tracking-wide hover:opacity-90 transition-all hover:scale-[1.02] shadow-[0_0_10px_rgba(34,211,238,0.15)] text-[10px] sm:text-xs"
           >
             Design Your PC
           </button>
@@ -40,8 +40,8 @@ const Hero: React.FC<HeroProps> = ({ onExplore }) => {
       </div>
 
       {/* Subtle indicator */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 opacity-30">
-        <div className="w-1 h-8 bg-gradient-to-b from-cyan-500 to-transparent rounded-full animate-pulse"></div>
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-30">
+        <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-transparent rounded-full animate-pulse"></div>
       </div>
     </section>
   );

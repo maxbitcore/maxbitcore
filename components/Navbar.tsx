@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
-import { loginUser, registerUser, logoutUser, getStoredAuth, forgotPassword } from '../services/authService';
+import {
+  loginUser,
+  registerUser,
+  logoutUser,
+  getStoredAuth,
+  forgotPassword,
+  pickJoinedFromAuthPayload,
+  mergeResolvedJoined,
+} from '../services/authService';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -152,12 +160,19 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       const isActuallySuccess = response.success === true || response.success === "true" || !!response.token;
 
       if (isActuallySuccess) {
+        const resolvedEmail = response.email || response.user?.email || email;
+        const resolvedJoined = mergeResolvedJoined(
+          resolvedEmail,
+          pickJoinedFromAuthPayload(response),
+        );
         const userData = {
-             id: response.id || response.user_id,
-             email: response.email || email, 
-             role: response.role || 'user',
-             firstName: response.firstName || 'User', 
-             joined: response.joined || new Date().toISOString()
+          id: response.id || response.user_id || response.user?.id,
+          email: resolvedEmail,
+          role: response.role || 'user',
+          firstName: response.firstName || response.user?.firstName || 'User',
+          lastName: response.lastName || response.user?.lastName,
+          username: response.username || response.user?.username || username,
+          ...(resolvedJoined ? { joined: resolvedJoined } : {}),
         };
         
         console.log("DEBUG: Saving to LocalStorage:", userData);

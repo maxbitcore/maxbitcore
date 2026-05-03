@@ -138,7 +138,9 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                 <div className="border-l-2 border-slate-800 pl-4">
                   <p className="text-[9px] text-slate-500 uppercase font-black mb-1">System Joined</p>
                   <p className="text-sm font-bold text-white uppercase italic tracking-wider">
-                    {currentUser?.joined ? new Date(currentUser.joined).toLocaleDateString() : 'ACTIVATED'}
+                    {currentUser?.joined
+                      ? new Date(currentUser.joined).toLocaleDateString()
+                      : '—'}
                   </p>
                 </div>
 
