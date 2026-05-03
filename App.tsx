@@ -243,10 +243,15 @@ function App() {
 
     loadData();
     window.addEventListener('storage', loadData);
-    window.addEventListener('maxbit-update', loadData);
+    const onCatalogUpdate = (e: Event) => {
+      const d = (e as CustomEvent<{ scope?: string }>).detail;
+      if (d?.scope === 'submissions') return;
+      void loadData();
+    };
+    window.addEventListener('maxbit-update', onCatalogUpdate);
     return () => {
       window.removeEventListener('storage', loadData);
-      window.removeEventListener('maxbit-update', loadData);
+      window.removeEventListener('maxbit-update', onCatalogUpdate);
     };
   }, []);
 

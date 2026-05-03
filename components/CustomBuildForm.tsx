@@ -102,6 +102,33 @@ interface CustomBuildFormProps {
   currentUser?: any;
 }
 
+/** First + last for logged-in user; snake_case + localStorage fallbacks if API omits a part. */
+function getFullNameForConfigurator(user: any | undefined): string {
+  if (!user) return '';
+  let first = String(user.firstName ?? user.first_name ?? '').trim();
+  let last = String(user.lastName ?? user.last_name ?? '').trim();
+  const email = String(user.email ?? '').trim().toLowerCase();
+
+  if (email && (!first || !last)) {
+    const tryMerge = (raw: string | null) => {
+      if (!raw) return;
+      try {
+        const o = JSON.parse(raw);
+        const oem = String(o?.email ?? '').trim().toLowerCase();
+        if (oem !== email) return;
+        if (!first) first = String(o.firstName ?? o.first_name ?? '').trim();
+        if (!last) last = String(o.lastName ?? o.last_name ?? '').trim();
+      } catch {
+        /* ignore */
+      }
+    };
+    tryMerge(localStorage.getItem('maxbit_currentUser'));
+    tryMerge(localStorage.getItem('maxbit_user'));
+  }
+
+  return [first, last].filter(Boolean).join(' ').trim();
+}
+
 const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [status, setStatus] = useState<'idle' | 'success'>('idle');
   const [isLoading, setIsLoading] = useState(false);
@@ -129,14 +156,6 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [caseType, setCaseType] = useState('Not Specified');
   const [aesthetic, setAesthetic] = useState('Not Specified');
   const [resolution, setResolution] = useState('Not Specified');
-
-  useEffect(() => {
-    if (currentUser) {
-      const fullName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ');
-      if (fullName) setUserName(fullName);
-      if (currentUser.email) setUserEmail(currentUser.email);
-    }
-  }, [currentUser]);
 
   const loadConfig = () => {
     // Load custom configuration if available
@@ -227,29 +246,40 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     };
 
     try {
-      const response = await fetch('https://www.maxbitcore.com/api/submit-build.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newSubmission),
-      });
+      const existing = JSON.parse(localStorage.getItem('maxbit_submissions') || '[]');
+      localStorage.setItem('maxbit_submissions', JSON.stringify([newSubmission, ...existing]));
+      window.dispatchEvent(
+        new CustomEvent('maxbit-update', { detail: { scope: 'submissions' } }),
+      );
 
-      if (!response.ok) throw new Error('Server error');
+      setIsLoading(false);
+      setStatus('success');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
-     const existing = JSON.parse(localStorage.getItem('maxbit_submissions') || '[]');
-     localStorage.setItem('maxbit_submissions', JSON.stringify([newSubmission, ...existing]));
-
-     window.dispatchEvent(new Event('maxbit-update'));
-
-     setIsLoading(false);
-     setStatus('success');
-     window.scrollTo({ top: 0, behavior: 'smooth' });
-
+      const controller = new AbortController();
+      const timeoutMs = 12000;
+      const tid = window.setTimeout(() => controller.abort(), timeoutMs);
+      void (async () => {
+        try {
+          const response = await fetch('https://www.maxbitcore.com/api/submit-build.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newSubmission),
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            console.warn('submit-build.php:', response.status, await response.text().catch(() => ''));
+          }
+        } catch (err) {
+          console.warn('Build saved on this device; server sync failed or timed out.', err);
+        } finally {
+          window.clearTimeout(tid);
+        }
+      })();
     } catch (error) {
       setIsLoading(false);
-      console.error("Submission failed:", error);
-      alert("System Error: Could not deploy build protocol. Please try again.");
+      console.error('Submission failed:', error);
+      alert('Could not save your request locally. Please try again.');
     }
   }; 
 
@@ -301,12 +331,11 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   }
 
   useEffect(() => {
-    if (currentUser) {
-      const fullName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim();
-      
-      if (fullName) setUserName(fullName.toUpperCase()); 
-      if (currentUser.email) setUserEmail(currentUser.email.toLowerCase());
-    }
+    if (!currentUser) return;
+    const full = getFullNameForConfigurator(currentUser);
+    if (full) setUserName(full.toUpperCase());
+    const em = String(currentUser.email ?? '').trim();
+    if (em) setUserEmail(em.toLowerCase());
   }, [currentUser]);
 
   return (
