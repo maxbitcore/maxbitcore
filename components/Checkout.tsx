@@ -11,6 +11,7 @@ import {
   type CitySuggestion,
   type ParsedPlaceAddress,
 } from '../services/addressSearch';
+import { CoverImage } from './CoverImage';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
@@ -174,7 +175,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
       const urlOrderId = q.get('orderId') || '';
       if (!sessionId.startsWith('cs_')) {
         setStep('details');
-        alert('Invalid payment return. Please start checkout again.');
+        alert('This payment link is not valid. Please return to your cart and start checkout again.');
         return;
       }
 
@@ -193,7 +194,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
           const response = await fetch(`${apiBaseUrl}/payment-status?${params.toString()}`);
           const data = await response.json().catch(() => ({}));
           if (response.status === 429) {
-            throw new Error('Too many requests. Wait a minute and refresh this page.');
+            throw new Error('Too many checks at once. Wait a minute, then refresh this page.');
           }
           if (!response.ok) {
             lastError =
@@ -230,7 +231,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
           }
           setStep('details');
           alert(
-            `${msg}\n\nAPI: ${apiBaseUrl}\nIf this persists, check VITE_API_URL at build time and CLIENT_URL on the server (must match this site’s exact URL, including www).`
+            `${msg}\n\nIf this keeps happening, contact support and mention you returned from payment on this page.`
           );
           return;
         }
@@ -239,7 +240,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
 
       setStep('details');
       alert(
-        `Payment could not be confirmed after several tries (${lastError || 'unknown'}). If you were charged, contact support with your order ID: ${urlOrderId || '—'}.`
+        `We could not confirm your payment yet (${lastError || 'unknown reason'}). If money left your account, contact support with your order number: ${urlOrderId || '—'}.`
       );
     };
 
@@ -256,7 +257,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
     }
 
     if (!stripePublishableKey) {
-      throw new Error("Stripe publishable key is missing. Set VITE_STRIPE_PUBLISHABLE_KEY.");
+      throw new Error('Online payments are not set up on this site yet. Please contact the store.');
     }
 
     const response = await fetch(`${apiBaseUrl}/create-checkout-session`, {
@@ -276,7 +277,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
     });
 
     const rawText = await response.text();
-    let session: { id?: string; error?: string } = {};
+    let session: { id?: string; error?: string; url?: string } = {};
     try {
       session = rawText ? JSON.parse(rawText) : {};
     } catch {
@@ -284,7 +285,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
     }
 
     if (response.status === 429) {
-      throw new Error('Too many checkout attempts. Please wait a few minutes and try again.');
+      throw new Error('Too many attempts. Please wait a few minutes and try again.');
     }
 
     if (!response.ok) {
@@ -300,7 +301,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       throw new Error(
         fromJson ||
           snippet ||
-          `Payment gateway error (${response.status}). API: ${apiBaseUrl}`
+          `Payment could not be started (${response.status}). Try again or contact the store.`
       );
     }
 
@@ -309,7 +310,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       window.location.assign(session.url);
       return;
     }
-    throw new Error('Checkout URL was not returned by the payment gateway.');
+    throw new Error('We could not open the payment page. Please try again or contact the store.');
 
   } catch (err: any) {
     console.error("Payment Error:", err);
@@ -331,10 +332,10 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           </div>
         </div>
         <h2 className="text-2xl font-black italic text-white uppercase tracking-widest mb-4">
-          Verifying payment
+          Checking your payment
         </h2>
         <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">
-          Confirming with Stripe…
+          Please wait…
         </p>
       </div>
     );
@@ -353,12 +354,12 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           </div>
         </div>
         <h2 className="text-2xl font-black italic text-white uppercase tracking-widest mb-4">
-            Processing Secure Payment
+            Processing your payment
         </h2>   
         <div className="max-w-xs w-full bg-slate-900 h-1 rounded-full overflow-hidden mb-6">
           <div className="h-full bg-cyan-500 animate-pulse w-2/3"></div>
         </div>
-        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Encrypting data / Verifying credentials...</p>
+        <p className="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Securing your connection…</p>
       </div>
     );
   }
@@ -378,11 +379,11 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-10 mb-12 text-left space-y-8">
             <div className="flex flex-col md:flex-row justify-between gap-8">
               <div>
-                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-2">Order Reference</span>
+                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-2">Order number</span>
                 <span className="text-xl font-bold text-white font-mono">{orderId}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-2">Estimated Arrival</span>
+                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest block mb-2">Estimated delivery</span>
                 <span className="text-xl font-bold text-white">3-5 Business Days</span>
               </div>
             </div>
@@ -392,9 +393,9 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               </p>
               <div className="mt-4 flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 <span className="font-bold uppercase tracking-wide">Admin Notification Sent to info@maxbitcore.com</span>
+                 <span className="font-bold uppercase tracking-wide">Our team at info@maxbitcore.com has been notified</span>
               </div>
-              <p className="text-slate-500 mt-4 text-xs">Your hardware has been allocated and is being prepared for final assembly and stress-testing.</p>
+              <p className="text-slate-500 mt-4 text-xs">Your order is in the queue and will be prepared for assembly and testing.</p>
             </div>
           </div>
 
@@ -434,7 +435,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
           <div className="space-y-12">
             <div>
               <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 uppercase">Checkout</h1>
-              <p className="text-[10px] text-cyan-500/70 font-bold uppercase tracking-[0.2em]">Secure checkout session / 256-bit Encryption</p>
+              <p className="text-[10px] text-cyan-500/70 font-bold uppercase tracking-[0.2em]">Secure checkout — your details are encrypted</p>
             </div>
             
             <div className="space-y-12">
@@ -453,7 +454,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="EMAIL ADDRESS"
+                    placeholder="Email address"
                     className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                    />
                 </div>
@@ -466,7 +467,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="FIRST NAME"
+                    placeholder="First name"
                     className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                    />
                    <input
@@ -477,7 +478,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    placeholder="LAST NAME"
+                    placeholder="Last name"
                     className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                    />
                 </div>
@@ -490,7 +491,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                   Shipping Information
                 </h2>
                 <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                  Deliver to {firstName || '…'} {lastName || ''}
+                  Shipping to: {firstName || '…'} {lastName || ''}
                   {countryLabel ? ` · ${countryLabel}` : ''}
                 </p>
                 <div className="space-y-4">
@@ -505,7 +506,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                         onChange={(e) => setUsState(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white outline-none focus:border-cyan-500 transition-colors [&>option]:bg-slate-900 [&>option]:text-white"
                       >
-                        <option value="">STATE</option>
+                        <option value="">Select state</option>
                         {US_STATES.map(({ code, name }) => (
                           <option key={code} value={code}>
                             {name}
@@ -527,7 +528,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                           onFocus={() => {
                             if (citySuggestions.length > 0) setCitySuggestOpen(true);
                           }}
-                          placeholder="CITY — type to search"
+                          placeholder="City (type to search)"
                           className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                         />
                         {citySuggestOpen && citySuggestions.length > 0 && (
@@ -563,7 +564,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                         type="text"
                         value={zip}
                         onChange={(e) => setZip(e.target.value)}
-                        placeholder="ZIP CODE"
+                        placeholder="ZIP code"
                         className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                       />
                    </div>
@@ -582,7 +583,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                       onFocus={() => {
                         if (addressSuggestions.length > 0) setAddressSuggestOpen(true);
                       }}
-                      placeholder="STREET ADDRESS — type to search (OpenStreetMap)"
+                      placeholder="Street address (type for address suggestions)"
                       className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                     />
                     <input
@@ -592,7 +593,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                       type="text"
                       value={addressUnit}
                       onChange={(e) => setAddressUnit(e.target.value)}
-                      placeholder="APT / UNIT (OPTIONAL)"
+                      placeholder="Apartment, suite, etc. (optional)"
                       className="mt-3 w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                     />
                     {addressSuggestOpen && addressSuggestions.length > 0 && (
@@ -636,8 +637,8 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-white font-black italic uppercase tracking-widest text-sm">Complimentary Direct Shipping</p>
-                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight mt-1">Standard delivery on all orders — $0.00 USD</p>
+                    <p className="text-white font-black italic uppercase tracking-widest text-sm">Free standard shipping</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight mt-1">No shipping charge on this order</p>
                   </div>
                 </div>
               </div>
@@ -658,7 +659,11 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               {items.map((item, idx) => (
                 <div key={item.id} className="flex justify-between items-start gap-4">
                   <div className="flex gap-4">
-                    <img src={item.imageUrl} className="w-16 h-16 object-cover rounded-xl border border-slate-800" alt="" />
+                    <CoverImage
+                      src={item.imageUrl}
+                      alt=""
+                      className="w-16 h-16 rounded-xl border border-slate-800 shrink-0"
+                    />
                     <div>
                       <div 
                         className="text-sm font-black uppercase tracking-tighter text-white"
@@ -683,13 +688,13 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                   <span className="text-emerald-500 font-black italic">FREE</span>
                 </div> 
                 <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500">
-                  <span className="uppercase tracking-widest">Estimated Tax (Stripe)</span>
+                  <span className="uppercase tracking-widest">Estimated sales tax</span>
                   <span className="text-white font-mono">${estimatedTax.toFixed(2)}</span>
                 </div>
               </div>
                 
               <p className="text-[8px] text-slate-600 uppercase italic leading-tight border-t border-slate-800/50 pt-3">
-                * Final tax will be calculated by Stripe based on your precise jurisdiction.
+                * Final tax is calculated at payment based on your shipping address.
               </p> 
 
               <div className="pt-2">
@@ -709,7 +714,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Secure encrypted checkout</span>
+            <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Checkout is secure and encrypted</span>
           </div>
           </div>
         </form>

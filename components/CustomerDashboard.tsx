@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { sanitizeHtml } from '../services/sanitizeHtml';
+import { CoverImage } from './CoverImage';
 
 interface CustomerDashboardProps {
   currentUser: any;
@@ -163,12 +164,12 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                       className="group flex items-center gap-4 p-3 bg-slate-950/30 border border-white/5 rounded-2xl hover:border-cyan-500/30 hover:bg-white/5 transition-all cursor-pointer mb-3"
                     >
                       <div className="w-16 h-16 bg-slate-900 rounded-xl overflow-hidden border border-white/10 shrink-0 shadow-lg">
-                        <img 
-                        src={item.imageUrl || 'https://via.placeholder.com/150'} 
-                        alt="Unit Preview" 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                    </div>
+                        <CoverImage
+                          src={item.imageUrl || 'https://via.placeholder.com/150'}
+                          alt="Unit preview"
+                          className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                        />
+                      </div>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">

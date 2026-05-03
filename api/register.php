@@ -11,9 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once 'db_config.php';
 
 /**
- * В таблице users должна быть колонка даты регистрации, например:
+ * Для поля joined в ответе добавь колонку (один раз в MySQL):
  * ALTER TABLE users ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
- * (если колонки ещё нет — один раз выполни в MySQL)
  */
 function maxbit_joined_iso(?string $raw): ?string
 {
@@ -26,6 +25,26 @@ function maxbit_joined_iso(?string $raw): ?string
         return $dt->format('c');
     } catch (Exception $e) {
         return null;
+    }
+}
+
+/** SELECT после INSERT: если колонки created_at ещё нет — повтор без неё (без joined в JSON). */
+function maxbit_fetch_registered_user(PDO $conn, int $userId): array
+{
+    $sqlWith = 'SELECT id, username, email, first_name, last_name, role, created_at FROM users WHERE id = ? LIMIT 1';
+    $sqlWithout = 'SELECT id, username, email, first_name, last_name, role FROM users WHERE id = ? LIMIT 1';
+
+    $sel = $conn->prepare($sqlWith);
+    try {
+        $sel->execute([$userId]);
+        return $sel->fetch(PDO::FETCH_ASSOC) ?: [];
+    } catch (PDOException $e) {
+        if (strpos($e->getMessage(), 'created_at') !== false) {
+            $sel2 = $conn->prepare($sqlWithout);
+            $sel2->execute([$userId]);
+            return $sel2->fetch(PDO::FETCH_ASSOC) ?: [];
+        }
+        throw $e;
     }
 }
 
@@ -61,11 +80,7 @@ try {
     if ($stmt->execute([$username, $email, $password, $firstName, $lastName])) {
         $userId = (int) $conn->lastInsertId();
 
-        $sel = $conn->prepare(
-            'SELECT id, username, email, first_name, last_name, role, created_at FROM users WHERE id = ? LIMIT 1'
-        );
-        $sel->execute([$userId]);
-        $row = $sel->fetch(PDO::FETCH_ASSOC) ?: [];
+        $row = maxbit_fetch_registered_user($conn, $userId);
 
         $joinedRaw = isset($row['created_at']) ? $row['created_at'] : null;
         $joinedIso = is_string($joinedRaw) ? maxbit_joined_iso($joinedRaw) : null;

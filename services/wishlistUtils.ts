@@ -8,6 +8,12 @@ export const toggleWishlist = (product: any, userEmail: string | undefined): boo
   const key = getStorageKey(userEmail);
   const saved = localStorage.getItem(key);
   let wishlist: any[] = [];
+  try {
+    wishlist = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(wishlist)) wishlist = [];
+  } catch {
+    wishlist = [];
+  }
 
   const index = wishlist.findIndex(item => item.id === product.id);
   let isNowWishlisted = false;
@@ -37,7 +43,13 @@ export const checkIsWishlisted = (productId: string, userEmail: string): boolean
   if (!userEmail) return false;
   const saved = localStorage.getItem(getStorageKey(userEmail));
   if (!saved) return false;
-  const wishlist: any[] = JSON.parse(saved);
-  
-  return wishlist.some(item => (typeof item === 'string' ? item === productId : item.id === productId));
+  try {
+    const wishlist: unknown = JSON.parse(saved);
+    if (!Array.isArray(wishlist)) return false;
+    return wishlist.some((item: any) =>
+      typeof item === 'string' ? item === productId : item?.id === productId,
+    );
+  } catch {
+    return false;
+  }
 };

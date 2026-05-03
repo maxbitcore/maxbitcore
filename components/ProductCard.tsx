@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 import { sanitizeHtml } from '../services/sanitizeHtml';
+import { CoverImage } from './CoverImage';
 
 interface ProductCardProps {
   product: Product;
@@ -41,10 +42,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
     >
       {/* Immersive Image Container */}
       <div className="relative aspect-[4/5] overflow-hidden bg-slate-950">
-        <img 
-          src={product.imageUrl} 
-          alt={product.name.replace(/<[^>]*>?/gm, '')} 
-          className="w-full h-full object-cover object-center transition-transform duration-[1.5s] cubic-bezier(0.2, 1, 0.3, 1) group-hover:scale-110"
+        <CoverImage
+          src={product.imageUrl}
+          alt={product.name.replace(/<[^>]*>?/gm, '')}
+          className="w-full h-full transition-transform duration-[1.5s] cubic-bezier(0.2, 1, 0.3, 1) group-hover:scale-110"
         />
         
         {/* Artistic Overlays */}

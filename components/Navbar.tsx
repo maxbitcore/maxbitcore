@@ -51,6 +51,22 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
+    const onOpenLogin = () => {
+      setAuthMode('login');
+      setEmail('');
+      setUsername('');
+      setPassword('');
+      setAdminCode('');
+      setShowPassword(false);
+      setAuthStep('credentials');
+      setError(null);
+      setIsLoginOpen(true);
+    };
+    window.addEventListener('maxbit-open-login', onOpenLogin);
+    return () => window.removeEventListener('maxbit-open-login', onOpenLogin);
+  }, []);
+
+  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
@@ -164,6 +180,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         const resolvedJoined = mergeResolvedJoined(
           resolvedEmail,
           pickJoinedFromAuthPayload(response),
+          username,
         );
         const userData = {
           id: response.id || response.user_id || response.user?.id,

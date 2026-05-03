@@ -73,18 +73,25 @@ export function pickJoinedFromAuthPayload(data: any): string | undefined {
   return undefined;
 }
 
-/** Prefer API date; if missing, keep previously stored joined for the same email (survives authService overwrite). */
+/**
+ * Prefer API date; if missing, keep previously stored joined for the same account
+ * (match by email and/or login username — PHP login often returns flat JSON without `user`).
+ */
 export function mergeResolvedJoined(
   email: string | undefined,
   fromApi: string | undefined,
+  loginUsername?: string,
 ): string | undefined {
   if (fromApi) return fromApi;
-  if (!email) return undefined;
   try {
     const raw = localStorage.getItem('maxbit_currentUser');
     if (!raw) return undefined;
     const prev = JSON.parse(raw);
-    if (prev?.email === email && prev?.joined) return prev.joined;
+    if (!prev?.joined) return undefined;
+    const em = email?.trim();
+    if (em && prev.email === em) return prev.joined;
+    const lu = loginUsername?.trim();
+    if (lu && (prev.username === lu || prev.email === lu)) return prev.joined;
   } catch {
     /* ignore */
   }
@@ -111,8 +118,12 @@ export const registerUser = async (username: string, email: string, password: st
   if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
-    const emailVal = data.user?.email || email;
-    const joined = mergeResolvedJoined(emailVal, pickJoinedFromAuthPayload(data));
+    const emailVal = data.user?.email || data.email || email;
+    const joined = mergeResolvedJoined(
+      emailVal || undefined,
+      pickJoinedFromAuthPayload(data),
+      data.user?.username || data.username || username,
+    );
     const userToSave = {
       id: data.user?.id ?? data.id ?? data.user_id,
       email: emailVal,
@@ -142,15 +153,19 @@ export const loginUser = async (username: string, password: string, adminCode?: 
   if (data.token) {
     localStorage.setItem('maxbit_token', data.token);
     localStorage.setItem('maxbit_role', data.role);
-    if (data.user?.email) localStorage.setItem('maxbit_email', data.user.email);
-    const emailVal = data.user?.email || '';
-    const joined = mergeResolvedJoined(emailVal || undefined, pickJoinedFromAuthPayload(data));
+    const emailVal = data.user?.email || data.email || '';
+    if (emailVal) localStorage.setItem('maxbit_email', emailVal);
+    const joined = mergeResolvedJoined(
+      emailVal || undefined,
+      pickJoinedFromAuthPayload(data),
+      username,
+    );
     const userToSave = {
       id: data.user?.id ?? data.id ?? data.user_id,
       email: emailVal,
-      firstName: data.user?.firstName || '',
-      lastName: data.user?.lastName || '',
-      username: data.user?.username,
+      firstName: data.user?.firstName || data.firstName || '',
+      lastName: data.user?.lastName || data.lastName || '',
+      username: data.user?.username || data.username || username,
       role: data.role,
       ...(joined ? { joined } : {}),
     };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { CoverImage } from './CoverImage';
 
 interface HeroProps {
   onExplore: () => void;
@@ -10,10 +11,10 @@ const Hero: React.FC<HeroProps> = ({ onExplore }) => {
       
       {/* Dynamic Background */}
       <div className="absolute inset-0 w-full h-full">
-        <img 
-            src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=2000" 
-            alt="Hardware Circuitry" 
-            className="w-full h-full object-cover opacity-30 contrast-125 saturate-50"
+        <CoverImage
+          src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=2000"
+          alt="Hardware circuitry background"
+          className="w-full h-full opacity-30 contrast-125 saturate-50"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0b0f1a] via-[#0b0f1a]/70 to-transparent"></div>
         {/* Accent Glow */}

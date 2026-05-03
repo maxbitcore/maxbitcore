@@ -6,43 +6,52 @@ import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { sanitizeHtml } from '../services/sanitizeHtml';
+import { CoverImage } from './CoverImage';
 
 interface ProductDetailProps {
   product: Product;
+  currentUser?: any;
   onBack: () => void;
   onAddToCart: (product: Product) => void;
   openLoginModal?: () => void;
 }
 
-const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToCart, openLoginModal }) => {
+const ProductDetail: React.FC<ProductDetailProps> = ({
+  product,
+  currentUser: currentUserProp,
+  onBack,
+  onAddToCart,
+  openLoginModal,
+}) => {
   const { email, role } = getStoredAuth();
   const [activeImage, setActiveImage] = useState(product.imageUrl);
   const isSoldOut = product.status === 'Sold Out';
 
-  const { currentUser, isAuthenticated } = useAuth()
+  const authCtx = useAuth();
+  const wishlistEmail =
+    (currentUserProp?.email || authCtx?.currentUser?.email || email || '').trim();
 
-  const [isWishlisted, setIsWishlisted] = useState(() => 
-    checkIsWishlisted(product.id, email || '')
+  const [isWishlisted, setIsWishlisted] = useState(() =>
+    wishlistEmail ? checkIsWishlisted(product.id, wishlistEmail) : false,
   );
 
   const handleWishlistClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
 
-  if (!isAuthenticated && !currentUser) {
-    if (openLoginModal) {
-      openLoginModal();
-    } else {
-      alert("Please login to access Wishlist protocols."); 
+    const em =
+      (currentUserProp?.email || authCtx?.currentUser?.email || getStoredAuth().email || '').trim();
+    if (!em) {
+      if (openLoginModal) openLoginModal();
+      else window.dispatchEvent(new Event('maxbit-open-login'));
+      return;
     }
-    return;
-  }
 
-  const nextState = toggleWishlist(product.id, currentUser?.email || email || '');
-  setIsWishlisted(nextState);
-    
-  logAction('CLICK', `${nextState ? 'Added' : 'Removed'} ${product.name} from Wishlist`);
-};
+    const nextState = toggleWishlist(product, em);
+    setIsWishlisted(nextState);
+
+    logAction('CLICK', `${nextState ? 'Added' : 'Removed'} ${product.name} from Wishlist`);
+  };
   
   // Review Form State
   const [reviewName, setReviewName] = useState('');
@@ -52,8 +61,14 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
  
   useEffect(() => {
     setActiveImage(product.imageUrl);
-    setIsWishlisted(checkIsWishlisted(product.id, currentUser?.email || email || ''));
-  }, [product, currentUser, email]);
+    const em = (
+      currentUserProp?.email ||
+      authCtx?.currentUser?.email ||
+      getStoredAuth().email ||
+      ''
+    ).trim();
+    setIsWishlisted(em ? checkIsWishlisted(product.id, em) : false);
+  }, [product, currentUserProp?.email, authCtx?.currentUser?.email, email]);
 
   const handleAddToCart = () => {
     trackCartAddition(product.id);
@@ -129,10 +144,10 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
           {/* Left: Images */}
           <div className="flex flex-col gap-6 lg:sticky lg:top-24 h-fit z-10">
             <div className="w-full aspect-[4/5] bg-slate-950 border border-slate-800/50 overflow-hidden rounded-[2rem] md:rounded-[3rem] relative shadow-2xl group">
-              <img 
-                src={activeImage} 
-                alt={product.name.replace(/<[^>]*>?/gm, '')} 
-                className="w-full h-full object-cover object-center transition-opacity duration-500"
+              <CoverImage
+                src={activeImage}
+                alt={product.name.replace(/<[^>]*>?/gm, '')}
+                className="w-full h-full transition-opacity duration-500"
               />
               <div className="absolute top-6 left-6 md:top-10 md:left-10">
                 <span className={`flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] px-6 py-3 md:px-8 md:py-4 rounded-full border backdrop-blur-2xl transition-all duration-500 ${
@@ -155,7 +170,11 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
                                 activeImage === img ? 'border-cyan-500 ring-2 ring-cyan-500/20' : 'border-slate-800 opacity-60'
                             }`}
                         >
-                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <CoverImage
+                              src={img}
+                              alt={`Gallery ${idx + 1}`}
+                              className="w-full h-full"
+                            />
                         </button>
                     ))}
                 </div>
@@ -199,10 +218,11 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onBack, onAddToC
              >
                {isSoldOut ? 'ARCHIVE DATA ONLY' : `ADD TO CART — $${product.price}`}
              </button>
-             <button 
+             <button
+                 type="button"
                  onClick={handleWishlistClick}
-                 className={`w-20 rounded-[1.5rem] border ... ${
-                     isWishlisted ? 'border-rose-500/50 text-rose-500' : 'border-slate-700/50 text-slate-400'
+                 className={`mt-4 w-20 h-20 shrink-0 rounded-[1.5rem] flex items-center justify-center border transition-all ${
+                     isWishlisted ? 'border-rose-500/50 text-rose-500' : 'border-slate-700/50 text-slate-400 hover:text-rose-500'
                  }`}
              >
                  <svg className="w-6 h-6" fill={isWishlisted ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">

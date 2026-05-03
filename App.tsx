@@ -28,11 +28,18 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { enUS } from 'date-fns/locale';
 
 
-const ProductDetailRoute = ({ publishedProducts, addToCart, setView, navigate }: { 
-  publishedProducts: any[], 
-  addToCart: (p: any) => void, 
-  setView: (v: any) => void,
-  navigate: any 
+const ProductDetailRoute = ({
+  publishedProducts,
+  addToCart,
+  setView,
+  navigate,
+  currentUser,
+}: {
+  publishedProducts: any[];
+  addToCart: (p: any) => void;
+  setView: (v: any) => void;
+  navigate: any;
+  currentUser: any;
 }) => {
   const { id } = useParams();
   const product = publishedProducts.find(p => p && p.id && p.id.toString() === id);
@@ -49,16 +56,17 @@ const ProductDetailRoute = ({ publishedProducts, addToCart, setView, navigate }:
   }
 
   return (
-    <ProductDetail 
-      product={product} 
+    <ProductDetail
+      product={product}
+      currentUser={currentUser}
       onBack={() => {
-        navigate(-1); 
-        setView({ type: 'tab', activeTab: 'gaming-pcs' }); 
+        navigate(-1);
+        setView({ type: 'tab', activeTab: 'gaming-pcs' });
       }}
-      onAddToCart={addToCart} 
+      onAddToCart={addToCart}
     />
   );
-}
+};
 
 function App() {
   const [view, setView] = useState<ViewState>({ type: 'tab', activeTab: 'home' });
@@ -461,11 +469,12 @@ function App() {
             } />
 
           <Route path="/product/:id" element={
-            <ProductDetailRoute 
-              publishedProducts={publishedProducts} 
-              addToCart={addToCart} 
-              setView={setView} 
+            <ProductDetailRoute
+              publishedProducts={publishedProducts}
+              addToCart={addToCart}
+              setView={setView}
               navigate={navigate}
+              currentUser={currentUser}
             />
           } />
 
