@@ -8,12 +8,13 @@ import { trackProductView } from '../services/analyticsService';
 interface ProductGridProps {
   category: 'Gaming PCs' | 'Components' | 'Peripherals' | 'All';
   onProductClick: (product: Product) => void;
+  onAddToCart?: (product: Product) => void;
   searchQuery?: string;
   externalProducts?: Product[];
   currentUser: any;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, currentUser, searchQuery = '' }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, onAddToCart, currentUser, searchQuery = '' }) => {
   const [deployedProducts, setDeployedProducts] = useState<Product[]>([]);
 
   const loadPublished = () => {
@@ -86,7 +87,14 @@ const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, cur
         {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
             {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} onClick={handleProductClick} label="Product Info" currentUser={currentUser} /> 
+              <ProductCard
+                key={product.id}
+                product={product}
+                onClick={handleProductClick}
+                onAddToCart={onAddToCart}
+                label="Product Info"
+                currentUser={currentUser}
+              /> 
             ))}
           </div>
         ) : (

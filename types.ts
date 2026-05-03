@@ -6,6 +6,8 @@ export interface Review {
   rating: number;
   date: string;
   comment: string;
+  /** Email залогиненного автора; нужен, чтобы править/удалять только свои отзывы */
+  authorEmail?: string;
 }
 
 export type ProductStatus = 'In Stock' | 'Sold Out' | 'Pre-Order' | 'Limited Edition' | 'Coming Soon' | 'Backordered' | 'Discontinued';

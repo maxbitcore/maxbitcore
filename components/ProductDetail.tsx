@@ -8,6 +8,47 @@ import { useAuth } from '../contexts/AuthContext';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 import { CoverImage } from './CoverImage';
 
+/** Shown in the review "Your login" field for logged-in shoppers. */
+function pickReviewerDisplayName(propUser: any, ctxUser: any): string {
+  const u = propUser || ctxUser;
+  if (u && typeof u === 'object') {
+    const fn = String(u.firstName || '').trim();
+    const ln = String(u.lastName || '').trim();
+    const full = [fn, ln].filter(Boolean).join(' ').trim();
+    if (full) return full;
+    const un = String(u.username || '').trim();
+    if (un) return un;
+    const em = String(u.email || '').trim();
+    if (em) {
+      const local = em.split('@')[0]?.trim();
+      if (local) return local;
+      return em;
+    }
+  }
+  const { firstName, email } = getStoredAuth();
+  if (String(firstName || '').trim()) return String(firstName).trim();
+  const e = String(email || '').trim();
+  if (e) return e.split('@')[0]?.trim() || e;
+  return '';
+}
+
+function hasRegisteredSession(propUser: any, ctxUser: any): boolean {
+  if (propUser?.email || ctxUser?.email) return true;
+  const { token, email } = getStoredAuth();
+  return Boolean(token && email);
+}
+
+function sessionReviewerEmail(propUser: any, ctxUser: any): string {
+  return String(propUser?.email || ctxUser?.email || getStoredAuth().email || '')
+    .trim()
+    .toLowerCase();
+}
+
+function isReviewOwner(review: Review, sessionEmail: string): boolean {
+  if (!sessionEmail || !review.authorEmail) return false;
+  return String(review.authorEmail).trim().toLowerCase() === sessionEmail;
+}
+
 interface ProductDetailProps {
   product: Product;
   currentUser?: any;
@@ -58,7 +99,18 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
- 
+
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editComment, setEditComment] = useState('');
+  const [editRating, setEditRating] = useState(5);
+
+  const sessionEmail = sessionReviewerEmail(currentUserProp, authCtx?.currentUser);
+  const registered = hasRegisteredSession(currentUserProp, authCtx?.currentUser);
+  const hasOwnReview =
+    registered &&
+    Boolean(sessionEmail) &&
+    Boolean((product.reviews || []).some((r) => isReviewOwner(r as Review, sessionEmail)));
+
   useEffect(() => {
     setActiveImage(product.imageUrl);
     const em = (
@@ -70,53 +122,140 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     setIsWishlisted(em ? checkIsWishlisted(product.id, em) : false);
   }, [product, currentUserProp?.email, authCtx?.currentUser?.email, email]);
 
+  useEffect(() => {
+    const registered = hasRegisteredSession(currentUserProp, authCtx?.currentUser);
+    if (!registered) {
+      setReviewName('');
+      return;
+    }
+    setReviewName(pickReviewerDisplayName(currentUserProp, authCtx?.currentUser));
+  }, [
+    product.id,
+    currentUserProp?.email,
+    currentUserProp?.firstName,
+    currentUserProp?.lastName,
+    currentUserProp?.username,
+    authCtx?.currentUser?.email,
+    authCtx?.currentUser?.firstName,
+    authCtx?.currentUser?.lastName,
+    authCtx?.currentUser?.username,
+  ]);
+
   const handleAddToCart = () => {
     trackCartAddition(product.id);
     onAddToCart(product);
+  };
+
+  const persistReviews = async (nextReviews: Review[]) => {
+    const res = await fetch('https://www.maxbitcore.com/api/products.php');
+    if (!res.ok) throw new Error('Could not load products');
+    const freshProducts = await res.json();
+
+    const updatedProducts = freshProducts.map((p: Product) => {
+      if (p.id === product.id) {
+        return { ...p, reviews: nextReviews };
+      }
+      return p;
+    });
+
+    const saveRes = await fetch('https://www.maxbitcore.com/api/save_products.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedProducts),
+    });
+    if (!saveRes.ok) throw new Error('Could not save reviews');
+
+    localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedProducts));
+    product.reviews = nextReviews;
+    window.dispatchEvent(new CustomEvent('maxbit-update'));
   };
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reviewComment.trim()) return;
 
+    if (registered && sessionEmail && hasOwnReview) {
+      alert('You already left a review for this product. Edit or delete it in the list on the left.');
+      return;
+    }
+
     setIsSubmitting(true);
-    
+
     const newReview: Review = {
       id: `REV-${Date.now()}`,
       user: reviewName.trim() || (role === 'admin' ? 'System Admin' : 'Guest Operator'),
       rating: reviewRating,
       date: new Date().toLocaleDateString(),
-      comment: reviewComment.trim()
+      comment: reviewComment.trim(),
+      ...(registered && sessionEmail ? { authorEmail: sessionEmail } : {}),
     };
 
     const updatedReviews = [newReview, ...(product.reviews || [])];
 
     try {
-      const res = await fetch('https://www.maxbitcore.com/api/products.php');
-      const freshProducts = await res.json();
-
-      const updatedProducts = freshProducts.map((p: Product) => {
-        if (p.id === product.id) {
-          return { ...p, reviews: updatedReviews };
-        }
-        return p; 
-      });
-
-      await fetch('https://www.maxbitcore.com/api/save_products.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedProducts)
-      });
-      
-      localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedProducts));
+      await persistReviews(updatedReviews);
       logAction('CLICK', `Posted Review on ${product.name.replace(/<[^>]*>?/gm, '')}`);
-      
+
       setReviewComment('');
-      setReviewName('');
+      setReviewName(
+        hasRegisteredSession(currentUserProp, authCtx?.currentUser)
+          ? pickReviewerDisplayName(currentUserProp, authCtx?.currentUser)
+          : ''
+      );
       setReviewRating(5);
-      product.reviews = updatedReviews;
     } catch (error) {
-      console.error("Failed to sync report:", error);
+      console.error('Failed to sync report:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const startEditReview = (r: Review) => {
+    setEditingReviewId(r.id);
+    setEditComment(r.comment);
+    setEditRating(r.rating);
+  };
+
+  const cancelEditReview = () => {
+    setEditingReviewId(null);
+    setEditComment('');
+    setEditRating(5);
+  };
+
+  const saveEditReview = async () => {
+    if (!editingReviewId || !editComment.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const next = (product.reviews || []).map((r: Review) =>
+        r.id === editingReviewId
+          ? {
+              ...r,
+              comment: editComment.trim(),
+              rating: editRating,
+              date: `${new Date().toLocaleDateString()} (edited)`,
+            }
+          : r
+      );
+      await persistReviews(next);
+      logAction('CLICK', `Edited review on ${product.name.replace(/<[^>]*>?/gm, '')}`);
+      cancelEditReview();
+    } catch (error) {
+      console.error('Failed to save edited review:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!window.confirm('Delete this review? You cannot undo this.')) return;
+    setIsSubmitting(true);
+    try {
+      const next = (product.reviews || []).filter((r: Review) => r.id !== reviewId);
+      await persistReviews(next);
+      if (editingReviewId === reviewId) cancelEditReview();
+      logAction('CLICK', `Deleted review on ${product.name.replace(/<[^>]*>?/gm, '')}`);
+    } catch (error) {
+      console.error('Failed to delete review:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -216,7 +355,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                  isSoldOut ? 'bg-slate-800 text-slate-500' : 'maxbit-gradient text-slate-900'
                }`}
              >
-               {isSoldOut ? 'ARCHIVE DATA ONLY' : `ADD TO CART — $${product.price}`}
+               {isSoldOut ? 'Out of stock' : `Add to cart — $${product.price}`}
              </button>
              <button
                  type="button"
@@ -239,35 +378,129 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 {/* Left: Review List */}
                 <div className="lg:w-2/3 space-y-12">
                     <div className="flex items-center justify-between mb-12">
-                        <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase">Combat Reports</h2>
-                        <span className="bg-slate-900 px-6 py-2 rounded-full border border-slate-800 text-xs font-black text-cyan-500 uppercase tracking-widest">
-                            {product.reviews?.length || 0} Logs
+                        <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white">Customer reviews</h2>
+                        <span className="bg-slate-900 px-6 py-2 rounded-full border border-slate-800 text-xs font-semibold text-cyan-500 tracking-wide">
+                            {product.reviews?.length || 0}{' '}
+                            {(product.reviews?.length || 0) === 1 ? 'review' : 'reviews'}
                         </span>
                     </div>
 
                     <div className="space-y-8">
                         {product.reviews && product.reviews.length > 0 ? (
-                            product.reviews.map((review) => (
-                                <div key={review.id} className="bg-slate-900/30 border border-slate-800 p-8 rounded-[2rem] animate-fade-in-up">
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div>
-                                            <span className="font-black text-white uppercase italic tracking-tighter text-lg">{review.user}</span>
-                                            <div className="flex gap-1 text-cyan-400 mt-2">
-                                                {[...Array(5)].map((_, i) => (
-                                                    <svg key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-cyan-400' : 'fill-slate-800'}`} viewBox="0 0 20 20">
-                                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                                    </svg>
-                                                ))}
-                                            </div>
+                            product.reviews.map((raw) => {
+                              const review = raw as Review;
+                              const owned = registered && isReviewOwner(review, sessionEmail);
+                              const isEditing = editingReviewId === review.id;
+                              return (
+                                <div
+                                  key={review.id}
+                                  className="bg-slate-900/30 border border-slate-800 p-8 rounded-[2rem] animate-fade-in-up"
+                                >
+                                  <div className="flex justify-between items-start gap-4 mb-6">
+                                    <div>
+                                      <span className="font-black text-white uppercase italic tracking-tighter text-lg">
+                                        {review.user}
+                                      </span>
+                                      {!isEditing && (
+                                        <div className="flex gap-1 text-cyan-400 mt-2">
+                                          {[...Array(5)].map((_, i) => (
+                                            <svg
+                                              key={i}
+                                              className={`w-3 h-3 ${i < review.rating ? 'fill-cyan-400' : 'fill-slate-800'}`}
+                                              viewBox="0 0 20 20"
+                                            >
+                                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                            </svg>
+                                          ))}
                                         </div>
-                                        <span className="text-[10px] font-mono text-slate-600 uppercase">{review.date}</span>
+                                      )}
                                     </div>
-                                    <p className="text-slate-400 leading-relaxed font-medium">"{review.comment}"</p>
+                                    <div className="flex flex-col items-end gap-2 shrink-0 text-right">
+                                      <span className="text-[10px] font-mono text-slate-600 uppercase">
+                                        {review.date}
+                                      </span>
+                                      {owned && !isEditing && (
+                                        <div className="flex gap-4">
+                                          <button
+                                            type="button"
+                                            disabled={isSubmitting}
+                                            onClick={() => startEditReview(review)}
+                                            className="text-xs font-semibold text-cyan-400 hover:underline disabled:opacity-40"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={isSubmitting}
+                                            onClick={() => void handleDeleteReview(review.id)}
+                                            className="text-xs font-semibold text-rose-400 hover:underline disabled:opacity-40"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {isEditing ? (
+                                    <div className="space-y-4 border-t border-slate-800/80 pt-6">
+                                      <p className="text-xs font-medium text-slate-500">Editing your review</p>
+                                      <div>
+                                        <span className="text-sm font-medium text-slate-300 mb-2 block">
+                                          Rating (1–5)
+                                        </span>
+                                        <div className="flex gap-2">
+                                          {[1, 2, 3, 4, 5].map((num) => (
+                                            <button
+                                              key={num}
+                                              type="button"
+                                              onClick={() => setEditRating(num)}
+                                              className={`w-10 h-10 rounded-lg border transition-all flex items-center justify-center ${
+                                                editRating >= num
+                                                  ? 'bg-cyan-500 border-cyan-400 text-slate-950'
+                                                  : 'bg-slate-950 border-slate-800 text-slate-600 hover:border-slate-600'
+                                              }`}
+                                            >
+                                              <span className="font-black text-xs">{num}</span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <textarea
+                                        value={editComment}
+                                        onChange={(e) => setEditComment(e.target.value)}
+                                        rows={4}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 text-sm resize-none"
+                                      />
+                                      <div className="flex flex-wrap gap-3">
+                                        <button
+                                          type="button"
+                                          disabled={isSubmitting || !editComment.trim()}
+                                          onClick={() => void saveEditReview()}
+                                          className="px-5 py-2.5 rounded-xl bg-cyan-500 text-slate-950 text-sm font-bold hover:bg-white disabled:opacity-40"
+                                        >
+                                          Save changes
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isSubmitting}
+                                          onClick={cancelEditReview}
+                                          className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-slate-400 leading-relaxed font-medium">
+                                      &ldquo;{review.comment}&rdquo;
+                                    </p>
+                                  )}
                                 </div>
-                            ))
+                              );
+                            })
                         ) : (
                             <div className="py-20 text-center border-2 border-dashed border-slate-800 rounded-[2.5rem]">
-                                <p className="text-slate-600 font-black uppercase tracking-widest text-xs">No reports filed for this unit yet.</p>
+                                <p className="text-slate-600 font-medium text-sm">No reviews yet. Be the first to share your experience.</p>
                             </div>
                         )}
                     </div>
@@ -276,21 +509,37 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                 {/* Right: Review Form */}
                 <div className="lg:w-1/3">
                     <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] lg:sticky lg:top-24 h-fit bg-[#0b0f1a] z-10">
-                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-6">File Field Report</h3>
+                        <h3 className="text-xl font-bold text-white tracking-tight mb-2">Write a review</h3>
+                        <p className="text-sm text-slate-500 mb-6">Share how this product worked for you. Your login and comment will appear below.</p>
+                        {hasOwnReview ? (
+                          <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-6 text-sm text-slate-400 leading-relaxed">
+                            <p className="font-semibold text-white mb-2">You already reviewed this product</p>
+                            <p>
+                              Use <span className="text-cyan-400">Edit</span> or{' '}
+                              <span className="text-rose-400">Delete</span> next to your review in the list on the
+                              left.
+                            </p>
+                          </div>
+                        ) : (
                         <form onSubmit={handleSubmitReview} className="space-y-6">
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Tactical Callsign</label>
+                                <label htmlFor="review-display-name" className="text-sm font-medium text-slate-300 mb-2 block">Your login</label>
                                 <input 
+                                    id="review-display-name"
                                     type="text" 
-                                    placeholder={role === 'admin' ? 'System Administrator' : 'Enter Codename...'}
+                                    placeholder={
+                                      hasRegisteredSession(currentUserProp, authCtx?.currentUser)
+                                        ? 'Your login (editable)'
+                                        : 'e.g. Alex or nickname'
+                                    }
                                     value={reviewName}
                                     onChange={(e) => setReviewName(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 text-xs font-bold uppercase transition-all"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 text-sm transition-all placeholder:text-slate-600"
                                 />
                             </div>
                             
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Efficiency Rating</label>
+                                <label className="text-sm font-medium text-slate-300 mb-2 block">Rating (1 = poor, 5 = excellent)</label>
                                 <div className="flex gap-2">
                                     {[1, 2, 3, 4, 5].map((num) => (
                                         <button 
@@ -308,27 +557,29 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Intel Briefing</label>
+                                <label htmlFor="review-comment" className="text-sm font-medium text-slate-300 mb-2 block">Your comments</label>
                                 <textarea 
+                                    id="review-comment"
                                     required
                                     rows={4}
-                                    placeholder="Describe unit performance..."
+                                    placeholder="What did you like or dislike? Would you recommend it?"
                                     value={reviewComment}
                                     onChange={(e) => setReviewComment(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 text-xs font-bold uppercase transition-all resize-none"
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 text-sm transition-all resize-none placeholder:text-slate-600"
                                 />
                             </div>
 
                             <button 
                                 type="submit" 
                                 disabled={isSubmitting}
-                                className="w-full py-4 bg-cyan-500 text-slate-950 font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-white transition-all shadow-lg shadow-cyan-500/10"
+                                className="w-full py-4 bg-cyan-500 text-slate-950 font-bold text-sm rounded-xl hover:bg-white transition-all shadow-lg shadow-cyan-500/10"
                             >
-                                {isSubmitting ? 'TRANSMITTING...' : 'POST REPORT'}
+                                {isSubmitting ? 'Submitting…' : 'Submit review'}
                             </button>
                         </form>
-                        <p className="mt-6 text-[9px] text-slate-600 font-bold uppercase tracking-widest leading-relaxed text-center">
-                            By posting, you agree to technical debriefing protocols. Reports are publicly visible.
+                        )}
+                        <p className="mt-6 text-xs text-slate-500 leading-relaxed text-center">
+                            Your review will be public once it is posted. Please stay respectful and honest.
                         </p>
                     </div>
                 </div>

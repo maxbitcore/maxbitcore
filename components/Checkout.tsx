@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { sanitizeHtml } from '../services/sanitizeHtml';
@@ -29,6 +29,19 @@ function resolveApiBaseUrl(): string {
 }
 
 const apiBaseUrl = resolveApiBaseUrl();
+
+/** Match typed state name or 2-letter code to a US_STATES code (empty if ambiguous / no match). */
+function matchUsStateDraftToCode(draft: string): string {
+  const t = draft.trim().toLowerCase();
+  if (!t) return '';
+  const byCode = US_STATES.find((s) => s.code.toLowerCase() === t);
+  if (byCode) return byCode.code;
+  const byName = US_STATES.find((s) => s.name.toLowerCase() === t);
+  if (byName) return byName.code;
+  const starts = US_STATES.filter((s) => s.name.toLowerCase().startsWith(t));
+  if (starts.length === 1) return starts[0].code;
+  return '';
+}
 
 interface CheckoutProps {
   items: Product[];
@@ -66,14 +79,30 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
   const cityWrapRef = useRef<HTMLDivElement>(null);
   const skipCitySearchUntilRef = useRef(0);
 
+  const [stateDraft, setStateDraft] = useState('');
+  const [stateSuggestOpen, setStateSuggestOpen] = useState(false);
+  const stateWrapRef = useRef<HTMLDivElement>(null);
+  const skipStatePickBlurUntilRef = useRef(0);
+
   const applyParsedAddress = (p: ParsedPlaceAddress) => {
     setAddress(p.street);
     setCity(p.city);
     setZip(p.postal);
     if (p.countryCode === 'US' || !p.countryCode) {
-      setUsState(resolveUsStateCode(p.regionRaw));
+      const code = resolveUsStateCode(p.regionRaw);
+      setUsState(code);
+      const st = US_STATES.find((s) => s.code === code);
+      setStateDraft(st ? st.name : '');
     }
   };
+
+  const filteredUsStates = useMemo(() => {
+    const t = stateDraft.trim().toLowerCase();
+    if (!t) return US_STATES;
+    return US_STATES.filter(
+      (s) => s.name.toLowerCase().includes(t) || s.code.toLowerCase().includes(t)
+    );
+  }, [stateDraft]);
 
   useEffect(() => {
     if (step !== 'details') return;
@@ -112,7 +141,8 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
     if (Date.now() < skipCitySearchUntilRef.current) return;
 
     const q = city.trim();
-    if (q.length < 2) {
+    const minLen = usState ? 1 : 2;
+    if (q.length < minLen) {
       setCitySuggestions([]);
       setCitySuggestOpen(false);
       return;
@@ -147,10 +177,13 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
       if (cityWrapRef.current && !cityWrapRef.current.contains(t)) {
         setCitySuggestOpen(false);
       }
+      if (stateWrapRef.current && !stateWrapRef.current.contains(t)) {
+        setStateSuggestOpen(false);
+      }
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [addressSuggestOpen, citySuggestOpen]);
+  }, [addressSuggestOpen, citySuggestOpen, stateSuggestOpen]);
 
   const TAX_RATE = 0.0995; // 9.95%
   const checkoutItems = items.filter(
@@ -263,6 +296,20 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
 
 const handlePlaceOrder = async (e: React.FormEvent) => {
   e.preventDefault();
+
+  const resolvedState = usState || matchUsStateDraftToCode(stateDraft);
+  if (!resolvedState) {
+    alert(
+      'Please choose a valid U.S. state: type to filter the list, pick a row, or enter the full state name or 2-letter code.'
+    );
+    return;
+  }
+  if (resolvedState !== usState) {
+    const st = US_STATES.find((s) => s.code === resolvedState);
+    setUsState(resolvedState);
+    if (st) setStateDraft(st.name);
+  }
+
   setStep('processing');
 
   try {
@@ -511,22 +558,66 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 <div className="space-y-4">
                    <input type="hidden" name="shipping-country" value="US" />
                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <select
-                        id="checkout-shipping-state"
-                        name="shipping-region"
-                        autoComplete="shipping address-level1"
-                        required
-                        value={usState}
-                        onChange={(e) => setUsState(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white outline-none focus:border-cyan-500 transition-colors [&>option]:bg-slate-900 [&>option]:text-white"
-                      >
-                        <option value="">Select state</option>
-                        {US_STATES.map(({ code, name }) => (
-                          <option key={code} value={code}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
+                      <div ref={stateWrapRef} className="relative w-full sm:col-span-1">
+                        <input type="hidden" name="shipping-region" value={usState} readOnly />
+                        <input
+                          id="checkout-shipping-state"
+                          name="shipping-state-search"
+                          autoComplete="shipping address-level1"
+                          type="text"
+                          value={stateDraft}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setStateDraft(v);
+                            const cur = US_STATES.find((s) => s.code === usState);
+                            if (!cur || cur.name !== v.trim()) {
+                              setUsState('');
+                            }
+                            setStateSuggestOpen(true);
+                          }}
+                          onFocus={() => setStateSuggestOpen(true)}
+                          onBlur={() => {
+                            window.setTimeout(() => {
+                              if (Date.now() < skipStatePickBlurUntilRef.current) return;
+                              const code = matchUsStateDraftToCode(stateDraft);
+                              if (code) {
+                                const st = US_STATES.find((s) => s.code === code);
+                                if (st) {
+                                  setUsState(code);
+                                  setStateDraft(st.name);
+                                }
+                              }
+                              setStateSuggestOpen(false);
+                            }, 180);
+                          }}
+                          placeholder="State (type to search)"
+                          className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
+                        />
+                        {stateSuggestOpen && filteredUsStates.length > 0 && (
+                          <ul
+                            role="listbox"
+                            className="absolute z-40 mt-1 max-h-48 w-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
+                          >
+                            {filteredUsStates.map((s) => (
+                              <li key={s.code} role="option">
+                                <button
+                                  type="button"
+                                  className="w-full px-4 py-2.5 text-left text-xs text-slate-200 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    skipStatePickBlurUntilRef.current = Date.now() + 800;
+                                    setUsState(s.code);
+                                    setStateDraft(s.name);
+                                    setStateSuggestOpen(false);
+                                  }}
+                                >
+                                  {s.name} <span className="text-slate-500">({s.code})</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                       <div ref={cityWrapRef} className="relative w-full sm:col-span-1">
                         <input
                           id="checkout-shipping-city"
@@ -539,9 +630,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                             setCity(e.target.value);
                             setCitySuggestOpen(true);
                           }}
-                          onFocus={() => {
-                            if (citySuggestions.length > 0) setCitySuggestOpen(true);
-                          }}
+                          onFocus={() => setCitySuggestOpen(true)}
                           placeholder="City (type to search)"
                           className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                         />

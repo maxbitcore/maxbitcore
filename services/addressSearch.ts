@@ -139,7 +139,9 @@ export async function searchPhotonCities(
   options?: { countryCode?: string; usStateCode?: string }
 ): Promise<CitySuggestion[]> {
   let q = query.trim();
-  if (q.length < 2) return [];
+  if (q.length < 1) return [];
+  // Single-letter queries are noisy without state context; allow them when a US state is selected.
+  if (q.length < 2 && !(options?.countryCode === 'US' && options.usStateCode)) return [];
 
   if (options?.countryCode === 'US' && options.usStateCode) {
     const stateName = US_STATES.find((s) => s.code === options.usStateCode)?.name;

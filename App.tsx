@@ -334,6 +334,7 @@ function App() {
                   key={product.id} 
                   product={product} 
                   onClick={(p) => navigate(`/product/${p.id}`)} 
+                  onAddToCart={addToCart}
                   currentUser={currentUser}
                 />
               ))}
@@ -429,6 +430,7 @@ function App() {
                 onProductClick={(p) => {
                   navigate(`/product/${p.id}`);
                 }}
+                onAddToCart={addToCart}
                 searchQuery={searchQuery} 
                 externalProducts={filteredProducts}
                 currentUser={currentUser}
@@ -441,6 +443,7 @@ function App() {
                 onProductClick={(p) => {
                   navigate(`/product/${p.id}`);
                 }}
+                onAddToCart={addToCart}
                 searchQuery={searchQuery} 
                 externalProducts={filteredProducts} 
                 currentUser={currentUser}
@@ -453,6 +456,7 @@ function App() {
                 onProductClick={(p) => {
                   navigate(`/product/${p.id}`);
                 }}
+                onAddToCart={addToCart}
                 searchQuery={searchQuery} 
                 externalProducts={filteredProducts} 
                 currentUser={currentUser}

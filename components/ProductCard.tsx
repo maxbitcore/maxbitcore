@@ -8,11 +8,13 @@ import { CoverImage } from './CoverImage';
 interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
+  /** Adds item to cart / opens checkout tray; card click still opens product page */
+  onAddToCart?: (product: Product) => void;
   label?: string;
   currentUser: any;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onAddToCart, currentUser }) => {
   const [isWishlisted, setIsWishlisted] = useState(() => 
     currentUser?.email ? checkIsWishlisted(product.id, currentUser.email) : false
   );
@@ -34,6 +36,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
     const newState = toggleWishlist(product, currentUser?.email || "");
     setIsWishlisted(newState);
   };
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (product.status === 'Sold Out' || !onAddToCart) return;
+    onAddToCart(product);
+  };
+
+  const plusVisual =
+    product.status === 'Sold Out'
+      ? 'bg-slate-800 text-slate-600'
+      : 'bg-slate-800/50 border border-slate-700/50 group-hover:bg-cyan-500 text-slate-400 group-hover:text-slate-950 group-hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] group-hover:border-cyan-400';
 
   return (
     <div 
@@ -99,6 +112,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
             <div className="flex gap-2">
                 {/* Wishlist */}
                 <button 
+                    type="button"
                     onClick={handleToggle} 
                     className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${
                         isWishlisted ? 'border-rose-500/50 text-rose-500' : 'border-slate-700/50 text-slate-400 hover:text-rose-500'
@@ -108,13 +122,26 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, currentUser
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
                 </button>
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-700 ${
-                    product.status === 'Sold Out' ? 'bg-slate-800 text-slate-600' : 'bg-slate-800/50 border border-slate-700/50 group-hover:bg-cyan-500 text-slate-400 group-hover:text-slate-950 group-hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] group-hover:border-cyan-400'
-                }`}>
+                {onAddToCart ? (
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={product.status === 'Sold Out'}
+                    aria-label="Add to cart"
+                    title={product.status === 'Sold Out' ? 'Out of stock' : 'Add to cart'}
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-700 disabled:opacity-50 disabled:cursor-not-allowed ${plusVisual}`}
+                  >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                     </svg>
-                </div>
+                  </button>
+                ) : (
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-700 ${plusVisual}`}>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                )}
             </div>
         </div>
       </div>
