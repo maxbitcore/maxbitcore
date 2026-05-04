@@ -49,6 +49,87 @@ function isReviewOwner(review: Review, sessionEmail: string): boolean {
   return String(review.authorEmail).trim().toLowerCase() === sessionEmail;
 }
 
+/** "CPU: AMD …" style lines after stripping simple HTML */
+const SPEC_LABEL_LINE = /^([^:]+):\s*(.+)$/;
+
+function roughTextLinesFromSanitizedHtml(html: string): string[] {
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])\s*>/gi, '\n')
+    .replace(/<(p|div|li|h[1-6])[^>]*>/gi, '');
+  const stripped = withBreaks
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#160;/gi, ' ')
+    .replace(/\u00a0/g, ' ');
+  return stripped
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+/** One paragraph may list "CPU: … GPU: …" separated by spaces */
+function splitDenseSpecSegments(line: string): string[] {
+  const parts = line.split(/\s+(?=[A-Za-z][A-Za-z0-9]*\s*:)/);
+  if (parts.length <= 1) return [line];
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+
+function expandToSpecLines(sanitizedHtml: string): string[] {
+  const rough = roughTextLinesFromSanitizedHtml(sanitizedHtml);
+  const out: string[] = [];
+  for (const line of rough) {
+    out.push(...splitDenseSpecSegments(line));
+  }
+  return out;
+}
+
+function shouldRenderComponentsAsSpecLines(sanitizedHtml: string): boolean {
+  const lines = expandToSpecLines(sanitizedHtml);
+  if (lines.length === 0) return false;
+  return lines.every((l) => SPEC_LABEL_LINE.test(l));
+}
+
+function CoreComponentsBody({ rawHtml }: { rawHtml: string }) {
+  const sanitized = sanitizeHtml(rawHtml);
+  if (!sanitized.trim()) return null;
+
+  if (shouldRenderComponentsAsSpecLines(sanitized)) {
+    const lines = expandToSpecLines(sanitized);
+    return (
+      <ul className="m-0 list-none space-y-0 p-0">
+        {lines.map((line, idx) => {
+          const m = line.match(SPEC_LABEL_LINE);
+          if (!m) return null;
+          return (
+            <li
+              key={idx}
+              className="grid gap-1 border-b border-slate-800/60 py-3 first:pt-0 last:border-b-0 sm:grid-cols-[minmax(0,10.5rem)_1fr] sm:gap-x-5"
+            >
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-500">
+                {m[1].trim()}
+              </span>
+              <span className="text-sm font-bold uppercase tracking-wide text-slate-100">{m[2].trim()}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div
+      className="space-y-2 text-sm font-bold uppercase tracking-wide leading-relaxed text-slate-200
+        [&_p]:mb-2 [&_p:last-child]:mb-0
+        [&_strong]:text-cyan-400 [&_strong]:font-black
+        [&_b]:text-cyan-400 [&_b]:font-black
+        [&_em]:text-teal-400/90
+        [&_a]:text-cyan-400 hover:[&_a]:underline"
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+    />
+  );
+}
+
 interface ProductDetailProps {
   product: Product;
   currentUser?: any;
@@ -335,10 +416,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                <div className="mb-8">
                   <h3 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-4">Core Components</h3>
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
-                    <div 
-                      className="text-slate-300 text-sm font-bold uppercase tracking-wide leading-relaxed prose prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.components) }}
-                    />
+                    <CoreComponentsBody rawHtml={product.components} />
                   </div>
                </div>
              )}

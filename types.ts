@@ -47,6 +47,8 @@ export interface BuildSubmission {
   aesthetic: string;
   resolution: string;
   requirements: string;
+  /** Extra admin-defined configurator sections (camelCase key → selected label). */
+  customOptions?: Record<string, string>;
   status?: string;
 }
 

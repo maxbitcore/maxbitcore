@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BuildSubmission } from '../types';
-import { sendBuildRequestEmail } from '../services/emailService';
+import {
+  BUILTIN_CONFIGURATOR_OPTION_KEY_SET,
+  formatConfiguratorSectionTitle,
+  normalizeStoredConfiguratorConfig,
+} from '../services/configuratorOptions';
 
 // Default Data Constants (Fallbacks)
 const DEFAULT_CONFIG = {
@@ -135,9 +139,10 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [activeSections, setActiveSections] = useState<string[]>([]);
   const [hoveredSize, setHoveredSize] = useState<string | null>(null);
   
-  // Dynamic Configuration State
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  // Dynamic Configuration State (built-in defaults + admin lists + custom sections)
+  const [config, setConfig] = useState(() => ({ ...DEFAULT_CONFIG }));
   const [caseImages, setCaseImages] = useState<Record<string, string>>(DEFAULT_CASE_IMAGES);
+  const [customSelections, setCustomSelections] = useState<Record<string, string>>({});
   
   // Input states
   const [userName, setUserName] = useState('');
@@ -158,24 +163,29 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [resolution, setResolution] = useState('Not Specified');
 
   const loadConfig = () => {
-    // Load custom configuration if available
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
     if (storedConfig) {
       try {
         const parsed = JSON.parse(storedConfig);
-        setConfig(prev => ({ ...prev, ...parsed }));
+        const normalized = normalizeStoredConfiguratorConfig(parsed);
+        setConfig({ ...DEFAULT_CONFIG, ...normalized } as typeof DEFAULT_CONFIG);
       } catch (e) {
-        console.error("Failed to load configurator options", e);
+        console.error('Failed to load configurator options', e);
       }
+    } else {
+      setConfig({ ...DEFAULT_CONFIG });
     }
 
-    // Load custom case images
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
     if (storedCaseStyles) {
-        setCaseImages(prev => ({
-            ...prev,
-            ...JSON.parse(storedCaseStyles)
+      try {
+        setCaseImages((prev) => ({
+          ...prev,
+          ...JSON.parse(storedCaseStyles),
         }));
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -200,6 +210,27 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     if (em) setUserEmail(em.toLowerCase());
   }, [currentUser]);
 
+  const extraConfiguratorKeys = useMemo(
+    () =>
+      Object.keys(config as object).filter(
+        (k) => !BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(k) && Array.isArray((config as Record<string, unknown>)[k])
+      ),
+    [config]
+  );
+
+  useEffect(() => {
+    setCustomSelections((prev) => {
+      const next: Record<string, string> = { ...prev };
+      for (const k of extraConfiguratorKeys) {
+        if (!(k in next)) next[k] = 'Not Specified';
+      }
+      for (const k of Object.keys(next)) {
+        if (!extraConfiguratorKeys.includes(k)) delete next[k];
+      }
+      return next;
+    });
+  }, [extraConfiguratorKeys]);
+
   const resetConfiguratorForm = useCallback(() => {
     setPurpose('Not Specified');
     setSelectedCPUBrand('Not Specified');
@@ -215,6 +246,13 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     setRequirements('');
     setActiveSections([]);
     setHoveredSize(null);
+    setCustomSelections((prev) => {
+      const next: Record<string, string> = {};
+      for (const k of Object.keys(prev)) {
+        next[k] = 'Not Specified';
+      }
+      return next;
+    });
 
     if (currentUser) {
       const full = getFullNameForConfigurator(currentUser);
@@ -260,6 +298,13 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     e.preventDefault();
     setIsLoading(true);
 
+    const customOpts =
+      extraConfiguratorKeys.length > 0
+        ? Object.fromEntries(
+            extraConfiguratorKeys.map((k) => [k, customSelections[k] || 'Not Specified'])
+          )
+        : undefined;
+
     const newSubmission: BuildSubmission = {
       id: `PROTOCOL-${Date.now()}`,
       timestamp: Date.now(),
@@ -278,6 +323,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
       aesthetic,
       resolution,
       requirements,
+      ...(customOpts && Object.keys(customOpts).length ? { customOptions: customOpts } : {}),
     };
 
     const persistAndFinish = () => {
@@ -537,6 +583,38 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
                   ))}
                 </div>
               </AccordionSection>
+
+              {extraConfiguratorKeys.map((key) => {
+                const opts = ((config as Record<string, unknown>)[key] as string[]) || [];
+                const val = customSelections[key] || 'Not Specified';
+                return (
+                  <AccordionSection
+                    key={key}
+                    id={key}
+                    title={formatConfiguratorSectionTitle(key)}
+                    value={val}
+                    isOpen={activeSections.includes(key)}
+                    onToggle={toggleSection}
+                  >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {[...opts, 'Not Specified'].map((opt) => (
+                        <button
+                          key={`${key}-${opt}`}
+                          type="button"
+                          onClick={() => setCustomSelections((s) => ({ ...s, [key]: opt }))}
+                          className={`py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                            val === opt
+                              ? 'border-[#00c2a8] bg-[#00c2a8]/10 text-[#00c2a8]'
+                              : 'border-slate-800 bg-[#0b0f1a] text-slate-500 hover:border-slate-700'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </AccordionSection>
+                );
+              })}
 
             </div>
           </div>

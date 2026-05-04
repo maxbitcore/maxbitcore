@@ -36,14 +36,22 @@ export const sendBuildRequestEmail = async (buildData: any) => {
         deadline: buildData.deadline,
         purpose: buildData.purpose,
   
-        hardware_summary: `
+        hardware_summary: (() => {
+          const base = `
           CPU Brand: ${buildData.cpu}
           GPU: ${buildData.gpu} (${buildData.manufacturer})
           Storage: ${buildData.ssd}
           Case: ${buildData.caseSize} / ${buildData.caseType}
           Aesthetic: ${buildData.aesthetic}
           Resolution: ${buildData.resolution}
-        `,
+        `;
+          const extra = buildData.customOptions;
+          if (!extra || typeof extra !== 'object') return base;
+          const lines = Object.entries(extra)
+            .map(([k, v]) => `          ${k}: ${v}`)
+            .join('\n');
+          return `${base}\n          ---\n${lines}\n`;
+        })(),
         requirements: buildData.requirements || 'No specific requirements',
         timestamp: new Date(buildData.timestamp).toLocaleString(),
       },

@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BuildSubmission, Product, ProductStatus, Review } from '../types';
 import { getAnalytics, AnalyticsData, OrderRecord, VisitorSession } from '../services/analyticsService';
+import {
+  BUILTIN_CONFIGURATOR_OPTION_KEYS,
+  BUILTIN_CONFIGURATOR_OPTION_KEY_SET,
+  DEFAULT_CONFIGURATOR_STRING_LISTS,
+  formatConfiguratorSectionTitle,
+  normalizeStoredConfiguratorConfig,
+  sanitizeNewConfiguratorSectionKey,
+} from '../services/configuratorOptions';
 import { loginUser, registerUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
@@ -52,18 +60,6 @@ function trafficGroupKey(session: VisitorSession): string {
   if (u === 'registered_user') return '__registered__';
   return u;
 }
-
-const DEFAULT_CONFIG = {
-  purposes: ['Gaming', 'Classic', 'Universal', 'Working'],
-  cpuBrands: ['Intel', 'AMD'],
-  gpuBrands: ['NVIDIA', 'RADEON'],
-  gpuManufacturers: ['ASUS', 'MSI', 'Gigabyte', 'Sapphire', 'ASRock'],
-  ssdSizes: ['1TB', '2TB', '4TB'],
-  caseSizes: ['Mid-Tower', 'Full Tower', 'Mini-ITX'],
-  caseTypes: ['Panoramic', 'Airflow', 'Stealth', 'Dual-Chamber'],
-  aesthetics: ['Stealth Black', 'Alpine White', 'Black RGB', 'White RGB'],
-  resolutions: ['1080p (FHD)', '1440p (QHD)', '2160p (4K)']
-};
 
 interface AdminDashboardProps {
   showRegister: boolean;      
@@ -236,8 +232,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [newProductDesc, setNewProductDesc] = useState('');
 
   // Configurator Assets State
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<Record<string, string[]>>(() => ({
+    ...DEFAULT_CONFIGURATOR_STRING_LISTS,
+  }));
   const [configDrafts, setConfigDrafts] = useState<Record<string, string>>({});
+  const [newSectionKeyDraft, setNewSectionKeyDraft] = useState('');
   const [caseStyles, setCaseStyles] = useState<Record<string, string>>({});
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
@@ -409,12 +408,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       loadAllData();
     }
     const storedConfig = localStorage.getItem('maxbit_configurator_options');
-    const parsedConfig = storedConfig ? JSON.parse(storedConfig) : DEFAULT_CONFIG;
-    setConfig(parsedConfig);
-    setConfigDrafts((Object.keys(DEFAULT_CONFIG) as Array<keyof typeof DEFAULT_CONFIG>).reduce((acc, key) => {
-      acc[key] = '';
-      return acc;
-    }, {} as Record<string, string>));
+    let parsed: unknown = null;
+    if (storedConfig) {
+      try {
+        parsed = JSON.parse(storedConfig);
+      } catch {
+        parsed = null;
+      }
+    }
+    setConfig(normalizeStoredConfiguratorConfig(parsed));
+    setConfigDrafts({});
 
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
     if (storedCaseStyles) setCaseStyles(JSON.parse(storedCaseStyles));
@@ -628,9 +631,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   };
 
   // Asset Management Helpers
-  const updateConfigList = (key: keyof typeof DEFAULT_CONFIG, values: string[]) => {
+  const updateConfigList = (key: string, values: string[]) => {
     const normalizedValues = values
-      .map(v => String(v || '').trim())
+      .map((v) => String(v || '').trim())
       .filter(Boolean);
     const newConfig = { ...config, [key]: normalizedValues };
     setConfig(newConfig);
@@ -638,17 +641,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     notifyUpdate();
   };
 
-  const addConfigOption = (key: keyof typeof DEFAULT_CONFIG) => {
+  const addConfigOption = (key: string) => {
     const draftValue = (configDrafts[key] || '').trim();
     if (!draftValue) return;
-    if (config[key].includes(draftValue)) return;
-    updateConfigList(key, [...config[key], draftValue]);
-    setConfigDrafts(prev => ({ ...prev, [key]: '' }));
+    const list = config[key] || [];
+    if (list.includes(draftValue)) return;
+    updateConfigList(key, [...list, draftValue]);
+    setConfigDrafts((prev) => ({ ...prev, [key]: '' }));
   };
 
-  const removeConfigOption = (key: keyof typeof DEFAULT_CONFIG, item: string) => {
-    updateConfigList(key, config[key].filter(v => v !== item));
+  const removeConfigOption = (key: string, item: string) => {
+    const list = config[key] || [];
+    updateConfigList(
+      key,
+      list.filter((v) => v !== item)
+    );
   };
+
+  const addConfiguratorSection = () => {
+    const key = sanitizeNewConfiguratorSectionKey(newSectionKeyDraft);
+    if (!key) {
+      alert('Use camelCase: starts with a letter, then letters/numbers only (e.g. coolingTypes).');
+      return;
+    }
+    if (BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(key)) {
+      alert('That name is reserved for a built-in section.');
+      return;
+    }
+    if (key in config) {
+      alert('A section with this key already exists.');
+      return;
+    }
+    updateConfigList(key, []);
+    setNewSectionKeyDraft('');
+  };
+
+  const removeConfiguratorSection = (key: string) => {
+    if (BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(key)) return;
+    if (!window.confirm(`Remove section "${formatConfiguratorSectionTitle(key)}" and all its options?`)) return;
+    const next = { ...config };
+    delete next[key];
+    setConfig(next);
+    localStorage.setItem('maxbit_configurator_options', JSON.stringify(next));
+    setConfigDrafts((prev) => {
+      const d = { ...prev };
+      delete d[key];
+      return d;
+    });
+    notifyUpdate();
+  };
+
+  const configuratorSectionKeys = useMemo(() => {
+    const keys = Object.keys(config);
+    const builtins = BUILTIN_CONFIGURATOR_OPTION_KEYS.filter((k) => keys.includes(k));
+    const extras = keys
+      .filter((k) => !BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(k))
+      .sort((a, b) => a.localeCompare(b));
+    return [...builtins, ...extras];
+  }, [config]);
 
   const handleAssetImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -909,13 +959,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                       <div className="space-y-8">
                         <h2 className="text-xl font-black text-white italic uppercase pl-2">Configurator Options</h2>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
-                          {(Object.keys(DEFAULT_CONFIG) as Array<keyof typeof DEFAULT_CONFIG>).map((key) => (
+                          <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">
+                              New section (internal key, camelCase — e.g. coolingTypes)
+                            </label>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                value={newSectionKeyDraft}
+                                onChange={(e) => setNewSectionKeyDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addConfiguratorSection();
+                                  }
+                                }}
+                                placeholder="coolingTypes"
+                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[10px] font-mono text-white outline-none focus:border-cyan-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={addConfiguratorSection}
+                                className="px-4 py-2 rounded-lg bg-cyan-500 text-slate-950 text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-all shrink-0"
+                              >
+                                Add section
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest pl-1">
+                              Then add choices below. Built-in sections cannot be removed.
+                            </p>
+                          </div>
+                          {configuratorSectionKeys.map((key) => (
                             <div key={key} className="space-y-2">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
+                              <div className="flex items-center justify-between gap-2 ml-1">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                  {formatConfiguratorSectionTitle(key)}
+                                  <span className="text-slate-700 font-mono normal-case tracking-normal ml-2">{key}</span>
+                                </label>
+                                {!BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(key) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeConfiguratorSection(key)}
+                                    className="text-[9px] font-black uppercase tracking-widest text-rose-500/80 hover:text-rose-400"
+                                  >
+                                    Remove section
+                                  </button>
+                                )}
+                              </div>
                               <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-3">
                                 <div className="flex flex-wrap gap-2 min-h-[34px]">
-                                  {config[key].map((item) => (
-                                    <span key={`${key}-${item}`} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[9px] font-black uppercase tracking-widest text-white">
+                                  {(config[key] || []).map((item) => (
+                                    <span
+                                      key={`${key}-${item}`}
+                                      className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[9px] font-black uppercase tracking-widest text-white"
+                                    >
                                       {item}
                                       <button
                                         type="button"
@@ -931,7 +1027,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                                 <div className="flex gap-2">
                                   <input
                                     value={configDrafts[key] || ''}
-                                    onChange={(e) => setConfigDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+                                    onChange={(e) => setConfigDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
                                         e.preventDefault();
