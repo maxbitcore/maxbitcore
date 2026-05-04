@@ -186,8 +186,19 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
           id: response.id || response.user_id || response.user?.id,
           email: resolvedEmail,
           role: response.role || 'user',
-          firstName: response.firstName || response.user?.firstName || 'User',
-          lastName: response.lastName || response.user?.lastName,
+          firstName:
+            response.firstName ||
+            response.user?.firstName ||
+            (response.user as any)?.first_name ||
+            'User',
+          lastName:
+            response.lastName ||
+            response.user?.lastName ||
+            (response.user as any)?.last_name ||
+            (response.user as any)?.surname ||
+            (response as any).last_name ||
+            (response as any).surname ||
+            '',
           username: response.username || response.user?.username || username,
           ...(resolvedJoined ? { joined: resolvedJoined } : {}),
         };

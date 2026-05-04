@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BuildSubmission, Product, ProductStatus, Review } from '../types';
-import { getAnalytics, AnalyticsData, saveAnalytics, OrderRecord, VisitorSession } from '../services/analyticsService';
+import { getAnalytics, AnalyticsData, OrderRecord, VisitorSession } from '../services/analyticsService';
 import { loginUser, registerUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
@@ -19,6 +19,39 @@ const TACTICAL_PALETTE = [
   { color: '#84cc16', name: 'Electric Lime' },
   { color: '#10b981', name: 'Emerald Blade' },
 ];
+
+function formatTrafficDateTime(ms: number | undefined): string {
+  const t = Number(ms);
+  if (!Number.isFinite(t) || t <= 0) return '—';
+  try {
+    return new Date(t).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return '—';
+  }
+}
+
+function trafficSessionDurationSec(session: VisitorSession): number {
+  const start = Number(session.startTime) || 0;
+  const end = Number(session.lastActive) || start;
+  if (!start) return 0;
+  return Math.max(0, Math.round((end - start) / 1000));
+}
+
+/** Stable key to merge repeat visits from the same actor in Live Traffic. */
+function trafficGroupKey(session: VisitorSession): string {
+  const u = String(session?.user || '').trim().toLowerCase();
+  if (!u || u === 'guest') return '__guest__';
+  if (u === 'admin') return '__admin__';
+  if (u === 'registered_user') return '__registered__';
+  return u;
+}
 
 const DEFAULT_CONFIG = {
   purposes: ['Gaming', 'Classic', 'Universal', 'Working'],
@@ -214,7 +247,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
   const [trafficRange, setTrafficRange] = useState<'recent' | 'month'>('recent');
- 
+  const [expandedTrafficGroups, setExpandedTrafficGroups] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const assetImageRef = useRef<HTMLInputElement>(null);
@@ -388,23 +421,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     
     const analyticsData = getAnalytics();
     setAnalytics(analyticsData);
-    const currentSession: VisitorSession = {
-      id: `ADMIN-${Date.now()}`,
-      user: 'ADMIN',           
-      startTime: Date.now(),
-      lastActive: Date.now(),  
-      pagesVisited: ['/admin-dashboard'],
-      date: new Date().toISOString().split('T')[0],
-      actions: []
-    };
-
-    const updatedAnalytics: AnalyticsData = {
-      ...analyticsData,
-      sessions: [...(analyticsData.sessions || []), currentSession],
-    };
-
-    saveAnalytics(updatedAnalytics); 
-    setAnalytics(updatedAnalytics);
 
     window.addEventListener('maxbit-update', loadAllData);
     return () => window.removeEventListener('maxbit-update', loadAllData);
@@ -698,20 +714,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     return { guests, admins, registered, total: sessions.length };
   }, [analytics?.sessions]);
 
-  const trafficSessions = useMemo(() => {
-    const sessions = (analytics?.sessions || []).slice().sort((a: any, b: any) => {
+  const trafficSessionsFiltered = useMemo(() => {
+    const raw = (analytics?.sessions || []).slice() as VisitorSession[];
+    const sessions = raw.filter((s) => {
+      const id = String(s?.id || '');
+      const user = String(s?.user || '').trim().toUpperCase();
+      if (id.startsWith('ADMIN-') && user === 'ADMIN') return false;
+      return true;
+    });
+
+    sessions.sort((a, b) => {
       const aTime = Number(a?.lastActive || a?.startTime || 0);
       const bTime = Number(b?.lastActive || b?.startTime || 0);
       return bTime - aTime;
     });
 
     if (trafficRange === 'month') {
-      const monthAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-      return sessions.filter((session: any) => Number(session?.lastActive || session?.startTime || 0) >= monthAgo);
+      const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      return sessions.filter((s) => Number(s?.lastActive || s?.startTime || 0) >= monthAgo);
     }
 
-    return sessions.slice(0, 6);
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return sessions.filter((s) => Number(s?.lastActive || s?.startTime || 0) >= weekAgo).slice(0, 120);
   }, [analytics?.sessions, trafficRange]);
+
+  const trafficGroups = useMemo(() => {
+    const map = new Map<string, VisitorSession[]>();
+    for (const s of trafficSessionsFiltered) {
+      const k = trafficGroupKey(s);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(s);
+    }
+    for (const arr of map.values()) {
+      arr.sort(
+        (a, b) =>
+          Number(b.lastActive || b.startTime || 0) - Number(a.lastActive || a.startTime || 0)
+      );
+    }
+    const list = [...map.entries()].map(([key, sessions]) => ({
+      key,
+      sessions,
+      latest: sessions[0],
+      count: sessions.length,
+    }));
+    list.sort((a, b) => {
+      const ta = Number(a.latest?.lastActive || a.latest?.startTime || 0);
+      const tb = Number(b.latest?.lastActive || b.latest?.startTime || 0);
+      return tb - ta;
+    });
+    return trafficRange === 'month' ? list.slice(0, 200) : list.slice(0, 24);
+  }, [trafficSessionsFiltered, trafficRange]);
 
   return (
     <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
@@ -1244,51 +1296,128 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                       </button>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    {trafficSessions.map((session: any, idx: number) => (
-                      (() => {
-                        const identity = String(session?.user || '').trim();
-                        const normalized = identity.toLowerCase();
-                        const isAdmin = normalized === 'admin';
-                        const isGuest = !normalized || normalized === 'guest';
-                        const label = isAdmin
-                          ? 'Admin'
-                          : isGuest
-                            ? 'Guest'
+                  <div className="space-y-1">
+                    {trafficGroups.map((group) => {
+                      const session = group.latest;
+                      const identity = String(session?.user || '').trim();
+                      const normalized = identity.toLowerCase();
+                      const isAdmin = normalized === 'admin';
+                      const isGuest = !normalized || normalized === 'guest';
+                      const isRegisteredToken = normalized === 'registered_user';
+                      const label = isAdmin
+                        ? 'Admin'
+                        : isGuest
+                          ? 'Guest'
+                          : isRegisteredToken
+                            ? 'Registered User'
                             : 'Registered User';
-                        const badgeClass = isAdmin
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          : isGuest
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-                        const displayIdentity = isGuest || isAdmin
-                          ? label
-                          : identity.includes('@')
-                            ? identity
-                            : `${identity}`;
+                      const badgeClass = isAdmin
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        : isGuest
+                          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                      const displayIdentity = isGuest || isAdmin
+                        ? label
+                        : identity.includes('@')
+                          ? identity
+                          : label;
+                      const expanded = !!expandedTrafficGroups[group.key];
+                      const canExpand = group.count > 1;
+                      const lastMs = Number(session.lastActive || session.startTime || 0);
+                      const dur = trafficSessionDurationSec(session);
 
-                        return (
-                      <div key={idx} className="flex items-center justify-between text-[10px] p-3 border-b border-slate-800/50 last:border-0">
-                        <div className="flex items-center gap-3">
-                          <div className="p-1 bg-slate-800 rounded text-slate-400">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      return (
+                        <div
+                          key={group.key}
+                          className="border-b border-slate-800/50 last:border-0 rounded-lg overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between text-[10px] p-3 gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {canExpand ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedTrafficGroups((prev) => ({
+                                      ...prev,
+                                      [group.key]: !prev[group.key],
+                                    }))
+                                  }
+                                  className="p-1 rounded-md text-slate-500 hover:text-cyan-400 hover:bg-slate-800/80 shrink-0"
+                                  aria-expanded={expanded}
+                                  title={expanded ? 'Collapse visits' : 'Expand all visits'}
+                                >
+                                  <svg
+                                    className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span className="w-6 shrink-0" aria-hidden />
+                              )}
+                              <div className="p-1 bg-slate-800 rounded text-slate-400 shrink-0">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                              </div>
+                              <span className="font-mono text-slate-300 truncate">{displayIdentity}</span>
+                              <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest shrink-0 ${badgeClass}`}>
+                                {label}
+                              </span>
+                              {canExpand && (
+                                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest shrink-0">
+                                  {group.count} visits
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 shrink-0 text-right">
+                              <span className="px-2 py-0.5 bg-slate-950 text-slate-500 rounded border border-slate-800 font-black whitespace-nowrap">
+                                {dur}s active
+                              </span>
+                              <span className="text-slate-500 font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
+                                {formatTrafficDateTime(lastMs)}
+                              </span>
+                            </div>
                           </div>
-                          <span className="font-mono text-slate-300 max-w-[170px] truncate">{displayIdentity}</span>
-                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${badgeClass}`}>
-                            {label}
-                          </span>
+                          {canExpand && expanded && (
+                            <div className="pl-10 pr-3 pb-3 pt-0 space-y-2 border-t border-slate-800/40 bg-slate-950/30">
+                              {group.sessions.map((vis) => {
+                                const startMs = Number(vis.startTime || 0);
+                                const endMs = Number(vis.lastActive || vis.startTime || 0);
+                                const d = trafficSessionDurationSec(vis);
+                                const sid = String(vis.id || '').slice(0, 18);
+                                return (
+                                  <div
+                                    key={vis.id}
+                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[9px] text-slate-500 font-mono border border-slate-800/60 rounded-lg px-2 py-1.5"
+                                  >
+                                    <span className="text-slate-600 truncate" title={vis.id}>
+                                      {sid}
+                                      {String(vis.id || '').length > 18 ? '…' : ''}
+                                    </span>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 justify-end text-[9px]">
+                                      <span>
+                                        <span className="text-slate-600 uppercase font-black">Start </span>
+                                        {formatTrafficDateTime(startMs)}
+                                      </span>
+                                      <span>
+                                        <span className="text-slate-600 uppercase font-black">Last </span>
+                                        {formatTrafficDateTime(endMs)}
+                                      </span>
+                                      <span className="text-slate-400">{d}s</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-4 items-center">
-                          <span className="px-2 py-0.5 bg-slate-950 text-slate-500 rounded border border-slate-800 font-black">
-                            {session.duration || '0'}s active
-                          </span>
-                          <span className="text-slate-600 font-bold">{new Date(session.lastActive || session.startTime || Date.now()).toLocaleTimeString()}</span>
-                        </div>
-                      </div>
-                        );
-                      })()
-                    ))}
-                    {trafficSessions.length === 0 && (
+                      );
+                    })}
+                    {trafficGroups.length === 0 && (
                       <div className="text-[10px] font-bold uppercase tracking-widest text-slate-600 border border-dashed border-slate-800 rounded-xl p-4 text-center">
                         No sessions in selected period
                       </div>

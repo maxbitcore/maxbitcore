@@ -127,8 +127,20 @@ export const registerUser = async (username: string, email: string, password: st
     const userToSave = {
       id: data.user?.id ?? data.id ?? data.user_id,
       email: emailVal,
-      firstName: data.user?.firstName || '',
-      lastName: data.user?.lastName || '',
+      firstName:
+        data.user?.firstName ||
+        (data.user as any)?.first_name ||
+        data.firstName ||
+        (data as any).first_name ||
+        '',
+      lastName:
+        data.user?.lastName ||
+        (data.user as any)?.last_name ||
+        (data.user as any)?.surname ||
+        data.lastName ||
+        (data as any).last_name ||
+        (data as any).surname ||
+        '',
       username: data.user?.username,
       role: data.role,
       ...(joined ? { joined } : {}),
@@ -163,8 +175,20 @@ export const loginUser = async (username: string, password: string, adminCode?: 
     const userToSave = {
       id: data.user?.id ?? data.id ?? data.user_id,
       email: emailVal,
-      firstName: data.user?.firstName || data.firstName || '',
-      lastName: data.user?.lastName || data.lastName || '',
+      firstName:
+        data.user?.firstName ||
+        (data.user as any)?.first_name ||
+        data.firstName ||
+        (data as any).first_name ||
+        '',
+      lastName:
+        data.user?.lastName ||
+        (data.user as any)?.last_name ||
+        (data.user as any)?.surname ||
+        data.lastName ||
+        (data as any).last_name ||
+        (data as any).surname ||
+        '',
       username: data.user?.username || data.username || username,
       role: data.role,
       ...(joined ? { joined } : {}),

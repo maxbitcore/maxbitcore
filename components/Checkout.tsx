@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
+import { notifyShopOwnerOfPaidOrder } from '../services/orderNotifyService';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 import { US_STATES } from '../data/usStates';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../services/addressSearch';
 import { CoverImage } from './CoverImage';
 import { trackOrder } from '../services/analyticsService';
+import { useAuth } from '../contexts/AuthContext';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
@@ -30,6 +32,47 @@ function resolveApiBaseUrl(): string {
 
 const apiBaseUrl = resolveApiBaseUrl();
 
+const PENDING_CHECKOUT_KEY = 'maxbit_pending_checkout_v1';
+const ORDER_ADMIN_NOTIFY_SENT_PREFIX = 'maxbit_order_admin_notify:';
+
+type PendingCheckoutSnapshot = {
+  v: 1;
+  orderId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  addressUnit: string;
+  city: string;
+  usState: string;
+  zip: string;
+  countryLabel: string;
+  items: { id: string; name: string; price: number }[];
+  subtotal: number;
+  estimatedTax: number;
+  total: number;
+};
+
+function readPendingCheckoutSnapshot(): PendingCheckoutSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_CHECKOUT_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Partial<PendingCheckoutSnapshot>;
+    if (o && o.v === 1 && typeof o.orderId === 'string') return o as PendingCheckoutSnapshot;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function clearPendingCheckoutSnapshot() {
+  try {
+    sessionStorage.removeItem(PENDING_CHECKOUT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Match typed state name or 2-letter code to a US_STATES code (empty if ambiguous / no match). */
 function matchUsStateDraftToCode(draft: string): string {
   const t = draft.trim().toLowerCase();
@@ -43,15 +86,62 @@ function matchUsStateDraftToCode(draft: string): string {
   return '';
 }
 
+/** Merge stored profile with props/context so checkout can autofill when logged in. */
+function readCheckoutProfile(propUser: any, ctxUser: any): Record<string, unknown> | null {
+  let fromDisk: Record<string, unknown> | null = null;
+  try {
+    const raw = localStorage.getItem('maxbit_currentUser') || localStorage.getItem('maxbit_user');
+    if (raw) fromDisk = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    /* ignore */
+  }
+  const merged: Record<string, unknown> = {
+    ...(fromDisk && typeof fromDisk === 'object' ? fromDisk : {}),
+    ...(ctxUser && typeof ctxUser === 'object' ? ctxUser : {}),
+    ...(propUser && typeof propUser === 'object' ? propUser : {}),
+  };
+  const email = String(merged.email ?? '').trim();
+  return email ? merged : null;
+}
+
+/** Prefer separate last name; if only one full-name string exists, treat last token as surname. */
+function pickCheckoutFirstLast(u: Record<string, unknown>): { first: string; last: string } {
+  const rawFirst = String(
+    u.firstName ?? u.first_name ?? u.given_name ?? u.givenName ?? ''
+  ).trim();
+  let last = String(
+    u.lastName ??
+      u.last_name ??
+      u.lastname ??
+      u.surname ??
+      u.family_name ??
+      u.familyName ??
+      ''
+  ).trim();
+
+  let first = rawFirst;
+  if (!last && /\s/.test(first)) {
+    const parts = first.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      last = parts[parts.length - 1] ?? '';
+      first = parts.slice(0, -1).join(' ');
+    }
+  }
+
+  return { first, last };
+}
+
 interface CheckoutProps {
   items: Product[];
   onBack: () => void;
+  currentUser?: any;
 }
 
 type CheckoutStep = 'details' | 'processing' | 'verifying' | 'success';
 
-const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
+const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
   const navigate = useNavigate();
+  const authCtx = useAuth();
   const [step, setStep] = useState<CheckoutStep>('details');
   const [orderId, setOrderId] = useState('');
   
@@ -103,6 +193,25 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
       (s) => s.name.toLowerCase().includes(t) || s.code.toLowerCase().includes(t)
     );
   }, [stateDraft]);
+
+  useEffect(() => {
+    if (step !== 'details') return;
+    const u = readCheckoutProfile(currentUser, authCtx?.currentUser);
+    if (!u?.email) return;
+    const em = String(u.email).trim().toLowerCase();
+    const { first: fn, last: ln } = pickCheckoutFirstLast(u);
+    setEmail((prev) => (prev.trim() === '' ? em : prev));
+    setFirstName((prev) => (prev.trim() === '' ? fn : prev));
+    setLastName((prev) => (prev.trim() === '' ? ln : prev));
+  }, [
+    step,
+    currentUser?.email,
+    currentUser?.firstName,
+    currentUser?.lastName,
+    authCtx?.currentUser?.email,
+    authCtx?.currentUser?.firstName,
+    authCtx?.currentUser?.lastName,
+  ]);
 
   useEffect(() => {
     if (step !== 'details') return;
@@ -246,17 +355,85 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack }) => {
             const oid = String(data.orderId || urlOrderId || '').trim();
             const paidEmail =
               (typeof data.email === 'string' && data.email.trim()) || email.trim();
-            if (oid && checkoutItems.length > 0 && paidEmail) {
-              const nameFromForm = [firstName, lastName].filter(Boolean).join(' ').trim();
-              const street = [address.trim(), addressUnit.trim()].filter(Boolean).join(' ').trim();
-              const cityLine = [city.trim(), [usState, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-              const fullAddress = [street, cityLine, countryLabel].filter(Boolean).join(', ') || '—';
-              trackOrder(oid, checkoutItems, total, {
+            const pending = readPendingCheckoutSnapshot();
+            const snapOk = !!(pending && pending.orderId === oid);
+
+            const lines =
+              snapOk && pending!.items.length > 0
+                ? pending!.items
+                : checkoutItems.map((item) => ({
+                    id: item.id,
+                    name: item.name.replace(/<[^>]*>?/gm, ''),
+                    price: item.price,
+                  }));
+
+            const productsForTrack: Product[] = lines.map((i) => ({
+              id: i.id,
+              name: i.name,
+              price: i.price,
+              category: '',
+              status: 'In Stock',
+              imageUrl: '',
+              description: '',
+            }));
+
+            const nameFromForm = snapOk
+              ? [pending!.firstName, pending!.lastName].filter(Boolean).join(' ').trim()
+              : [firstName, lastName].filter(Boolean).join(' ').trim();
+            const street = snapOk
+              ? [pending!.address, pending!.addressUnit].filter(Boolean).join(' ').trim()
+              : [address.trim(), addressUnit.trim()].filter(Boolean).join(' ').trim();
+            const cityLine = snapOk
+              ? [pending!.city, [pending!.usState, pending!.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+              : [city.trim(), [usState, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+            const countryForAddr = snapOk ? pending!.countryLabel : countryLabel;
+            const fullAddress = [street, cityLine, countryForAddr].filter(Boolean).join(', ') || '—';
+
+            const notifySubtotal = snapOk ? pending!.subtotal : subtotal;
+            const notifyTax = snapOk ? pending!.estimatedTax : estimatedTax;
+            const notifyTotal = snapOk ? pending!.total : total;
+
+            if (oid && lines.length > 0 && paidEmail) {
+              trackOrder(oid, productsForTrack, notifyTotal, {
                 name: nameFromForm || 'Customer',
                 email: paidEmail,
                 address: fullAddress,
               });
             }
+
+            if (oid && paidEmail) {
+              try {
+                if (!localStorage.getItem(ORDER_ADMIN_NOTIFY_SENT_PREFIX + oid)) {
+                  const st = snapOk ? pending!.usState : usState;
+                  await notifyShopOwnerOfPaidOrder({
+                    orderId: oid,
+                    stripeSessionId: sessionId,
+                    customerName: nameFromForm || 'Customer',
+                    customerEmail: paidEmail,
+                    addressLine1: snapOk ? pending!.address.trim() : address.trim(),
+                    addressUnit: snapOk ? pending!.addressUnit.trim() : addressUnit.trim(),
+                    city: snapOk ? pending!.city.trim() : city.trim(),
+                    state: st || '—',
+                    zip: snapOk ? pending!.zip.trim() : zip.trim(),
+                    country: snapOk ? pending!.countryLabel : countryLabel,
+                    items: lines,
+                    subtotal: notifySubtotal,
+                    estimatedTax: notifyTax,
+                    cartTotal: notifyTotal,
+                    stripeAmountTotal: Number(data.amountTotal ?? 0),
+                    stripeAmountTax: Number(data.amountTax ?? 0),
+                    currency: typeof data.currency === 'string' ? data.currency : 'usd',
+                    stripeLivemode: !!data.livemode,
+                  });
+                  localStorage.setItem(ORDER_ADMIN_NOTIFY_SENT_PREFIX + oid, '1');
+                }
+              } catch (e) {
+                console.warn('Store order notification failed:', e);
+              }
+            }
+
+            if (snapOk) clearPendingCheckoutSnapshot();
+
             setStep('success');
             navigate(`/checkout?verified=true&orderId=${encodeURIComponent(oid)}`, { replace: true });
             return;
@@ -368,6 +545,34 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
 
     if (session.error) throw new Error(session.error);
     if (session.url && typeof session.url === 'string') {
+      try {
+        sessionStorage.setItem(
+          PENDING_CHECKOUT_KEY,
+          JSON.stringify({
+            v: 1,
+            orderId,
+            email: email.trim(),
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            address: address.trim(),
+            addressUnit: addressUnit.trim(),
+            city: city.trim(),
+            usState: resolvedState,
+            zip: zip.trim(),
+            countryLabel,
+            items: checkoutItems.map((item) => ({
+              id: item.id,
+              name: item.name.replace(/<[^>]*>?/gm, ''),
+              price: item.price,
+            })),
+            subtotal,
+            estimatedTax,
+            total,
+          } satisfies PendingCheckoutSnapshot)
+        );
+      } catch {
+        /* storage unavailable */
+      }
       window.location.assign(session.url);
       return;
     }

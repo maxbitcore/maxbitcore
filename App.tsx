@@ -490,6 +490,7 @@ function App() {
           <Route path="/checkout" element={
             <Checkout 
               items={cartItems} 
+              currentUser={currentUser}
               onBack={() => {
                 setView({ type: 'tab', activeTab: 'home' }); 
                 navigate('/');            

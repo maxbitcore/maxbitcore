@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BuildSubmission } from '../types';
 import { sendBuildRequestEmail } from '../services/emailService';
 
@@ -200,6 +200,33 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     if (em) setUserEmail(em.toLowerCase());
   }, [currentUser]);
 
+  const resetConfiguratorForm = useCallback(() => {
+    setPurpose('Not Specified');
+    setSelectedCPUBrand('Not Specified');
+    setSelectedGPUBrand('Not Specified');
+    setSelectedGPUManufacturer('Not Specified');
+    setSelectedSSD('Not Specified');
+    setCaseSize('Not Specified');
+    setCaseType('Not Specified');
+    setAesthetic('Not Specified');
+    setResolution('Not Specified');
+    setExactBudget('');
+    setTargetDeadline('');
+    setRequirements('');
+    setActiveSections([]);
+    setHoveredSize(null);
+
+    if (currentUser) {
+      const full = getFullNameForConfigurator(currentUser);
+      setUserName(full ? full.toUpperCase() : '');
+      const em = String(currentUser.email ?? '').trim();
+      setUserEmail(em ? em.toLowerCase() : '');
+    } else {
+      setUserName('');
+      setUserEmail('');
+    }
+  }, [currentUser]);
+
   // Validation Logic
   const handleInvalid = (e: React.FormEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.');
@@ -269,6 +296,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
 
         setIsLoading(false);
         setStatus('success');
+        resetConfiguratorForm();
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
         const controller = new AbortController();
@@ -338,8 +366,10 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
           </p>
 
           <button 
+            type="button"
             onClick={() => {
               setIsLoading(false);
+              resetConfiguratorForm();
               setStatus('idle');
             }} 
             className="px-10 py-4 bg-transparent border border-cyan-500/50 text-cyan-500 text-[10px] font-black uppercase tracking-[0.3em] rounded-xl hover:bg-cyan-500 hover:text-black transition-all"
