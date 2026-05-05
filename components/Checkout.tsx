@@ -4,14 +4,7 @@ import { Product } from '../types';
 import { notifyShopOwnerOfPaidOrder } from '../services/orderNotifyService';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 import { US_STATES } from '../data/usStates';
-import {
-  resolveUsStateCode,
-  searchPhotonAddresses,
-  searchPhotonCities,
-  type AddressSuggestion,
-  type CitySuggestion,
-  type ParsedPlaceAddress,
-} from '../services/addressSearch';
+import { searchPhotonCities, type CitySuggestion } from '../services/addressSearch';
 import { CoverImage } from './CoverImage';
 import { trackOrder } from '../services/analyticsService';
 import { useAuth } from '../contexts/AuthContext';
@@ -159,11 +152,6 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
   const countryCode = 'US';
   const countryLabel = 'United States';
 
-  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
-  const [addressSuggestOpen, setAddressSuggestOpen] = useState(false);
-  const addressWrapRef = useRef<HTMLDivElement>(null);
-  const skipAddressSearchUntilRef = useRef(0);
-
   const [citySuggestions, setCitySuggestions] = useState<CitySuggestion[]>([]);
   const [citySuggestOpen, setCitySuggestOpen] = useState(false);
   const cityWrapRef = useRef<HTMLDivElement>(null);
@@ -173,18 +161,6 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
   const [stateSuggestOpen, setStateSuggestOpen] = useState(false);
   const stateWrapRef = useRef<HTMLDivElement>(null);
   const skipStatePickBlurUntilRef = useRef(0);
-
-  const applyParsedAddress = (p: ParsedPlaceAddress) => {
-    setAddress(p.street);
-    setCity(p.city);
-    setZip(p.postal);
-    if (p.countryCode === 'US' || !p.countryCode) {
-      const code = resolveUsStateCode(p.regionRaw);
-      setUsState(code);
-      const st = US_STATES.find((s) => s.code === code);
-      setStateDraft(st ? st.name : '');
-    }
-  };
 
   const filteredUsStates = useMemo(() => {
     const t = stateDraft.trim().toLowerCase();
@@ -212,38 +188,6 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
     authCtx?.currentUser?.firstName,
     authCtx?.currentUser?.lastName,
   ]);
-
-  useEffect(() => {
-    if (step !== 'details') return;
-    if (Date.now() < skipAddressSearchUntilRef.current) return;
-
-    const q = address.trim();
-    if (q.length < 3) {
-      setAddressSuggestions([]);
-      setAddressSuggestOpen(false);
-      return;
-    }
-
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const list = await searchPhotonAddresses(q, {
-            countryCode,
-            usStateCode: usState || undefined,
-            city: city || undefined,
-            postal: zip || undefined,
-          });
-          setAddressSuggestions(list);
-          setAddressSuggestOpen(list.length > 0);
-        } catch {
-          setAddressSuggestions([]);
-          setAddressSuggestOpen(false);
-        }
-      })();
-    }, 380);
-
-    return () => window.clearTimeout(handle);
-  }, [address, step]);
 
   useEffect(() => {
     if (step !== 'details') return;
@@ -280,9 +224,6 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
     const onDoc = (e: MouseEvent) => {
       const t = e.target;
       if (!(t instanceof Node)) return;
-      if (addressWrapRef.current && !addressWrapRef.current.contains(t)) {
-        setAddressSuggestOpen(false);
-      }
       if (cityWrapRef.current && !cityWrapRef.current.contains(t)) {
         setCitySuggestOpen(false);
       }
@@ -292,7 +233,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [addressSuggestOpen, citySuggestOpen, stateSuggestOpen]);
+  }, [citySuggestOpen, stateSuggestOpen]);
 
   const TAX_RATE = 0.0995; // 9.95%
   const checkoutItems = items.filter(
@@ -876,22 +817,16 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                         className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                       />
                    </div>
-                   <div ref={addressWrapRef} className="relative">
+                   <div>
                     <input
                       id="checkout-shipping-address"
                       name="shipping-address-line1"
-                      autoComplete="shipping street-address"
+                      autoComplete="off"
                       required
                       type="text"
                       value={address}
-                      onChange={(e) => {
-                        setAddress(e.target.value);
-                        setAddressSuggestOpen(true);
-                      }}
-                      onFocus={() => {
-                        if (addressSuggestions.length > 0) setAddressSuggestOpen(true);
-                      }}
-                      placeholder="Street address (type for address suggestions)"
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Street address"
                       className="w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                     />
                     <input
@@ -904,30 +839,6 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                       placeholder="Apartment, suite, etc. (optional)"
                       className="mt-3 w-full bg-slate-900 border border-slate-800 px-6 py-4 rounded-xl text-white placeholder-slate-600 outline-none focus:border-cyan-500 transition-colors"
                     />
-                    {addressSuggestOpen && addressSuggestions.length > 0 && (
-                      <ul
-                        role="listbox"
-                        className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
-                      >
-                        {addressSuggestions.map((s) => (
-                          <li key={s.id} role="option">
-                            <button
-                              type="button"
-                              className="w-full px-4 py-2.5 text-left text-xs text-slate-200 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                skipAddressSearchUntilRef.current = Date.now() + 800;
-                                applyParsedAddress(s.parsed);
-                                setAddressSuggestions([]);
-                                setAddressSuggestOpen(false);
-                              }}
-                            >
-                              {s.label}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                    </div>
                 </div>
               </div>

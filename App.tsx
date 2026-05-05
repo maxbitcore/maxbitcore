@@ -103,11 +103,8 @@ function App() {
   
   const navigate = useNavigate();
   const location = useLocation();
-  /** Mobile navbar = logo row + tab row + search; must not cover first screen content (e.g. Hero). */
-  const isAdminRoute = location.pathname.startsWith('/admin');
-  const mainTopClass = isAdminRoute
-    ? 'pt-16 md:pt-20'
-    : 'pt-44 lg:pt-16 xl:pt-20';
+  /** Desktop (lg+): fixed navbar — top padding. Mobile: navbar in flow — no offset. */
+  const mainTopClass = 'pt-0 lg:pt-16 xl:pt-20';
 
   const switchToRegister = () => {
     resetRegForm();
@@ -122,7 +119,24 @@ function App() {
     setIsLoginOpen(true);
   };
 
+  const clearCart = () => {
+    setCartItems([]);
+    setIsCartOpen(false);
+    try {
+      localStorage.removeItem('cart');
+    } catch {
+      /* private mode */
+    }
+  };
+
   const handleLoginSuccess = (user: any) => {
+    const prevKey = currentUser
+      ? String(currentUser.email ?? currentUser.id ?? '').toLowerCase()
+      : '';
+    const nextKey = String(user?.email ?? user?.id ?? '').toLowerCase();
+    if (prevKey && nextKey && prevKey !== nextKey) {
+      clearCart();
+    }
     setCurrentUser(user);
     if (user.role !== 'admin') {
       setAppMode('dashboard');
@@ -134,6 +148,7 @@ function App() {
 
   const handleLogout = () => {
     logoutUser();
+    clearCart();
     setCurrentUser(null);
     setAppMode('landing');
 
@@ -168,6 +183,7 @@ function App() {
 
     if (token && checkSessionIdleExpired()) {
       logoutDueToIdleSession();
+      clearCart();
       setSessionExpiredNotice(true);
       setCurrentUser(null);
       setAppMode('landing');
@@ -236,6 +252,7 @@ function App() {
       if (!localStorage.getItem('maxbit_token')) return;
       if (checkSessionIdleExpired()) {
         logoutDueToIdleSession();
+        clearCart();
         setSessionExpiredNotice(true);
         setCurrentUser(null);
         setAppMode('landing');
@@ -322,6 +339,8 @@ function App() {
     } else {
       setAppMode('dashboard');
     }
+
+    setView({ type: 'tab', activeTab: tab });
 
     const path = tab === 'home' ? '/' : `/${tab}`;
     navigate(path);
@@ -480,6 +499,8 @@ function App() {
                 allProducts={publishedProducts}
                 onSelectProduct={(product) => navigate(`/product/${product.id}`)}
                 onLogout={() => {
+                  logoutUser();
+                  clearCart();
                   setCurrentUser(null);
                   setAppMode('landing');
                   navigate('/'); 
@@ -630,6 +651,7 @@ function App() {
                       pickJoinedFromAuthPayload(data) || new Date().toISOString();
                     const userWithJoined = { ...userData, joined };
 
+                    clearCart();
                     setCurrentUser(userWithJoined);
 
                 sendRegistrationEmail(userWithJoined)

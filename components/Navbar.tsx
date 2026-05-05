@@ -284,7 +284,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   // Dedicated Admin Mode View
   if (activeTab === 'admin' && location.pathname !== '/') {
     return (
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0b0f1a] border-b border-rose-500/30 py-3 md:py-4 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.1)]">
+      <nav className="relative z-50 w-full bg-[#0b0f1a] border-b border-rose-500/30 py-3 md:py-4 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.1)] lg:fixed lg:top-0 lg:left-0 lg:right-0">
         <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-14">
           {/* Left Side */}
           <div className="flex items-center gap-3 md:gap-4">
@@ -322,7 +322,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   return (
     <>
     <nav
-      className={`fixed inset-x-0 top-0 z-50 isolate transform-gpu transition-all duration-500 ${
+      className={`relative z-50 w-full isolate transform-gpu transition-all duration-500 lg:fixed lg:inset-x-0 lg:top-0 ${
         scrolled
           ? 'bg-[#0b0f1a]/95 backdrop-blur-xl border-b border-slate-800/50 py-2 shadow-2xl'
           : 'py-3 md:py-4 bg-[#0b0f1a]/93 backdrop-blur-lg border-b border-slate-800/40 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.55)] lg:bg-transparent lg:backdrop-blur-none lg:border-b-transparent lg:shadow-none'
@@ -332,20 +332,17 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         
         {/* Left: Brand Space — flex-none on small screens so admin actions get width (avoid overlap). */}
         <div className="flex-none flex justify-start items-center gap-3 sm:gap-4 md:gap-8 min-w-0">
-          <button onClick={() => onTabChange('home')} className="flex items-center hover:scale-[1.03] active:scale-95 transition-all duration-300">
+          <button
+            type="button"
+            onClick={() => onTabChange('home')}
+            className="flex items-center hover:scale-[1.03] active:scale-95 transition-all duration-300"
+            aria-label="На главную"
+          >
             {logoContent}
           </button>
           
           {/* Desktop Nav Links */}
           <div className="hidden lg:flex items-center gap-6">
-             <button 
-                onClick={() => onTabChange('home')}
-                className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:text-cyan-400 ${
-                activeTab === 'home' ? 'text-cyan-400' : 'text-slate-400'
-                }`}
-            >
-                Home
-            </button>
             <button 
                 onClick={() => onTabChange('configurator')}
                 className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:text-cyan-400 ${
@@ -506,16 +503,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       {/* Mobile Top Menu */}
       <div className="lg:hidden max-w-[1800px] mx-auto px-4 md:px-12 pb-2">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => onTabChange('home')}
-            className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-2 rounded-lg border whitespace-nowrap transition-all ${
-              activeTab === 'home'
-                ? 'text-cyan-400 border-cyan-500/40 bg-cyan-500/10'
-                : 'text-slate-400 border-slate-700 bg-slate-900/50'
-            }`}
-          >
-            Home
-          </button>
           <button
             onClick={() => onTabChange('configurator')}
             className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-2 rounded-lg border whitespace-nowrap transition-all ${
