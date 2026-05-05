@@ -4,9 +4,12 @@ import { getAnalytics, AnalyticsData, OrderRecord, VisitorSession } from '../ser
 import {
   BUILTIN_CONFIGURATOR_OPTION_KEYS,
   BUILTIN_CONFIGURATOR_OPTION_KEY_SET,
+  CONFIGURATOR_SECTION_LABELS_KEY,
   DEFAULT_CONFIGURATOR_STRING_LISTS,
   formatConfiguratorSectionTitle,
   normalizeStoredConfiguratorConfig,
+  parseConfiguratorSectionLabels,
+  resolveConfiguratorSectionTitle,
   sanitizeNewConfiguratorSectionKey,
 } from '../services/configuratorOptions';
 import { loginUser, registerUser, getStoredAuth } from '../services/authService';
@@ -218,7 +221,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   // 2. NAVIGATION STATE
   const [activeAdminTab, setActiveAdminTab] = useState<'submissions' | 'orders' | 'catalog' | 'analytics' | 'comments'>('submissions');
-  const [catalogMode, setCatalogMode] = useState<'products' | 'assets'>('products');
+  const [catalogMode, setCatalogMode] = useState<'products' | 'options' | 'assets'>('products');
   const [isProcessing, setIsProcessing] = useState(false);
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -237,6 +240,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   }));
   const [configDrafts, setConfigDrafts] = useState<Record<string, string>>({});
   const [newSectionKeyDraft, setNewSectionKeyDraft] = useState('');
+  const [newSectionTitleDraft, setNewSectionTitleDraft] = useState('');
+  const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
   const [caseStyles, setCaseStyles] = useState<Record<string, string>>({});
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
@@ -418,6 +423,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     }
     setConfig(normalizeStoredConfiguratorConfig(parsed));
     setConfigDrafts({});
+
+    try {
+      const rawLb = localStorage.getItem(CONFIGURATOR_SECTION_LABELS_KEY);
+      setSectionLabels(parseConfiguratorSectionLabels(rawLb ? JSON.parse(rawLb) : null));
+    } catch {
+      setSectionLabels({});
+    }
 
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
     if (storedCaseStyles) setCaseStyles(JSON.parse(storedCaseStyles));
@@ -673,12 +685,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       return;
     }
     updateConfigList(key, []);
+    const title = newSectionTitleDraft.trim();
+    if (title) {
+      setSectionLabels((prev) => {
+        const next = { ...prev, [key]: title };
+        try {
+          localStorage.setItem(CONFIGURATOR_SECTION_LABELS_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        notifyUpdate();
+        return next;
+      });
+    }
     setNewSectionKeyDraft('');
+    setNewSectionTitleDraft('');
   };
 
   const removeConfiguratorSection = (key: string) => {
     if (BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(key)) return;
-    if (!window.confirm(`Remove section "${formatConfiguratorSectionTitle(key)}" and all its options?`)) return;
+    const label = resolveConfiguratorSectionTitle(key, sectionLabels);
+    if (!window.confirm(`Remove chapter "${label}" and all its options?`)) return;
     const next = { ...config };
     delete next[key];
     setConfig(next);
@@ -688,7 +715,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       delete d[key];
       return d;
     });
+    const nextLabels = { ...sectionLabels };
+    delete nextLabels[key];
+    setSectionLabels(nextLabels);
+    try {
+      localStorage.setItem(CONFIGURATOR_SECTION_LABELS_KEY, JSON.stringify(nextLabels));
+    } catch {
+      /* ignore */
+    }
     notifyUpdate();
+  };
+
+  const persistSectionLabel = (key: string, raw: string) => {
+    const v = raw.trim();
+    setSectionLabels((prev) => {
+      const next = { ...prev };
+      if (!v) delete next[key];
+      else next[key] = v;
+      try {
+        localStorage.setItem(CONFIGURATOR_SECTION_LABELS_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      notifyUpdate();
+      return next;
+    });
   };
 
   const configuratorSectionKeys = useMemo(() => {
@@ -864,9 +915,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
             {activeAdminTab === 'catalog' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 animate-fade-in-up">
                   <div className="lg:col-span-3 mb-4">
-                     <div className="flex gap-4 p-1 bg-slate-900/50 rounded-xl w-fit border border-slate-800">
-                         <button onClick={() => setCatalogMode('products')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'products' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Inventory</button>
-                         <button onClick={() => setCatalogMode('assets')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'assets' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator Assets</button>
+                     <div className="flex flex-wrap gap-2 p-1 bg-slate-900/50 rounded-xl w-fit border border-slate-800">
+                         <button type="button" onClick={() => setCatalogMode('products')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'products' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Inventory</button>
+                         <button type="button" onClick={() => setCatalogMode('options')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'options' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator chapters</button>
+                         <button type="button" onClick={() => setCatalogMode('assets')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'assets' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Case visuals</button>
                      </div>
                   </div>
 
@@ -954,14 +1006,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                     </>
                   )}
 
-                  {catalogMode === 'assets' && (
-                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-12 animate-fade-in-up">
-                      <div className="space-y-8">
-                        <h2 className="text-xl font-black text-white italic uppercase pl-2">Configurator Options</h2>
+                  {catalogMode === 'options' && (
+                    <div className="lg:col-span-3 animate-fade-in-up">
+                      <div className="space-y-8 max-w-4xl">
+                        <h2 className="text-xl font-black text-white italic uppercase pl-2">Configurator chapters</h2>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
                           <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">
-                              New section (internal key, camelCase — e.g. coolingTypes)
+                              New chapter — title (storefront)
+                            </label>
+                            <input
+                              value={newSectionTitleDraft}
+                              onChange={(e) => setNewSectionTitleDraft(e.target.value)}
+                              placeholder="e.g. Cooling & power"
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[10px] font-bold text-white outline-none focus:border-cyan-500"
+                            />
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">
+                              Internal key (camelCase — e.g. coolingTypes)
                             </label>
                             <div className="flex flex-col sm:flex-row gap-2">
                               <input
@@ -981,29 +1042,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                                 onClick={addConfiguratorSection}
                                 className="px-4 py-2 rounded-lg bg-cyan-500 text-slate-950 text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-all shrink-0"
                               >
-                                Add section
+                                Add chapter
                               </button>
                             </div>
                             <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest pl-1">
-                              Then add choices below. Built-in sections cannot be removed.
+                              Then add choices below. Built-in chapters cannot be removed.
                             </p>
                           </div>
                           {configuratorSectionKeys.map((key) => (
                             <div key={key} className="space-y-2">
-                              <div className="flex items-center justify-between gap-2 ml-1">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                  {formatConfiguratorSectionTitle(key)}
-                                  <span className="text-slate-700 font-mono normal-case tracking-normal ml-2">{key}</span>
+                              <div className="flex flex-col gap-2 ml-1">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                    {resolveConfiguratorSectionTitle(key, sectionLabels)}
+                                    <span className="text-slate-700 font-mono normal-case tracking-normal ml-2">{key}</span>
+                                  </span>
+                                  {!BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(key) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeConfiguratorSection(key)}
+                                      className="text-[9px] font-black uppercase tracking-widest text-rose-500/80 hover:text-rose-400 shrink-0"
+                                    >
+                                      Remove chapter
+                                    </button>
+                                  )}
+                                </div>
+                                <label className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">
+                                  Storefront title (optional override)
                                 </label>
-                                {!BUILTIN_CONFIGURATOR_OPTION_KEY_SET.has(key) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeConfiguratorSection(key)}
-                                    className="text-[9px] font-black uppercase tracking-widest text-rose-500/80 hover:text-rose-400"
-                                  >
-                                    Remove section
-                                  </button>
-                                )}
+                                <input
+                                  value={sectionLabels[key] ?? ''}
+                                  onChange={(e) =>
+                                    setSectionLabels((p) => ({ ...p, [key]: e.target.value }))
+                                  }
+                                  onBlur={(e) => persistSectionLabel(key, e.target.value)}
+                                  placeholder={formatConfiguratorSectionTitle(key)}
+                                  className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:border-cyan-500"
+                                />
                               </div>
                               <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-3">
                                 <div className="flex flex-wrap gap-2 min-h-[34px]">
@@ -1050,8 +1125,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                           ))}
                         </div>
                       </div>
-
-                      <div className="space-y-8">
+                    </div>
+                  )}
+                  {catalogMode === 'assets' && (
+                    <div className="lg:col-span-3 animate-fade-in-up">
+                      <div className="space-y-8 max-w-2xl">
                         <h2 className="text-xl font-black text-white italic uppercase pl-2">Case Style Assets</h2>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-4">Map case types to visual sketches</p>

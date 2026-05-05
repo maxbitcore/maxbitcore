@@ -2,8 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BuildSubmission } from '../types';
 import {
   BUILTIN_CONFIGURATOR_OPTION_KEY_SET,
+  CONFIGURATOR_SECTION_LABELS_KEY,
   formatConfiguratorSectionTitle,
   normalizeStoredConfiguratorConfig,
+  parseConfiguratorSectionLabels,
+  resolveConfiguratorSectionTitle,
 } from '../services/configuratorOptions';
 
 // Default Data Constants (Fallbacks)
@@ -143,6 +146,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
   const [config, setConfig] = useState(() => ({ ...DEFAULT_CONFIG }));
   const [caseImages, setCaseImages] = useState<Record<string, string>>(DEFAULT_CASE_IMAGES);
   const [customSelections, setCustomSelections] = useState<Record<string, string>>({});
+  const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
   
   // Input states
   const [userName, setUserName] = useState('');
@@ -174,6 +178,13 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
       }
     } else {
       setConfig({ ...DEFAULT_CONFIG });
+    }
+
+    try {
+      const rawLb = localStorage.getItem(CONFIGURATOR_SECTION_LABELS_KEY);
+      setSectionLabels(parseConfiguratorSectionLabels(rawLb ? JSON.parse(rawLb) : null));
+    } catch {
+      setSectionLabels({});
     }
 
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
@@ -591,7 +602,7 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
                   <AccordionSection
                     key={key}
                     id={key}
-                    title={formatConfiguratorSectionTitle(key)}
+                    title={resolveConfiguratorSectionTitle(key, sectionLabels)}
                     value={val}
                     isOpen={activeSections.includes(key)}
                     onToggle={toggleSection}

@@ -65,6 +65,24 @@ export function formatConfiguratorSectionTitle(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Admin-editable storefront titles for configurator sections (custom + optional overrides for built-ins). */
+export const CONFIGURATOR_SECTION_LABELS_KEY = 'maxbit_configurator_section_labels';
+
+export function parseConfiguratorSectionLabels(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === 'string' && v.trim()) out[k] = v.trim();
+  }
+  return out;
+}
+
+export function resolveConfiguratorSectionTitle(key: string, labels: Record<string, string>): string {
+  const custom = labels[key]?.trim();
+  if (custom) return custom;
+  return formatConfiguratorSectionTitle(key);
+}
+
 const CAMEL_KEY = /^[a-z][a-zA-Z0-9]*$/;
 
 export function sanitizeNewConfiguratorSectionKey(raw: string): string | null {
