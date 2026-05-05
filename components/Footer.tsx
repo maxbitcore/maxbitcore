@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MainTab } from '../types';
-import { BRAND_NAME } from '../constants';
+import { BRAND_NAME, DEFAULT_LOGO_URL } from '../constants';
 
 
 interface FooterProps {
@@ -35,9 +35,9 @@ const Footer: React.FC<FooterProps> = ({ onTabChange }) => {
         
         <div className="space-y-6">
           <div className="flex items-center justify-center md:justify-start gap-3">
-            <img 
-              src={currentLogo} 
-              alt="MAXBIT Logo" 
+            <img
+              src={currentLogo || DEFAULT_LOGO_URL}
+              alt="MAXBIT Logo"
               className="h-10 w-auto object-contain"
             />
             <div className="flex items-center">

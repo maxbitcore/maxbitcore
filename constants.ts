@@ -20,3 +20,6 @@ export const JOURNAL_ARTICLES: JournalArticle[] = [
 ];
 
 export const BRAND_NAME = 'MAXBIT';
+
+/** Used when no admin-uploaded logo is stored in localStorage (`maxbit_logo`). */
+export const DEFAULT_LOGO_URL = 'https://www.maxbitcore.com/uploads/logo.png';

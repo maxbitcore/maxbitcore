@@ -11,6 +11,7 @@ import {
 } from '../services/authService';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { DEFAULT_LOGO_URL } from '../constants';
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
@@ -70,10 +71,9 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    const serverLogo = "https://www.maxbitcore.com/uploads/logo.png"; 
     const handleLogoUpdate = () => {
       const newLogo = localStorage.getItem('maxbit_logo');
-      setCurrentLogo(newLogo || serverLogo);
+      setCurrentLogo(newLogo || DEFAULT_LOGO_URL);
     };
 
     window.addEventListener('logo-updated', handleLogoUpdate);
@@ -268,7 +268,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const logoContent = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:gap-3">
       <img 
-        src={currentLogo || "https://www.maxbitcore.com/uploads/logo.png"} 
+        src={currentLogo || DEFAULT_LOGO_URL} 
         className="h-8 md:h-10 w-auto object-contain"
         alt="MAXBIT Logo" 
         onError={(e) => {
@@ -321,13 +321,17 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
 
   return (
     <>
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-      scrolled ? 'bg-[#0b0f1a]/95 backdrop-blur-xl border-b border-slate-800/50 py-2 shadow-2xl' : 'bg-transparent py-3 md:py-4'
-    }`}>
+    <nav
+      className={`fixed inset-x-0 top-0 z-50 isolate transform-gpu transition-all duration-500 ${
+        scrolled
+          ? 'bg-[#0b0f1a]/95 backdrop-blur-xl border-b border-slate-800/50 py-2 shadow-2xl'
+          : 'py-3 md:py-4 bg-[#0b0f1a]/93 backdrop-blur-lg border-b border-slate-800/40 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.55)] lg:bg-transparent lg:backdrop-blur-none lg:border-b-transparent lg:shadow-none'
+      }`}
+    >
       <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-12 md:h-14">
         
-        {/* Left: Brand Space */}
-        <div className="flex-1 flex justify-start items-center gap-4 md:gap-8">
+        {/* Left: Brand Space — flex-none on small screens so admin actions get width (avoid overlap). */}
+        <div className="flex-none flex justify-start items-center gap-3 sm:gap-4 md:gap-8 min-w-0">
           <button onClick={() => onTabChange('home')} className="flex items-center hover:scale-[1.03] active:scale-95 transition-all duration-300">
             {logoContent}
           </button>
@@ -431,7 +435,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         </div>
         
         {/* Right: Actions */}
-        <div className="flex-1 flex items-center justify-end gap-2 md:gap-6">
+        <div className="flex-1 min-w-0 flex items-center justify-end gap-1.5 sm:gap-2 md:gap-6">
             {/* Auth Actions */}
             {!currentUser ? (
                 <button 
@@ -441,33 +445,42 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                     Login / Register
                 </button>
             ) : (
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className="flex items-center justify-end gap-1.5 sm:gap-2 md:gap-3 flex-wrap min-w-0">
                     {currentUser.role === 'admin' && (
                         <button 
+                            type="button"
+                            aria-label="Admin console"
                             onClick={() => {
                               onTabChange?.('admin' as any);
                              navigate('/admin');         
                             }}
-                            className="flex items-center gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500 hover:text-[#0b0f1a] px-3 py-2 rounded-lg border border-emerald-500/20 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                            className="flex shrink-0 items-center justify-center gap-1.5 sm:gap-2 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500 hover:text-[#0b0f1a] px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-emerald-500/20 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
                         >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>    
-                            Console
+                            <svg className="w-4 h-4 sm:hidden text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="hidden sm:inline-flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Console
+                            </span>
                         </button>
                     )}
 
                     <button 
+                        type="button"
                         onClick={() => navigate('/dashboard')}
-                        className="flex flex-col items-end mr-2 group"
+                        className="flex flex-col items-end mr-0 sm:mr-2 group min-w-0 max-w-[7rem] sm:max-w-none"
                     >
-                        <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter group-hover:text-white transition-colors">System_Active</span>
-                        <span className="text-[9px] text-white font-bold uppercase">{currentUser.firstName}</span>
+                        <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter group-hover:text-white transition-colors truncate w-full text-right">System_Active</span>
+                        <span className="text-[9px] text-white font-bold uppercase truncate w-full text-right">{currentUser.firstName}</span>
                     </button>
 
-                    <div className="h-4 w-px bg-slate-800"></div>
+                    <div className="h-4 w-px bg-slate-800 shrink-0" />
 
                     <button 
+                        type="button"
                         onClick={onLogout}
-                        className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-rose-500 bg-slate-900/50 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-slate-800 hover:border-slate-600 transition-all"
+                        className="shrink-0 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-rose-500 bg-slate-900/50 px-2.5 py-1.5 sm:px-3 md:px-4 md:py-2 rounded-lg border border-slate-800 hover:border-slate-600 transition-all"
                     >
                         Logout
                     </button>
