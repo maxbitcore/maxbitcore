@@ -816,7 +816,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   }, [trafficSessionsFiltered, trafficRange]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f1a] pt-32 pb-24 px-6 md:px-12 animate-fade-in-up">
+    <div className="min-h-screen bg-[#0b0f1a] pt-8 pb-24 px-6 md:px-12 animate-fade-in-up">
       <div className="max-w-7xl mx-auto space-y-12">
         {isAuthenticated && (
           <>

@@ -24,6 +24,11 @@ export interface AuthResponse {
 
 const API_URL = "https://www.maxbitcore.com/api";
 
+/** Updated while the tab is open; if unchanged for SESSION_MAX_IDLE_MS, user is logged out on next visit/focus. */
+const LAST_SESSION_ACTIVITY_KEY = 'maxbit_last_session_activity_at';
+
+export const SESSION_MAX_IDLE_MS = 60 * 60 * 1000;
+
 /** Normalize registration / account creation time from API payloads (PHP field names vary). */
 export function pickJoinedFromAuthPayload(data: any): string | undefined {
   if (!data || typeof data !== 'object') return undefined;
@@ -146,6 +151,7 @@ export const registerUser = async (username: string, email: string, password: st
       ...(joined ? { joined } : {}),
     };
     localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
+    touchSessionActivity();
   }
   return data;
 };
@@ -194,6 +200,7 @@ export const loginUser = async (username: string, password: string, adminCode?: 
       ...(joined ? { joined } : {}),
     };
     localStorage.setItem('maxbit_currentUser', JSON.stringify(userToSave));
+    touchSessionActivity();
   }
   return data;
 };
@@ -221,7 +228,40 @@ export const logoutUser = () => {
   localStorage.removeItem('maxbit_role');
   localStorage.removeItem('maxbit_email');
   localStorage.removeItem('maxbit_currentUser');
+  localStorage.removeItem('maxbit_user');
+  localStorage.removeItem(LAST_SESSION_ACTIVITY_KEY);
 };
+
+/** Call while logged in to keep the session alive (tab open / user returned). */
+export function touchSessionActivity(): void {
+  if (!localStorage.getItem('maxbit_token')) return;
+  try {
+    localStorage.setItem(LAST_SESSION_ACTIVITY_KEY, String(Date.now()));
+  } catch {
+    /* quota */
+  }
+}
+
+/** True if token exists and last activity is older than SESSION_MAX_IDLE_MS. */
+export function checkSessionIdleExpired(): boolean {
+  const token = localStorage.getItem('maxbit_token');
+  if (!token) return false;
+  const raw = localStorage.getItem(LAST_SESSION_ACTIVITY_KEY);
+  if (!raw) return false;
+  const last = Number(raw);
+  if (!Number.isFinite(last)) return false;
+  return Date.now() - last > SESSION_MAX_IDLE_MS;
+}
+
+/** Clears auth and sets a flag for the UI (sessionStorage). */
+export function logoutDueToIdleSession(): void {
+  logoutUser();
+  try {
+    sessionStorage.setItem('maxbit_session_expired', '1');
+  } catch {
+    /* private mode */
+  }
+}
 
 export const getStoredAuth = () => {
   const token = localStorage.getItem('maxbit_token');

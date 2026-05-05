@@ -23,7 +23,7 @@ const Hero: React.FC<HeroProps> = ({ onExplore }) => {
 
       <div className="relative z-10 px-8 md:px-24 max-w-7xl mx-auto w-full">
         <div className="animate-fade-in-up w-full max-w-4xl lg:max-w-5xl">
-          <h1 className="font-black text-white tracking-tight mb-3 leading-[1.05] whitespace-nowrap text-[clamp(1.15rem,3.8vw+0.6rem,4.5rem)]">
+          <h1 className="font-black text-white tracking-tight mb-3 leading-[1.05] max-sm:whitespace-normal sm:whitespace-nowrap text-[clamp(1.15rem,3.8vw+0.6rem,4.5rem)]">
             Built for <span className="maxbit-text-gradient">Victory</span>
           </h1>
           <p className="max-w-xl text-base md:text-lg text-slate-400 font-medium leading-relaxed mb-5">

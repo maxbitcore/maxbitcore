@@ -1,17 +1,36 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  touchSessionActivity,
+  checkSessionIdleExpired,
+  logoutDueToIdleSession,
+} from '../services/authService';
 
 const AuthContext = createContext<any>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState(null);
 
+  /** Runs before child effects; must match App.tsx session bootstrap (idle logout clears storage). */
   useEffect(() => {
-    const savedUser = localStorage.getItem('maxbit_currentUser');
-    if (savedUser) {
+    const token = localStorage.getItem('maxbit_token');
+
+    if (token && checkSessionIdleExpired()) {
+      logoutDueToIdleSession();
+      setCurrentUser(null);
+      return;
+    }
+
+    if (token) {
+      touchSessionActivity();
+    }
+
+    const savedUser =
+      localStorage.getItem('maxbit_currentUser') || localStorage.getItem('maxbit_user');
+    if (token && savedUser) {
       try {
         setCurrentUser(JSON.parse(savedUser));
       } catch (e) {
-        console.error("LocalStorage ERROR", e);
+        console.error('LocalStorage ERROR', e);
       }
     }
   }, []);

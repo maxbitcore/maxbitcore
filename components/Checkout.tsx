@@ -685,7 +685,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
 
   return (
     <div className="min-h-screen bg-[#0b0f1a] text-slate-200 animate-fade-in-up">
-      <div className="max-w-6xl mx-auto px-6 pt-32 pb-24">
+      <div className="max-w-6xl mx-auto px-6 pt-8 pb-24">
         <button 
           onClick={onBack}
           className="group flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-cyan-400 transition-colors mt-6 sm:mt-0 mb-12"

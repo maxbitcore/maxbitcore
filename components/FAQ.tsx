@@ -52,7 +52,7 @@ const FAQ: React.FC = () => {
   ];
 
   return (
-    <section className="pt-32 pb-32 px-6 max-w-5xl mx-auto animate-fade-in-up">
+    <section className="pt-10 pb-32 px-6 max-w-5xl mx-auto animate-fade-in-up">
       <div className="text-center mb-20">
         <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter text-white uppercase mb-4">The FAQ Terminal</h1>
         <p className="text-slate-400 text-lg">System diagnostics and frequently requested intelligence.</p>

@@ -70,7 +70,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ category, onProductClick, onA
   };
 
   return (
-    <section className="pt-32 pb-32 px-6 md:px-12 bg-[#0b0f1a]">
+    <section className="pt-10 pb-32 px-6 md:px-12 bg-[#0b0f1a]">
       <div className="max-w-[1800px] mx-auto">
         
         {/* Category Header */}

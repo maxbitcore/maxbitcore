@@ -2,7 +2,7 @@ import React from 'react';
 
 const Contact: React.FC = () => {
   return (
-    <section id="contact" className="pt-32 pb-24 px-6 max-w-7xl mx-auto">
+    <section id="contact" className="pt-10 pb-24 px-6 max-w-7xl mx-auto">
       <div className="mb-12 text-center">
         <h2 className="text-4xl font-bold text-white mb-4">Direct Support</h2>
         <p className="text-slate-400 text-lg">Hardware specialist ready to optimize your build.</p>

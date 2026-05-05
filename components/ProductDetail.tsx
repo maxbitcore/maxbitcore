@@ -279,7 +279,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   const galleryImages = [product.imageUrl, ...(product.gallery || [])].filter(Boolean);
 
   return (
-    <div className="pt-24 min-h-screen bg-[#0b0f1a] text-slate-200 animate-fade-in-up">
+    <div className="pt-6 md:pt-8 min-h-screen bg-[#0b0f1a] text-slate-200 animate-fade-in-up">
       <div className="max-w-[1800px] mx-auto px-6 md:px-12 pb-24">
         
         {/* Breadcrumb / Back */}

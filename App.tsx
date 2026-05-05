@@ -22,7 +22,13 @@ import { trackVisit, trackProductView, trackPageNav, trackSearch } from './servi
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { sendRegistrationEmail } from './services/emailService';
-import { pickJoinedFromAuthPayload } from './services/authService';
+import {
+  pickJoinedFromAuthPayload,
+  logoutUser,
+  touchSessionActivity,
+  checkSessionIdleExpired,
+  logoutDueToIdleSession,
+} from './services/authService';
 import DatePicker from "react-datepicker";
 import 'react-datepicker/dist/react-datepicker.css';
 import { enUS } from 'date-fns/locale';
@@ -93,9 +99,15 @@ function App() {
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState(false);
   
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
   const location = useLocation();
+  /** Mobile navbar = logo row + tab row + search; must not cover first screen content (e.g. Hero). */
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const mainTopClass = isAdminRoute
+    ? 'pt-16 md:pt-20'
+    : 'pt-44 lg:pt-16 xl:pt-20';
 
   const switchToRegister = () => {
     resetRegForm();
@@ -121,13 +133,10 @@ function App() {
   };
 
   const handleLogout = () => {
+    logoutUser();
     setCurrentUser(null);
     setAppMode('landing');
-    
-    localStorage.removeItem('maxbit_token');
-    localStorage.removeItem('maxbit_role');
-    localStorage.removeItem('maxbit_currentUser');
-    
+
     navigate('/');
     setView({ type: 'tab', activeTab: 'home' });
   };
@@ -144,31 +153,45 @@ function App() {
     setSecurityKey('');
   };
 
+  /** Restore session; idle >1h → clear auth and show notice (single effect avoids racing restores after logout). */
   useEffect(() => {
-    const saved = localStorage.getItem('maxbit_currentUser');
-    if (saved) {
-      try {
-        setCurrentUser(JSON.parse(saved));
-      } catch (e) {
-        console.error("Session error: Profile data corrupted");
+    try {
+      if (sessionStorage.getItem('maxbit_session_expired')) {
+        setSessionExpiredNotice(true);
+        sessionStorage.removeItem('maxbit_session_expired');
       }
+    } catch {
+      /* private mode */
     }
-  }, []);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('maxbit_currentUser') || localStorage.getItem('maxbit_user');
+    const token = localStorage.getItem('maxbit_token');
+
+    if (token && checkSessionIdleExpired()) {
+      logoutDueToIdleSession();
+      setSessionExpiredNotice(true);
+      setCurrentUser(null);
+      setAppMode('landing');
+      return;
+    }
+
+    if (token) {
+      touchSessionActivity();
+    }
+
+    const savedUser =
+      localStorage.getItem('maxbit_currentUser') || localStorage.getItem('maxbit_user');
     const savedRole = localStorage.getItem('maxbit_role');
 
-    if (savedUser) {
+    if (token && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
         setCurrentUser(parsedUser);
-        
+
         if (parsedUser.role !== 'admin' && savedRole !== 'admin') {
           setAppMode('dashboard');
         }
       } catch (e) {
-        console.error("Session error: Profile data corrupted");
+        console.error('Session error: Profile data corrupted');
         localStorage.removeItem('maxbit_currentUser');
       }
     }
@@ -200,6 +223,33 @@ function App() {
   useEffect(() => {
     trackVisit();
   }, []);
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible' && localStorage.getItem('maxbit_token')) {
+        touchSessionActivity();
+      }
+    };
+    const interval = window.setInterval(tick, 60 * 1000);
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!localStorage.getItem('maxbit_token')) return;
+      if (checkSessionIdleExpired()) {
+        logoutDueToIdleSession();
+        setSessionExpiredNotice(true);
+        setCurrentUser(null);
+        setAppMode('landing');
+        navigate('/');
+        return;
+      }
+      touchSessionActivity();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [navigate]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -372,6 +422,24 @@ function App() {
           onLoginSuccess={handleLoginSuccess}
           onOpenRegister={switchToRegister}
        />
+
+      {sessionExpiredNotice && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4 animate-fade-in">
+          <div className="bg-amber-500/95 text-slate-950 p-5 rounded-2xl border border-amber-400 shadow-xl flex flex-col gap-3 text-center">
+            <p className="text-sm font-black uppercase tracking-widest">Сессия истекла</p>
+            <p className="text-xs font-bold text-slate-900/85">
+              Вы отсутствовали более часа. Войдите снова, чтобы продолжить.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSessionExpiredNotice(false)}
+              className="py-2.5 bg-slate-950 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-colors"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
       
       {showSuccessAlert && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4 animate-fade-in">
@@ -399,7 +467,7 @@ function App() {
         </div>
       )}
 
-      <main className="flex-grow">
+      <main className={`flex-grow ${mainTopClass}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
@@ -422,7 +490,7 @@ function App() {
             )
           } />
 
-            <Route path="/configurator" element={<div className="pt-16"><CustomBuildForm currentUser={currentUser}/></div>} />
+            <Route path="/configurator" element={<div className="pt-4 lg:pt-6"><CustomBuildForm currentUser={currentUser}/></div>} />
             
             <Route path="/gaming-pcs" element={
               <ProductGrid 

@@ -6,7 +6,9 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     const geminiKey = env.VITE_GEMINI_API_KEY || env.GEMINI_API_KEY || '';
     return {
-      base: './',
+      // Root-relative URLs (/assets/...) so refreshes on /checkout, /product/:id, etc. load JS/CSS correctly.
+      // Relative base './' breaks SPA routes after refresh (browser resolves ./assets from current path → HTML MIME error).
+      base: '/',
       server: {
         port: 3000,
         host: '0.0.0.0',

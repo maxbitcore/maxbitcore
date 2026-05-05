@@ -14,7 +14,7 @@ interface JournalProps {
 
 const Journal: React.FC<JournalProps> = ({ onArticleClick }) => {
   return (
-    <section id="journal" className="bg-[#0b0f1a] pt-32 pb-32 px-6 md:px-12">
+    <section id="journal" className="bg-[#0b0f1a] pt-10 pb-32 px-6 md:px-12">
       <div className="max-w-[1800px] mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 pb-8 border-b border-slate-800">
             <div>

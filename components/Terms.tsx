@@ -2,7 +2,7 @@ import React from 'react';
 
 const Terms: React.FC = () => {
   return (
-    <section className="pt-32 pb-32 px-6 max-w-4xl mx-auto animate-fade-in-up">
+    <section className="pt-10 pb-32 px-6 max-w-4xl mx-auto animate-fade-in-up">
       <div className="mb-16">
         <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase mb-6">Terms of Service</h1>
         <p className="text-slate-400 text-lg leading-relaxed">The operational rules for the MaxBit ecosystem.</p>

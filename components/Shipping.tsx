@@ -2,7 +2,7 @@ import React from 'react';
 
 const Shipping: React.FC = () => {
   return (
-    <section className="pt-32 pb-32 px-6 max-w-6xl mx-auto animate-fade-in-up">
+    <section className="pt-10 pb-32 px-6 max-w-6xl mx-auto animate-fade-in-up">
       {/* Original Content Header */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center mb-24">
         <div>
