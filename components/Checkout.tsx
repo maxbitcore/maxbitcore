@@ -1012,7 +1012,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     <CoverImage
                       src={item.imageUrl}
                       alt=""
-                      className="w-16 h-16 rounded-xl border border-slate-800 shrink-0"
+                      className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-slate-800 shrink-0"
                     />
                     <div>
                       <div 
