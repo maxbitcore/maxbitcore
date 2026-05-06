@@ -89,6 +89,7 @@ function App() {
   const [birthDate, setBirthDate] = useState('');
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState('');
+  const [paymentSuccessEmailNote, setPaymentSuccessEmailNote] = useState('');
   const [showRegSuccess, setShowRegSuccess] = useState(false);
   const [password, setPassword] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -218,6 +219,30 @@ function App() {
     if (params.get('verified') === 'true') {
       const orderId = params.get('orderId') || 'CONFIRMED';
       setCurrentOrderId(orderId);
+
+      let note =
+        'Payment confirmed. You may get a receipt from Stripe or from us — check spam, or contact info@maxbitcore.com.';
+      try {
+        const raw = sessionStorage.getItem('maxbit_last_checkout_notify');
+        if (raw) {
+          const n = JSON.parse(raw) as { shopNotified?: boolean; customerNotified?: boolean | null };
+          if (n.shopNotified === false) {
+            note =
+              'We could not notify our store by email. Please email info@maxbitcore.com with this order ID.';
+          } else if (n.customerNotified === true) {
+            note = 'A confirmation email was sent. Our team at info@maxbitcore.com was notified.';
+          } else if (n.customerNotified === false) {
+            note =
+              'Our team was notified. The confirmation email to you may have failed — save this order ID.';
+          } else {
+            note = 'Our team was notified. You may also receive a Stripe receipt by email.';
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      setPaymentSuccessEmailNote(note);
+
       setShowSuccessAlert(true);
       if (cartItems.length > 0) {
         setCartItems([]);
@@ -469,13 +494,14 @@ function App() {
               </svg>
             </div>
             <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-1">Payment Received</h2>
-            <p className="text-[10px] font-black opacity-90 uppercase tracking-widest mb-6">
+            <p className="text-[10px] font-black opacity-90 uppercase tracking-widest mb-6 leading-relaxed max-w-xs">
               ORDER ID: {currentOrderId} <br />
-              Confirmation sent to your email
+              <span className="normal-case font-bold tracking-normal">{paymentSuccessEmailNote}</span>
             </p>
             <button 
               onClick={() => {
                 setShowSuccessAlert(false);
+                setPaymentSuccessEmailNote('');
                 navigate('/gaming-pcs');
               }}
               className="w-full py-3 bg-slate-950 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-slate-800 transition-all active:scale-95"

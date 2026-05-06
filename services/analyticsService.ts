@@ -2,8 +2,14 @@ import { Product } from '../types';
 
 export interface OrderRecord {
   id: string;
-  items: { id: string, name: string, price: number }[];
+  items: { id: string; name: string; price: number; imageUrl?: string }[];
+  /** Charged total in major units (e.g. USD), aligned with Stripe session amount_total */
   total: number;
+  /** Sum of line item prices (pre-tax), dollars */
+  subtotal?: number;
+  /** Tax from Stripe (amount_tax), dollars */
+  tax?: number;
+  currency?: string;
   timestamp: number;
   status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
   customer: {
@@ -193,10 +199,11 @@ export const trackCartAddition = (productId: string, productName?: string) => {
 };
 
 export const trackOrder = (
-  orderId: string, 
-  items: Product[], 
-  total: number, 
-  customerData: { name: string, email: string, address: string }
+  orderId: string,
+  items: Product[],
+  total: number,
+  customerData: { name: string; email: string; address: string },
+  stripeBreakdown?: { subtotal: number; tax: number; currency: string }
 ) => {
   const data = getAnalytics();
   if (!orderId.trim()) return;
@@ -207,9 +214,21 @@ export const trackOrder = (
     id: orderId,
     total,
     timestamp: Date.now(),
-    items: items.map(i => ({ id: i.id, name: i.name, price: i.price })),
+    items: items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      price: i.price,
+      imageUrl: i.imageUrl?.trim() || undefined,
+    })),
     status: 'Processing',
-    customer: customerData
+    customer: customerData,
+    ...(stripeBreakdown
+      ? {
+          subtotal: stripeBreakdown.subtotal,
+          tax: stripeBreakdown.tax,
+          currency: stripeBreakdown.currency,
+        }
+      : {}),
   };
   data.orders.push(record);
   

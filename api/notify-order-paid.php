@@ -81,4 +81,27 @@ if (!$ok) {
     exit;
 }
 
-echo json_encode(['ok' => true]);
+$customer_notified = false;
+if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+    $custSubject = '[MaxBit] Order confirmed — ' . $orderId;
+    $custBody = "Thank you for your order.\r\n\r\n";
+    $custBody .= 'Order ID: ' . $orderId . "\r\n\r\n";
+    $custBody .= "We received your payment. Your order is in the queue and will be prepared for assembly and testing.\r\n";
+    $custBody .= "Estimated delivery: 3–5 business days (US).\r\n\r\n";
+    $custBody .= "Order details (for your records):\r\n\r\n" . $body . "\r\n";
+    $custBody .= "\r\nQuestions? Contact info@maxbitcore.com.\r\n\r\n— MaxBit\r\n";
+    $custHeaders = [
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+        'From: MaxBit Orders <noreply@maxbitcore.com>',
+        'Reply-To: info@maxbitcore.com',
+    ];
+    $customer_notified = (bool) @mail(
+        $customerEmail,
+        '=?UTF-8?B?' . base64_encode($custSubject) . '?=',
+        $custBody,
+        implode("\r\n", $custHeaders)
+    );
+}
+
+echo json_encode(['ok' => true, 'customer_notified' => $customer_notified]);

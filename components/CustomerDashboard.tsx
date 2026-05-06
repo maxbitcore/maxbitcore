@@ -3,13 +3,43 @@ import { sanitizeHtml } from '../services/sanitizeHtml';
 import { getAnalytics } from '../services/analyticsService';
 import { CoverImage } from './CoverImage';
 
+function formatOrderMoney(amount: number, currency = 'usd'): string {
+  const cur = (currency || 'usd').toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(amount);
+  } catch {
+    return `$${Number(amount).toFixed(2)}`;
+  }
+}
+
+function mergePurchaseRow(prev: UserPurchaseLog, next: UserPurchaseLog): UserPurchaseLog {
+  const imgById = new Map(prev.items.map((i) => [i.id, i.imageUrl]));
+  const baseItems = next.items.length ? next.items : prev.items;
+  const items = baseItems.map((it) => ({
+    ...it,
+    imageUrl: it.imageUrl || imgById.get(it.id),
+  }));
+  return {
+    ...next,
+    items,
+    subtotal: next.subtotal ?? prev.subtotal,
+    tax: next.tax ?? prev.tax,
+    currency: next.currency || prev.currency,
+    total: Number.isFinite(next.total) && next.total > 0 ? next.total : prev.total,
+    timestamp: Math.max(next.timestamp || 0, prev.timestamp || 0),
+  };
+}
+
 interface UserPurchaseLog {
   id: string;
   orderNumber?: string;
   total: number;
+  subtotal?: number;
+  tax?: number;
+  currency?: string;
   timestamp: number;
   status: string;
-  items: { id: string; name: string; price: number }[];
+  items: { id: string; name: string; price: number; imageUrl?: string }[];
   source: 'local' | 'api';
 }
 
@@ -77,15 +107,26 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
           if (mail !== em) continue;
           const id = String(o.id || '').trim() || `local-${o.timestamp}`;
           const key = id.toLowerCase();
-          byId.set(key, {
+          const row: UserPurchaseLog = {
             id,
             orderNumber: id,
             total: Number(o.total) || 0,
+            subtotal: typeof o.subtotal === 'number' ? o.subtotal : undefined,
+            tax: typeof o.tax === 'number' ? o.tax : undefined,
+            currency: typeof o.currency === 'string' ? o.currency : undefined,
             timestamp: Number(o.timestamp) || 0,
             status: String(o.status || 'Processing'),
-            items: Array.isArray(o.items) ? o.items : [],
+            items: Array.isArray(o.items)
+              ? o.items.map((item: any) => ({
+                  id: String(item.id || 'n/a'),
+                  name: String(item.name || 'Item'),
+                  price: Number(item.price) || 0,
+                  imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : undefined,
+                }))
+              : [],
             source: 'local',
-          });
+          };
+          byId.set(key, row);
         }
       } catch {
         /* ignore */
@@ -110,17 +151,28 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                     id: String(item.id || 'n/a'),
                     name: String(item.name || 'Item'),
                     price: Number(item.price) || 0,
+                    imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : undefined,
                   }))
                 : [];
-              byId.set(key, {
+              const apiRow: UserPurchaseLog = {
                 id,
                 orderNumber: ord.orderNumber || id,
                 total: amount,
+                subtotal: ord.subtotal != null ? Number(ord.subtotal) : undefined,
+                tax:
+                  ord.tax != null
+                    ? Number(ord.tax)
+                    : ord.amountTax != null
+                      ? Number(ord.amountTax) / 100
+                      : undefined,
+                currency: typeof ord.currency === 'string' ? ord.currency : undefined,
                 timestamp: ts,
                 status: String(ord.status || 'PAID'),
                 items,
                 source: 'api',
-              });
+              };
+              const prev = byId.get(key);
+              byId.set(key, prev ? mergePurchaseRow(prev, apiRow) : apiRow);
             }
           }
         }
@@ -342,26 +394,49 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/30 group-hover:bg-emerald-500 transition-colors" />
                     <div className="flex flex-col md:flex-row justify-between gap-8">
                       <div className="flex-1 space-y-6">
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div>
+                        <div className="flex flex-wrap items-start gap-4">
+                          <div className="min-w-0 flex-1">
                             <p className="text-[9px] font-black uppercase text-emerald-500 tracking-widest mb-1">
                               Store purchase
                             </p>
-                            <h3 className="text-white font-black uppercase text-2xl italic leading-none">
+                            <h3 className="text-white font-black uppercase text-2xl italic leading-none break-all">
                               Order {row.purchase.orderNumber || row.purchase.id}
                             </h3>
-                            <p className="text-slate-500 text-[10px] font-mono mt-2 uppercase tracking-tighter">
-                              ID: {row.purchase.id}
+                            <p className="text-slate-500 text-[10px] font-mono mt-3 uppercase tracking-widest">
+                              Purchase time:{' '}
+                              {row.purchase.timestamp
+                                ? new Date(row.purchase.timestamp).toLocaleString()
+                                : '—'}
                             </p>
                           </div>
-                          <div className="h-10 w-px bg-white/5 hidden md:block" />
-                          <div>
-                            <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Total</p>
-                            <p className="text-xl font-mono font-black text-emerald-400">
-                              ${Number(row.purchase.total).toLocaleString()}
-                            </p>
+                          <div className="h-10 w-px bg-white/5 hidden md:block self-stretch" />
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left sm:text-right">
+                            <div>
+                              <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Items</p>
+                              <p className="text-sm font-mono font-black text-white">
+                                {formatOrderMoney(
+                                  row.purchase.subtotal ??
+                                    row.purchase.items.reduce((s, i) => s + Number(i.price), 0),
+                                  row.purchase.currency
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Tax (Stripe)</p>
+                              <p className="text-sm font-mono font-black text-slate-300">
+                                {row.purchase.tax != null
+                                  ? formatOrderMoney(row.purchase.tax, row.purchase.currency)
+                                  : '—'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Total paid</p>
+                              <p className="text-xl font-mono font-black text-emerald-400">
+                                {formatOrderMoney(row.purchase.total, row.purchase.currency)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
+                          <div className="sm:ml-auto">
                             <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Status</p>
                             <p className="text-sm font-black text-white uppercase tracking-tight">
                               {row.purchase.status}
@@ -373,36 +448,48 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                             <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest mb-4">
                               Line items
                             </p>
-                            <ul className="space-y-3">
+                            <ul className="space-y-4">
                               {row.purchase.items.map((line) => (
                                 <li
                                   key={`${row.key}-${line.id}-${line.name}`}
-                                  className="flex justify-between gap-4 text-xs font-bold text-white"
+                                  className="flex items-center gap-4 text-xs font-bold text-white"
                                 >
-                                  <span
-                                    className="uppercase italic line-clamp-2 min-w-0"
-                                    dangerouslySetInnerHTML={{
-                                      __html: sanitizeHtml(line.name || 'Item'),
-                                    }}
-                                  />
-                                  <span className="font-mono text-emerald-400 shrink-0">
-                                    ${Number(line.price).toLocaleString()}
-                                  </span>
+                                  <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 bg-slate-950 shrink-0">
+                                    {line.imageUrl ? (
+                                      <CoverImage
+                                        src={line.imageUrl}
+                                        alt=""
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14"
+                                          />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0 flex justify-between gap-4">
+                                    <span
+                                      className="uppercase italic line-clamp-2 min-w-0"
+                                      dangerouslySetInnerHTML={{
+                                        __html: sanitizeHtml(line.name || 'Item'),
+                                      }}
+                                    />
+                                    <span className="font-mono text-emerald-400 shrink-0">
+                                      {formatOrderMoney(Number(line.price), row.purchase.currency)}
+                                    </span>
+                                  </div>
                                 </li>
                               ))}
                             </ul>
                           </div>
                         )}
-                      </div>
-                      <div className="flex flex-col justify-end border-l border-white/5 pl-8 md:min-w-[140px]">
-                        <div className="text-right md:text-right">
-                          <p className="text-[9px] text-slate-600 uppercase font-black mb-1">Logged at</p>
-                          <p className="text-[10px] text-white font-mono">
-                            {row.purchase.timestamp
-                              ? new Date(row.purchase.timestamp).toLocaleString()
-                              : 'N/A'}
-                          </p>
-                        </div>
                       </div>
                     </div>
                   </div>

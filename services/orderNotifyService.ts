@@ -1,5 +1,3 @@
-import emailjs from '@emailjs/browser';
-
 export type PaidOrderLine = { id: string; name: string; price: number };
 
 export type PaidOrderNotifyPayload = {
@@ -43,7 +41,7 @@ const ZERO_DECIMAL = new Set([
   'xpf',
 ]);
 
-function stripeMinorToMajor(minor: number, currency: string): number {
+export function stripeMinorToMajor(minor: number, currency: string): number {
   const c = (currency || 'usd').toLowerCase();
   if (ZERO_DECIMAL.has(c)) return minor;
   return minor / 100;
@@ -95,24 +93,13 @@ export function buildPaidOrderPlainText(p: PaidOrderNotifyPayload): string {
   return lines.join('\n');
 }
 
-async function sendViaEmailJs(p: PaidOrderNotifyPayload, templateId: string): Promise<void> {
-  const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID?.trim() || 'service_2bhrbcn';
-  const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY?.trim() || 'ewqLULf0b6_PZy8W5';
-  const order_body = buildPaidOrderPlainText(p);
-  await emailjs.send(
-    serviceId,
-    templateId,
-    {
-      order_id: p.orderId,
-      order_body,
-      customer_email: p.customerEmail,
-      reply_to: p.customerEmail,
-    },
-    publicKey
-  );
-}
+export type OrderNotifyResult = {
+  shopNotified: boolean;
+  /** From PHP notify-order-paid.php: second mail() to the customer */
+  customerNotified: boolean | null;
+};
 
-async function sendViaHttp(p: PaidOrderNotifyPayload, url: string, secret: string): Promise<void> {
+async function sendViaHttp(p: PaidOrderNotifyPayload, url: string, secret: string): Promise<OrderNotifyResult> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (secret) headers['X-Maxbit-Order-Notify-Secret'] = secret;
   const res = await fetch(url, {
@@ -120,36 +107,45 @@ async function sendViaHttp(p: PaidOrderNotifyPayload, url: string, secret: strin
     headers,
     body: JSON.stringify({ ...p, order_body: buildPaidOrderPlainText(p) }),
   });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(`Order notify HTTP ${res.status}: ${t.slice(0, 200)}`);
+  const t = await res.text().catch(() => '');
+  let data: { ok?: boolean; customer_notified?: boolean; error?: string } = {};
+  try {
+    data = JSON.parse(t) as typeof data;
+  } catch {
+    /* non-JSON body */
   }
+  if (!res.ok || data.ok === false) {
+    const msg = typeof data.error === 'string' ? data.error : t.slice(0, 200);
+    throw new Error(`Order notify HTTP ${res.status}: ${msg}`);
+  }
+  const customerNotified =
+    typeof data.customer_notified === 'boolean' ? data.customer_notified : null;
+  return { shopNotified: true, customerNotified };
 }
 
 /**
- * Notifies the store (info@maxbitcore.com) after Stripe marks the session paid.
- * Configure either EmailJS template (VITE_EMAILJS_TEMPLATE_ORDER_PAID) or HTTP POST (VITE_ORDER_NOTIFY_URL).
+ * After Stripe marks the session paid: POST JSON to notify-order-paid.php.
+ * The script sends two messages via PHP mail() (host SMTP / relay — e.g. to Gmail / Google Workspace):
+ * 1) full details to info@maxbitcore.com
+ * 2) confirmation to the customer email
  */
-export async function notifyShopOwnerOfPaidOrder(p: PaidOrderNotifyPayload): Promise<void> {
-  const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ORDER_PAID?.trim();
-  if (templateId) {
-    await sendViaEmailJs(p, templateId);
-    return;
-  }
-
+export async function notifyPaidOrderEmails(p: PaidOrderNotifyPayload): Promise<OrderNotifyResult> {
   const urlOff =
     typeof import.meta.env.VITE_ORDER_NOTIFY_URL === 'string' &&
     import.meta.env.VITE_ORDER_NOTIFY_URL.trim().toLowerCase() === 'off';
   if (urlOff) {
-    console.warn(
-      '[orderNotify] VITE_ORDER_NOTIFY_URL is "off" and no EmailJS template — skipping store email.'
-    );
-    return;
+    console.warn('[orderNotify] VITE_ORDER_NOTIFY_URL is "off" — skipping order emails.');
+    return { shopNotified: false, customerNotified: false };
   }
 
   const url =
     import.meta.env.VITE_ORDER_NOTIFY_URL?.trim() ||
     'https://www.maxbitcore.com/api/notify-order-paid.php';
   const secret = import.meta.env.VITE_ORDER_NOTIFY_SECRET?.trim() || '';
-  await sendViaHttp(p, url, secret);
+  return sendViaHttp(p, url, secret);
+}
+
+/** @deprecated Use notifyPaidOrderEmails */
+export async function notifyShopOwnerOfPaidOrder(p: PaidOrderNotifyPayload): Promise<void> {
+  await notifyPaidOrderEmails(p);
 }

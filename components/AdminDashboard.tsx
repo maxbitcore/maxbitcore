@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BuildSubmission, Product, ProductStatus, Review } from '../types';
-import { getAnalytics, AnalyticsData, OrderRecord, VisitorSession } from '../services/analyticsService';
+import { getAnalytics, AnalyticsData, VisitorSession } from '../services/analyticsService';
 import {
   BUILTIN_CONFIGURATOR_OPTION_KEYS,
   BUILTIN_CONFIGURATOR_OPTION_KEY_SET,
@@ -63,6 +63,93 @@ function trafficGroupKey(session: VisitorSession): string {
   if (u === 'admin') return '__admin__';
   if (u === 'registered_user') return '__registered__';
   return u;
+}
+
+const FULFILLMENT_STATUSES = ['Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
+type FulfillmentStatus = (typeof FULFILLMENT_STATUSES)[number];
+
+type AdminMergedOrder = {
+  key: string;
+  orderNumber: string;
+  customerEmail: string;
+  amount: number;
+  timestamp: number;
+  paymentStatus: string;
+  fulfillmentStatus?: FulfillmentStatus | string;
+  managedByNode: boolean;
+  lineItems?: {
+    id: string;
+    name: string;
+    priceMajor: number;
+    quantity: number;
+    imageUrl?: string;
+    productId?: string;
+  }[];
+  currency?: string;
+};
+
+function resolveAdminApiBaseUrl(): string {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (typeof fromEnv === 'string' && fromEnv.trim()) {
+    return fromEnv.trim().replace(/\/+$/, '');
+  }
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    return `${window.location.origin.replace(/\/+$/, '')}/server`;
+  }
+  return 'http://localhost:4242';
+}
+
+function normalizePhpShopOrder(ord: any): AdminMergedOrder {
+  const key = String(ord.order_id ?? ord.id ?? ord.orderNumber ?? ord.order_number ?? '')
+    .trim()
+    .slice(0, 120);
+  const fallbackKey = `php-${Number(ord.timestamp) || Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = key || fallbackKey;
+  const ts = Number(ord.timestamp);
+  const created = ord.created_at ? Date.parse(String(ord.created_at)) : NaN;
+  return {
+    key: id,
+    orderNumber: String(ord.orderNumber ?? ord.order_id ?? ord.id ?? id),
+    customerEmail: String(ord.customerEmail ?? ord.customer_email ?? ord.customer?.email ?? ''),
+    amount: Number(ord.total ?? ord.amount ?? ord.total_amount) || 0,
+    timestamp: Number.isFinite(ts) && ts > 0 ? ts : Number.isFinite(created) ? created : Date.now(),
+    paymentStatus: String(ord.status ?? 'PAID'),
+    fulfillmentStatus: ord.fulfillment_status,
+    managedByNode: false,
+  };
+}
+
+function normalizeNodeShopOrder(o: any): AdminMergedOrder | null {
+  const key = String(o.id || '').trim();
+  if (!key) return null;
+  const paidMs = Date.parse(String(o.paidAt || ''));
+  const updatedMs = Date.parse(String(o.updatedAt || ''));
+  const ts = Number.isFinite(paidMs) ? paidMs : Number.isFinite(updatedMs) ? updatedMs : Date.now();
+  return {
+    key,
+    orderNumber: String(o.orderNumber || key),
+    customerEmail: String(o.customerEmail || ''),
+    amount: Number(o.totalMajor) || 0,
+    timestamp: ts,
+    paymentStatus: 'PAID',
+    fulfillmentStatus: (o.fulfillmentStatus as string) || 'Processing',
+    managedByNode: true,
+    lineItems: Array.isArray(o.lineItems) ? o.lineItems : undefined,
+    currency: o.currency,
+  };
+}
+
+function mergeAdminShopOrders(phpRows: any[], nodeRows: any[]): AdminMergedOrder[] {
+  const map = new Map<string, AdminMergedOrder>();
+  for (const ord of phpRows) {
+    const p = normalizePhpShopOrder(ord);
+    map.set(p.key, p);
+  }
+  for (const row of nodeRows) {
+    const n = normalizeNodeShopOrder(row);
+    if (n) map.set(n.key, n);
+  }
+  return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
 }
 
 interface AdminDashboardProps {
@@ -246,10 +333,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [caseStyles, setCaseStyles] = useState<Record<string, string>>({});
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
-  const [shopOrders, setShopOrders] = useState<any[]>([]);
+  const [shopOrders, setShopOrders] = useState<AdminMergedOrder[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [allOrders, setAllOrders] = useState<OrderRecord[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
   const [trafficRange, setTrafficRange] = useState<'recent' | 'month'>('recent');
   const [expandedTrafficGroups, setExpandedTrafficGroups] = useState<Record<string, boolean>>({});
@@ -292,6 +378,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     window.dispatchEvent(new CustomEvent('maxbit-update'));
     window.dispatchEvent(new CustomEvent('storage'));
     window.dispatchEvent(new CustomEvent('configurator-updated'));
+  };
+
+  const updateNodeOrderFulfillment = async (orderKey: string, status: FulfillmentStatus) => {
+    const adminSecret =
+      typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
+        ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
+        : '';
+    if (!adminSecret) return;
+    try {
+      const r = await fetch(
+        `${resolveAdminApiBaseUrl()}/shop-orders/${encodeURIComponent(orderKey)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Maxbit-Admin-Orders-Secret': adminSecret,
+          },
+          body: JSON.stringify({ fulfillmentStatus: status }),
+        }
+      );
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || String(r.status));
+      }
+      setShopOrders((prev) =>
+        prev.map((o) => (o.key === orderKey ? { ...o, fulfillmentStatus: status } : o))
+      );
+    } catch (err) {
+      console.error('Fulfillment update failed:', err);
+      alert('Could not update order status.');
+    }
+  };
+
+  const deleteNodeShopOrder = async (orderKey: string) => {
+    const adminSecret =
+      typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
+        ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
+        : '';
+    if (!adminSecret) return;
+    try {
+      const r = await fetch(
+        `${resolveAdminApiBaseUrl()}/shop-orders/${encodeURIComponent(orderKey)}`,
+        {
+          method: 'DELETE',
+          headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
+        }
+      );
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || String(r.status));
+      }
+      setShopOrders((prev) => prev.filter((o) => o.key !== orderKey));
+    } catch (err) {
+      console.error('Order delete failed:', err);
+      alert('Could not delete order.');
+    }
   };
 
   const resetProductForm = () => {
@@ -373,34 +515,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         }
 
         try {
+          let phpOrders: any[] = [];
           const orderRes = await fetch('https://www.maxbitcore.com/api/get-orders.php');
           if (orderRes.ok) {
             const orderData = await orderRes.json();
-            if (Array.isArray(orderData)) {
-              const validatedOrders: OrderRecord[] = orderData.map((ord: any) => ({
-                id: ord.id || `ORD-${Math.random().toString(36).substr(2, 9)}`,
-                total: Number(ord.total || ord.amount) || 0,
-                timestamp: Number(ord.timestamp) || Date.now(),
-                status: (['Processing', 'Shipped', 'Delivered', 'Cancelled'].includes(ord.status) 
-                  ? ord.status 
-                  : 'Processing') as OrderRecord['status'],
-                items: Array.isArray(ord.items) 
-                  ? ord.items.map((item: any) => ({
-                      id: item.id || 'n/a',
-                      name: item.name || 'Unknown Item',
-                      price: Number(item.price) || 0
-                    }))
-                  : [],
-                customer: {
-                  name: ord.customer_name || ord.customer?.name || 'Unknown',
-                  email: ord.customer_email || ord.customer?.email || 'No email',
-                  address: ord.customer_address || ord.customer?.address || 'No address'
-                }
-              }));
-              setShopOrders(orderData.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0)));
-              setAllOrders(validatedOrders);
+            if (Array.isArray(orderData)) phpOrders = orderData;
+          }
+
+          let nodeOrders: any[] = [];
+          const adminSecret =
+            typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
+              ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
+              : '';
+          if (adminSecret) {
+            try {
+              const nodeRes = await fetch(`${resolveAdminApiBaseUrl()}/shop-orders`, {
+                headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
+              });
+              if (nodeRes.ok) {
+                const nodeData = await nodeRes.json();
+                if (Array.isArray(nodeData)) nodeOrders = nodeData;
+              } else {
+                console.warn('Shop orders API:', nodeRes.status, await nodeRes.text().catch(() => ''));
+              }
+            } catch (nodeErr) {
+              console.error('Node shop orders fetch failed:', nodeErr);
             }
           }
+
+          setShopOrders(mergeAdminShopOrders(phpOrders, nodeOrders));
         } catch (e) {
           console.error("Orders Sync Failed:", e);
         }
@@ -1311,20 +1454,116 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                   <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest"> No Orders Logged</div>
                 ) : (
                   shopOrders.map((order) => (
-                    <div key={order.id} className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex justify-between items-center group hover:border-emerald-500/20 transition-all shadow-xl">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Transaction Detected</span>
+                    <div
+                      key={order.key}
+                      className="bg-slate-900/40 border border-slate-800 p-8 rounded-3xl flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6 group hover:border-emerald-500/20 transition-all shadow-xl"
+                    >
+                      <div className="space-y-3 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                            Transaction Detected
+                          </span>
+                          {order.managedByNode ? (
+                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
+                              Stripe / server
+                            </span>
+                          ) : null}
                         </div>
-                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">{order.orderNumber}</h3>
-                        <p className="text-xs text-slate-500 font-mono tracking-tight">CUSTOMER: {order.customerEmail}</p>
+                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">
+                          {order.orderNumber}
+                        </h3>
+                        <p className="text-xs text-slate-500 font-mono tracking-tight break-all">
+                          CUSTOMER: {order.customerEmail || '—'}
+                        </p>
+                        {order.lineItems && order.lineItems.length > 0 ? (
+                          <ul className="text-[10px] text-slate-400 space-y-1 border-t border-slate-800/80 pt-3 mt-2">
+                            {order.lineItems.map((li) => (
+                              <li key={li.id} className="flex justify-between gap-4">
+                                <span className="truncate">
+                                  {li.quantity > 1 ? `${li.quantity}× ` : ''}
+                                  {li.name}
+                                  {li.productId ? (
+                                    <span className="block text-[9px] font-mono text-slate-600 mt-0.5">
+                                      ID {li.productId}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="shrink-0 font-mono text-slate-500">
+                                  ${Number(li.priceMajor * li.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
-      
-                      <div className="text-right space-y-3">
-                        <div className="text-3xl font-black text-white italic tracking-tighter">${Number(order.amount).toLocaleString()}</div>
-                        <div className={`text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border ${order.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'  : 'bg-amber-500/10 text-amber-500 border-amber-500/20' }`}> {order.status}</div>
-                        <div className="text-[9px] font-mono text-slate-600 block uppercase tracking-widest">{new Date(order.timestamp).toLocaleString()}</div>
+
+                      <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:items-end lg:text-right shrink-0">
+                        <div className="space-y-3 sm:text-right">
+                          <div className="text-3xl font-black text-white italic tracking-tighter">
+                            ${Number(order.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div
+                            className={`text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border ${
+                              String(order.paymentStatus).toUpperCase() === 'PAID'
+                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                            }`}
+                          >
+                            {order.paymentStatus}
+                          </div>
+                          {order.fulfillmentStatus &&
+                          !(
+                            order.managedByNode &&
+                            typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string' &&
+                            import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
+                          ) ? (
+                            <div className="text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border bg-slate-800/80 text-slate-300 border-slate-700">
+                              {order.fulfillmentStatus}
+                            </div>
+                          ) : null}
+                          <div className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">
+                            {new Date(order.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+
+                        {order.managedByNode &&
+                        typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string' &&
+                        import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim() ? (
+                          <div className="flex flex-col gap-2 w-full sm:w-auto lg:w-48">
+                            <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                              Fulfillment
+                            </label>
+                            <select
+                              value={
+                                FULFILLMENT_STATUSES.includes(order.fulfillmentStatus as FulfillmentStatus)
+                                  ? (order.fulfillmentStatus as FulfillmentStatus)
+                                  : 'Processing'
+                              }
+                              onChange={(e) =>
+                                updateNodeOrderFulfillment(order.key, e.target.value as FulfillmentStatus)
+                              }
+                              className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-white uppercase tracking-tight focus:border-cyan-500/50 focus:outline-none"
+                            >
+                              {FULFILLMENT_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('Delete this order from the server list?')) {
+                                  void deleteNodeShopOrder(order.key);
+                                }
+                              }}
+                              className="mt-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-rose-500/10 text-rose-400 border border-rose-500/25 hover:bg-rose-500 hover:text-white transition-colors"
+                            >
+                              Delete order
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))

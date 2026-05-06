@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../types';
-import { notifyShopOwnerOfPaidOrder } from '../services/orderNotifyService';
+import { notifyPaidOrderEmails, stripeMinorToMajor, type OrderNotifyResult } from '../services/orderNotifyService';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 import { US_STATES } from '../data/usStates';
 import { searchPhotonCities, type CitySuggestion } from '../services/addressSearch';
@@ -27,6 +27,7 @@ const apiBaseUrl = resolveApiBaseUrl();
 
 const PENDING_CHECKOUT_KEY = 'maxbit_pending_checkout_v1';
 const ORDER_ADMIN_NOTIFY_SENT_PREFIX = 'maxbit_order_admin_notify:';
+const STRIPE_RECEIPT_STORAGE_KEY = 'maxbit_last_stripe_receipt';
 
 type PendingCheckoutSnapshot = {
   v: 1;
@@ -40,7 +41,7 @@ type PendingCheckoutSnapshot = {
   usState: string;
   zip: string;
   countryLabel: string;
-  items: { id: string; name: string; price: number }[];
+  items: { id: string; name: string; price: number; imageUrl?: string }[];
   subtotal: number;
   estimatedTax: number;
   total: number;
@@ -140,6 +141,10 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
   
   // Customer Data State
   const [email, setEmail] = useState('');
+  /** Set after paid session verify — drives honest copy on success screen */
+  const [orderEmailNotifyResult, setOrderEmailNotifyResult] = useState<OrderNotifyResult | null>(null);
+  /** Official Stripe receipt page (charge.receipt_url) — open / print / save as PDF */
+  const [stripeReceiptUrl, setStripeReceiptUrl] = useState<string | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [address, setAddress] = useState('');
@@ -188,6 +193,20 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
     authCtx?.currentUser?.firstName,
     authCtx?.currentUser?.lastName,
   ]);
+
+  useEffect(() => {
+    if (step !== 'success' || !orderId) return;
+    try {
+      const raw = sessionStorage.getItem(STRIPE_RECEIPT_STORAGE_KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw) as { orderId?: string; receiptUrl?: string };
+      if (o.orderId === orderId && typeof o.receiptUrl === 'string' && /^https:\/\//i.test(o.receiptUrl)) {
+        setStripeReceiptUrl((prev) => prev || o.receiptUrl || null);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [step, orderId]);
 
   useEffect(() => {
     if (step !== 'details') return;
@@ -264,6 +283,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
       }
 
       if (urlOrderId) setOrderId(urlOrderId);
+      setStripeReceiptUrl(null);
       setStep('verifying');
 
       const params = new URLSearchParams({ session_id: sessionId });
@@ -294,6 +314,19 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
             if (typeof data.orderId === 'string' && data.orderId) setOrderId(data.orderId);
             if (typeof data.email === 'string' && data.email) setEmail(data.email);
             const oid = String(data.orderId || urlOrderId || '').trim();
+            const receiptRaw = typeof data.receiptUrl === 'string' ? data.receiptUrl.trim() : '';
+            const receiptOk = /^https:\/\//i.test(receiptRaw);
+            if (receiptOk && oid) {
+              setStripeReceiptUrl(receiptRaw);
+              try {
+                sessionStorage.setItem(
+                  STRIPE_RECEIPT_STORAGE_KEY,
+                  JSON.stringify({ orderId: oid, receiptUrl: receiptRaw })
+                );
+              } catch {
+                /* private mode */
+              }
+            }
             const paidEmail =
               (typeof data.email === 'string' && data.email.trim()) || email.trim();
             const pending = readPendingCheckoutSnapshot();
@@ -301,11 +334,20 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
 
             const lines =
               snapOk && pending!.items.length > 0
-                ? pending!.items
+                ? pending!.items.map((it) => ({
+                    id: it.id,
+                    name: it.name,
+                    price: it.price,
+                    imageUrl:
+                      (typeof it.imageUrl === 'string' && it.imageUrl) ||
+                      checkoutItems.find((c) => c.id === it.id)?.imageUrl ||
+                      '',
+                  }))
                 : checkoutItems.map((item) => ({
                     id: item.id,
                     name: item.name.replace(/<[^>]*>?/gm, ''),
                     price: item.price,
+                    imageUrl: item.imageUrl || '',
                   }));
 
             const productsForTrack: Product[] = lines.map((i) => ({
@@ -314,7 +356,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
               price: i.price,
               category: '',
               status: 'In Stock',
-              imageUrl: '',
+              imageUrl: i.imageUrl || '',
               description: '',
             }));
 
@@ -334,19 +376,35 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
             const notifyTax = snapOk ? pending!.estimatedTax : estimatedTax;
             const notifyTotal = snapOk ? pending!.total : total;
 
+            const payCurrency = typeof data.currency === 'string' ? data.currency : 'usd';
+            const stripeChargedTotal = stripeMinorToMajor(Number(data.amountTotal ?? 0), payCurrency);
+            const stripeTaxCharged = stripeMinorToMajor(Number(data.amountTax ?? 0), payCurrency);
+            const lineSubtotalSum = lines.reduce((s, l) => s + Number(l.price), 0);
+
             if (oid && lines.length > 0 && paidEmail) {
-              trackOrder(oid, productsForTrack, notifyTotal, {
-                name: nameFromForm || 'Customer',
-                email: paidEmail,
-                address: fullAddress,
-              });
+              trackOrder(
+                oid,
+                productsForTrack,
+                stripeChargedTotal,
+                {
+                  name: nameFromForm || 'Customer',
+                  email: paidEmail,
+                  address: fullAddress,
+                },
+                {
+                  subtotal: lineSubtotalSum,
+                  tax: stripeTaxCharged,
+                  currency: payCurrency,
+                }
+              );
             }
 
+            let emailNotifySnapshot: OrderNotifyResult | null = null;
             if (oid && paidEmail) {
               try {
                 if (!localStorage.getItem(ORDER_ADMIN_NOTIFY_SENT_PREFIX + oid)) {
                   const st = snapOk ? pending!.usState : usState;
-                  await notifyShopOwnerOfPaidOrder({
+                  const result = await notifyPaidOrderEmails({
                     orderId: oid,
                     stripeSessionId: sessionId,
                     customerName: nameFromForm || 'Customer',
@@ -366,11 +424,32 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
                     currency: typeof data.currency === 'string' ? data.currency : 'usd',
                     stripeLivemode: !!data.livemode,
                   });
-                  localStorage.setItem(ORDER_ADMIN_NOTIFY_SENT_PREFIX + oid, '1');
+                  emailNotifySnapshot = result;
+                  setOrderEmailNotifyResult(result);
+                  if (result.shopNotified) {
+                    localStorage.setItem(ORDER_ADMIN_NOTIFY_SENT_PREFIX + oid, '1');
+                  }
+                } else {
+                  emailNotifySnapshot = { shopNotified: true, customerNotified: null };
+                  setOrderEmailNotifyResult(emailNotifySnapshot);
                 }
               } catch (e) {
                 console.warn('Store order notification failed:', e);
+                emailNotifySnapshot = { shopNotified: false, customerNotified: false };
+                setOrderEmailNotifyResult(emailNotifySnapshot);
               }
+            } else {
+              setOrderEmailNotifyResult(null);
+            }
+
+            try {
+              if (emailNotifySnapshot) {
+                sessionStorage.setItem('maxbit_last_checkout_notify', JSON.stringify(emailNotifySnapshot));
+              } else {
+                sessionStorage.removeItem('maxbit_last_checkout_notify');
+              }
+            } catch {
+              /* private mode */
             }
 
             if (snapOk) clearPendingCheckoutSnapshot();
@@ -505,6 +584,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               id: item.id,
               name: item.name.replace(/<[^>]*>?/gm, ''),
               price: item.price,
+              imageUrl: item.imageUrl || '',
             })),
             subtotal,
             estimatedTax,
@@ -594,15 +674,52 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 <span className="text-xl font-bold text-white">3-5 Business Days</span>
               </div>
             </div>
-            <div className="border-t border-slate-800 pt-8">
-              <p className="text-slate-400 leading-relaxed text-sm">
-                We've sent a confirmation email to <strong>{email}</strong>.
-              </p>
-              <div className="mt-4 flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
-                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 <span className="font-bold uppercase tracking-wide">Our team at info@maxbitcore.com has been notified</span>
-              </div>
-              <p className="text-slate-500 mt-4 text-xs">Your order is in the queue and will be prepared for assembly and testing.</p>
+            <div className="border-t border-slate-800 pt-8 space-y-4">
+              {orderEmailNotifyResult?.shopNotified === false && (
+                <div className="flex items-start gap-2 text-xs text-amber-200 bg-amber-500/10 p-3 rounded-lg border border-amber-500/30">
+                  <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>
+                    We could not send the automatic store notification. Please email{' '}
+                    <strong className="text-amber-100">info@maxbitcore.com</strong> with your order number{' '}
+                    <strong className="font-mono">{orderId}</strong> so we can process it.
+                  </span>
+                </div>
+              )}
+              {orderEmailNotifyResult?.customerNotified === true && (
+                <p className="text-slate-400 leading-relaxed text-sm">
+                  We&apos;ve sent a confirmation email to <strong>{email}</strong>. Check spam if you don&apos;t see it.
+                </p>
+              )}
+              {orderEmailNotifyResult?.customerNotified === false && (
+                <p className="text-slate-400 leading-relaxed text-sm">
+                  We could not send an email to <strong>{email}</strong> from our server. Your payment still went through.
+                  Save this order number; you can also write to <strong>info@maxbitcore.com</strong>.
+                </p>
+              )}
+              {orderEmailNotifyResult?.shopNotified === true && orderEmailNotifyResult.customerNotified === null && (
+                <p className="text-slate-400 leading-relaxed text-sm">
+                  If you use card checkout, Stripe may send a separate receipt to <strong>{email}</strong>. If nothing arrives,
+                  check spam or contact <strong>info@maxbitcore.com</strong> with order <strong className="font-mono">{orderId}</strong>.
+                </p>
+              )}
+              {!orderEmailNotifyResult && (
+                <p className="text-slate-400 leading-relaxed text-sm">
+                  Order <strong className="font-mono">{orderId}</strong> is confirmed. Keep this page or note your order number.
+                </p>
+              )}
+              {orderEmailNotifyResult?.shopNotified === true && (
+                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-bold uppercase tracking-wide">
+                    Our team at info@maxbitcore.com has been notified
+                  </span>
+                </div>
+              )}
+              <p className="text-slate-500 text-xs">Your order is in the queue and will be prepared for assembly and testing.</p>
             </div>
           </div>
 
@@ -613,11 +730,25 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
             >
               Continue Shopping
             </button>
-            <button 
-              className="px-10 py-5 border border-slate-800 text-white font-black uppercase tracking-widest text-sm rounded-xl hover:bg-slate-900 transition-all"
-            >
-              Download Receipt
-            </button>
+            {stripeReceiptUrl ? (
+              <a
+                href={stripeReceiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-10 py-5 border border-slate-800 text-white font-black uppercase tracking-widest text-sm rounded-xl hover:bg-slate-900 transition-all inline-flex items-center justify-center"
+              >
+                View receipt (Stripe)
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title="Stripe did not return a receipt link for this charge. Use your card statement or contact info@maxbitcore.com."
+                className="px-10 py-5 border border-slate-800 text-slate-500 font-black uppercase tracking-widest text-sm rounded-xl cursor-not-allowed opacity-60"
+              >
+                View receipt (Stripe)
+              </button>
+            )}
           </div>
         </div>
       </div>
