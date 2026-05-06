@@ -8,6 +8,7 @@ import {
   parseConfiguratorSectionLabels,
   resolveConfiguratorSectionTitle,
 } from '../services/configuratorOptions';
+import { resolveSiteAssetUrl } from '../constants';
 
 // Default Data Constants (Fallbacks)
 const DEFAULT_CONFIG = {
@@ -190,9 +191,13 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
     if (storedCaseStyles) {
       try {
+        const parsed = JSON.parse(storedCaseStyles) as Record<string, unknown>;
+        const normalized = Object.fromEntries(
+          Object.entries(parsed || {}).map(([k, v]) => [k, resolveSiteAssetUrl(String(v || ''))])
+        );
         setCaseImages((prev) => ({
           ...prev,
-          ...JSON.parse(storedCaseStyles),
+          ...normalized,
         }));
       } catch {
         /* ignore */

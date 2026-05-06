@@ -21,6 +21,7 @@ interface CustomerDashboardProps {
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUser, onLogout, allProducts, onSelectProduct }) => {
+  const isAdmin = currentUser?.role === 'admin';
   const [userSubmissions, setUserSubmissions] = useState<any[]>([]);
   const [userPurchases, setUserPurchases] = useState<UserPurchaseLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -222,58 +223,56 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
           </div>
         </div>
 
-        {/* DASHBOARD GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="flex flex-col gap-8">
-            
-            {/* PROFILE CARD */}
-            <div className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-6">User Parameters</h3>
-              <div className="space-y-6">
-                
-                {/* FULL NAME */}
-                <div className="border-l-2 border-cyan-500/30 pl-4">
-                  <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Full Name</p>
-                  <p className="text-sm font-bold uppercase italic text-white">
-                    {currentUser?.firstName || currentUser?.lastName 
-                      ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() 
-                      : (currentUser?.username || 'IDENTIFIED OPERATOR')}
-                  </p>
-                </div>
+        {/* DASHBOARD GRID — admins only see Operational Log (console) */}
+        <div className={`grid grid-cols-1 gap-8 ${isAdmin ? '' : 'lg:grid-cols-3'}`}>
+          {!isAdmin && (
+            <div className="flex flex-col gap-8">
+              {/* PROFILE CARD */}
+              <div className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-6">User Parameters</h3>
+                <div className="space-y-6">
+                  {/* FULL NAME */}
+                  <div className="border-l-2 border-cyan-500/30 pl-4">
+                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Full Name</p>
+                    <p className="text-sm font-bold uppercase italic text-white">
+                      {currentUser?.firstName || currentUser?.lastName
+                        ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim()
+                        : (currentUser?.username || 'IDENTIFIED OPERATOR')}
+                    </p>
+                  </div>
 
-                {/* EMAIL */}
-                <div className="border-l-2 border-slate-800 pl-4">
-                  <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Comm_Link (Email)</p>
-                  <p className="text-sm font-bold lowercase text-cyan-400">
-                    {currentUser?.email || 'OFFLINE / NOT FOUND'}
-                  </p>
-                </div>
+                  {/* EMAIL */}
+                  <div className="border-l-2 border-slate-800 pl-4">
+                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Comm_Link (Email)</p>
+                    <p className="text-sm font-bold lowercase text-cyan-400">
+                      {currentUser?.email || 'OFFLINE / NOT FOUND'}
+                    </p>
+                  </div>
 
-                {/* JOIN DATE */}
-                <div className="border-l-2 border-slate-800 pl-4">
-                  <p className="text-[9px] text-slate-500 uppercase font-black mb-1">System Joined</p>
-                  <p className="text-sm font-bold text-white uppercase italic tracking-wider">
-                    {currentUser?.joined
-                      ? new Date(currentUser.joined).toLocaleDateString()
-                      : '—'}
-                  </p>
+                  {/* JOIN DATE */}
+                  <div className="border-l-2 border-slate-800 pl-4">
+                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">System Joined</p>
+                    <p className="text-sm font-bold text-white uppercase italic tracking-wider">
+                      {currentUser?.joined
+                        ? new Date(currentUser.joined).toLocaleDateString()
+                        : '—'}
+                    </p>
+                  </div>
                 </div>
-
               </div>
-            </div>
-            
-            {/* WISH LIST */}
-            <div className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm flex-1 flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600">Wish List</h3>
-                <span className="text-[9px] font-black px-2 py-1 rounded text-cyan-500 bg-cyan-500/10">
-                  {wishlist.length} ITEMS
-                </span>
-              </div>
-              <div className="space-y-4">
-                {wishlist.map((item) => (
-                    <div 
-                      key={item.id} 
+
+              {/* WISH LIST */}
+              <div className="bg-slate-900/40 border border-white/5 p-8 rounded-3xl backdrop-blur-sm flex-1 flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600">Wish List</h3>
+                  <span className="text-[9px] font-black px-2 py-1 rounded text-cyan-500 bg-cyan-500/10">
+                    {wishlist.length} ITEMS
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {wishlist.map((item) => (
+                    <div
+                      key={item.id}
                       onClick={() => onSelectProduct(item)}
                       className="group flex items-center gap-4 p-3 bg-slate-950/30 border border-white/5 rounded-2xl hover:border-cyan-500/30 hover:bg-white/5 transition-all cursor-pointer mb-3"
                     >
@@ -285,46 +284,48 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                         />
                       </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                         <div className="w-1 h-1 bg-cyan-500 rounded-full" />
-                         <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest leading-none">
-                           {item.category || 'HARDWARE UNIT'}
-                         </p>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-1 h-1 bg-cyan-500 rounded-full" />
+                          <p className="text-[8px] text-slate-500 uppercase font-black tracking-widest leading-none">
+                            {item.category || 'HARDWARE UNIT'}
+                          </p>
+                        </div>
+
+                        <h4
+                          className="text-sm font-black uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1 leading-tight"
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name || 'Unknown Unit') }}
+                        />
+
+                        <p className="text-xs font-black text-cyan-500 font-mono mt-1">
+                          ${item.price || '0.00'}
+                        </p>
                       </div>
-      
-                      <h4 
-                         className="text-sm font-black uppercase italic text-white group-hover:text-cyan-400 transition-colors line-clamp-1 leading-tight"
-                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name || 'Unknown Unit') }}
-                      />
-      
-                      <p className="text-xs font-black text-cyan-500 font-mono mt-1">
-                        ${item.price || '0.00'}
-                      </p>
+
+                      {/* DELETE */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveFromWishlist(item.id);
+                        }}
+                        className="p-3 text-[10px] font-black text-slate-700 hover:text-rose-500 uppercase tracking-widest transition-colors"
+                        title="Remove from list"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
-    
-                    {/* DELETE */}
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFromWishlist(item.id);
-                      }}
-                      className="p-3 text-[10px] font-black text-slate-700 hover:text-rose-500 uppercase tracking-widest transition-colors"
-                      title="Remove from list"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* OPERATIONAL LOG */}
-          <div className="lg:col-span-2">
+          <div className={isAdmin ? '' : 'lg:col-span-2'}>
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-6">Operational Log</h3>
             <div className="space-y-4">
               {!isLoading && operationalLogItems.length === 0 && (

@@ -12,6 +12,7 @@ import {
   resolveConfiguratorSectionTitle,
   sanitizeNewConfiguratorSectionKey,
 } from '../services/configuratorOptions';
+import { resolveSiteAssetUrl } from '../constants';
 import { loginUser, registerUser, getStoredAuth } from '../services/authService';
 import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
@@ -318,7 +319,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setIsProcessing(true);
 
     try {
-        const url = await uploadImageToServer(file);
+        const url = resolveSiteAssetUrl(await uploadImageToServer(file));
         const updatedStyles = { ...caseStyles, [category]: url };
         setCaseStyles(updatedStyles);
         localStorage.setItem('maxbit_case_styles', JSON.stringify(updatedStyles));
@@ -432,7 +433,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     }
 
     const storedCaseStyles = localStorage.getItem('maxbit_case_styles');
-    if (storedCaseStyles) setCaseStyles(JSON.parse(storedCaseStyles));
+    if (storedCaseStyles) {
+      try {
+        const parsed = JSON.parse(storedCaseStyles) as Record<string, unknown>;
+        const normalized = Object.fromEntries(
+          Object.entries(parsed || {}).map(([k, v]) => [k, resolveSiteAssetUrl(String(v || ''))])
+        );
+        setCaseStyles(normalized);
+      } catch {
+        setCaseStyles({});
+      }
+    }
     
     const analyticsData = getAnalytics();
     setAnalytics(analyticsData);
@@ -762,7 +773,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
       if (!file) return;
 
-      const url = await uploadImageToServer(file as File);
+      const url = resolveSiteAssetUrl(await uploadImageToServer(file as File));
 
       const updatedStyles = { 
         ...caseStyles, 
@@ -1138,7 +1149,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               <div key={type} className="flex items-center gap-4 p-4 bg-slate-950 border border-slate-800 rounded-2xl group hover:border-cyan-500/30 transition-all">
                                 <div className="w-16 h-20 bg-slate-900 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 relative">
                                     {caseStyles[type] ? ( 
-                                       <img src={caseStyles[type]} className="w-full h-full object-cover" alt={type} /> 
+                                       <img src={resolveSiteAssetUrl(caseStyles[type])} className="w-full h-full object-cover" alt={type} /> 
                                     ) : (
                                        <div className="flex items-center justify-center h-full text-slat-700"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                        </div>

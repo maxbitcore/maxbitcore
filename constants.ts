@@ -27,14 +27,24 @@ export const DEFAULT_LOGO_URL = 'https://www.maxbitcore.com/uploads/logo.png';
 const LOGO_SITE_ORIGIN = 'https://www.maxbitcore.com';
 
 /**
- * Ensures logo URLs work in mobile wrappers (Capacitor/PWA) where relative paths
- * would resolve against the app origin instead of the live site.
+ * Resolves potentially relative media paths (`/uploads/...`) to absolute
+ * URLs so they also work inside mobile webviews.
  */
-export function resolveLogoSrc(stored: string | null | undefined): string {
+export function resolveSiteAssetUrl(stored: string | null | undefined): string {
   const raw = (stored ?? '').trim();
-  if (!raw) return DEFAULT_LOGO_URL;
+  if (!raw) return '';
+  if (/^(data|blob):/i.test(raw)) return raw;
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith('//')) return `https:${raw}`;
   const path = raw.startsWith('/') ? raw : `/${raw}`;
   return `${LOGO_SITE_ORIGIN}${path}`;
+}
+
+/**
+ * Ensures logo URLs work in mobile wrappers (Capacitor/PWA) where relative paths
+ * would resolve against the app origin instead of the live site.
+ */
+export function resolveLogoSrc(stored: string | null | undefined): string {
+  const resolved = resolveSiteAssetUrl(stored);
+  return resolved || DEFAULT_LOGO_URL;
 }
