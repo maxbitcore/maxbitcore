@@ -103,8 +103,8 @@ function App() {
   
   const navigate = useNavigate();
   const location = useLocation();
-  /** Desktop (lg+): fixed navbar — top padding. Mobile: navbar in flow — no offset. */
-  const mainTopClass = 'pt-0 lg:pt-16 xl:pt-20';
+  /** Navbar is in document flow on all breakpoints; no top offset needed. */
+  const mainTopClass = 'pt-0';
 
   const switchToRegister = () => {
     resetRegForm();

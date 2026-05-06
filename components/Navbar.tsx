@@ -284,7 +284,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   // Dedicated Admin Mode View
   if (activeTab === 'admin' && location.pathname !== '/') {
     return (
-      <nav className="relative z-50 w-full bg-[#0b0f1a] border-b border-rose-500/30 py-3 md:py-4 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.1)] lg:fixed lg:top-0 lg:left-0 lg:right-0">
+      <nav className="relative z-50 w-full bg-[#0b0f1a] border-b border-rose-500/30 py-3 md:py-4 shadow-[0_10px_40px_-10px_rgba(244,63,94,0.1)]">
         <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-14">
           {/* Left Side */}
           <div className="flex items-center gap-3 md:gap-4">
@@ -322,10 +322,10 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   return (
     <>
     <nav
-      className={`relative z-50 w-full isolate transform-gpu transition-all duration-500 lg:fixed lg:inset-x-0 lg:top-0 ${
+      className={`relative z-50 w-full isolate transform-gpu transition-all duration-500 ${
         scrolled
           ? 'bg-[#0b0f1a]/95 backdrop-blur-xl border-b border-slate-800/50 py-2 shadow-2xl'
-          : 'py-3 md:py-4 bg-[#0b0f1a]/93 backdrop-blur-lg border-b border-slate-800/40 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.55)] lg:bg-transparent lg:backdrop-blur-none lg:border-b-transparent lg:shadow-none'
+          : 'py-3 md:py-4 bg-[#0b0f1a]/93 backdrop-blur-lg border-b border-slate-800/40 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.55)]'
       }`}
     >
       <div className="max-w-[1800px] mx-auto px-4 md:px-12 flex items-center justify-between h-12 md:h-14">
@@ -355,7 +355,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
         </div>
 
         {/* Center: Search Bar */}
-        <div className="flex-1 hidden xl:flex justify-center">
+        <div className="flex-1 hidden lg:flex justify-center">
           <form 
             onSubmit={handleSearchSubmit} 
             className="relative flex items-center bg-slate-900/50 border border-slate-800 rounded-xl overflow-visible focus-within:border-cyan-500 transition-all shadow-lg w-full max-w-md"
@@ -517,7 +517,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
       </div>
 
       {/* Mobile Search */}
-      <div className="xl:hidden max-w-[1800px] mx-auto px-4 md:px-12 pb-3">
+      <div className="lg:hidden max-w-[1800px] mx-auto px-4 md:px-12 pb-3">
         <form onSubmit={handleSearchSubmit} className="relative max-w-sm">
           <div className="flex items-center bg-slate-900/60 border border-slate-800 rounded-xl overflow-visible focus-within:border-cyan-500 transition-all">
             <div className="flex items-center pl-4 text-slate-500">
