@@ -11,9 +11,7 @@ import {
 } from '../services/authService';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { DEFAULT_LOGO_URL } from '../constants';
-
-const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
+import { DEFAULT_LOGO_URL, resolveLogoSrc } from '../constants';
 
 interface NavbarProps {
   activeTab: MainTab | null;
@@ -268,11 +266,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
   const logoContent = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} className="md:gap-3">
       <img 
-        src={currentLogo || DEFAULT_LOGO_URL} 
+        src={resolveLogoSrc(currentLogo)} 
         className="h-8 md:h-10 w-auto object-contain"
         alt="MAXBIT Logo" 
         onError={(e) => {
-           e.currentTarget.style.display = 'none';
+          const el = e.currentTarget;
+          if (el.dataset.logoFallback === '1') return;
+          el.dataset.logoFallback = '1';
+          el.src = DEFAULT_LOGO_URL;
         }}
       />
       <span className="text-xl md:text-2xl font-black text-white italic">

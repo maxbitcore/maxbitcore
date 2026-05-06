@@ -23,3 +23,18 @@ export const BRAND_NAME = 'MAXBIT';
 
 /** Used when no admin-uploaded logo is stored in localStorage (`maxbit_logo`). */
 export const DEFAULT_LOGO_URL = 'https://www.maxbitcore.com/uploads/logo.png';
+
+const LOGO_SITE_ORIGIN = 'https://www.maxbitcore.com';
+
+/**
+ * Ensures logo URLs work in mobile wrappers (Capacitor/PWA) where relative paths
+ * would resolve against the app origin instead of the live site.
+ */
+export function resolveLogoSrc(stored: string | null | undefined): string {
+  const raw = (stored ?? '').trim();
+  if (!raw) return DEFAULT_LOGO_URL;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  const path = raw.startsWith('/') ? raw : `/${raw}`;
+  return `${LOGO_SITE_ORIGIN}${path}`;
+}
