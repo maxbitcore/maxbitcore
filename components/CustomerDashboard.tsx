@@ -1,7 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { resolveSiteAssetUrl } from '../constants';
 import { sanitizeHtml } from '../services/sanitizeHtml';
 import { getAnalytics } from '../services/analyticsService';
 import { CoverImage } from './CoverImage';
+
+/** Order payloads often omit imageUrl (PHP API / older analytics); hydrate from live catalog by product id. */
+function resolvePurchaseLineImageUrl(
+  line: { id: string; imageUrl?: string },
+  catalog: any[]
+): string {
+  const raw = typeof line.imageUrl === 'string' ? line.imageUrl.trim() : '';
+  if (raw) return resolveSiteAssetUrl(raw);
+  const id = String(line.id || '').trim();
+  if (!id || id === 'n/a') return '';
+  const p = catalog.find((x) => String(x?.id) === id);
+  if (!p) return '';
+  const img =
+    (typeof p.imageUrl === 'string' && p.imageUrl.trim()) ||
+    (Array.isArray(p.gallery) && typeof p.gallery[0] === 'string' ? p.gallery[0].trim() : '') ||
+    '';
+  return resolveSiteAssetUrl(img);
+}
 
 function formatOrderMoney(amount: number, currency = 'usd'): string {
   const cur = (currency || 'usd').toUpperCase();
@@ -449,15 +468,17 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                               Line items
                             </p>
                             <ul className="space-y-4">
-                              {row.purchase.items.map((line) => (
+                              {row.purchase.items.map((line) => {
+                                const lineImg = resolvePurchaseLineImageUrl(line, allProducts);
+                                return (
                                 <li
                                   key={`${row.key}-${line.id}-${line.name}`}
                                   className="flex items-center gap-4 text-xs font-bold text-white"
                                 >
                                   <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 bg-slate-950 shrink-0">
-                                    {line.imageUrl ? (
+                                    {lineImg ? (
                                       <CoverImage
-                                        src={line.imageUrl}
+                                        src={lineImg}
                                         alt=""
                                         className="w-full h-full object-cover"
                                       />
@@ -486,7 +507,8 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                                     </span>
                                   </div>
                                 </li>
-                              ))}
+                              );
+                              })}
                             </ul>
                           </div>
                         )}

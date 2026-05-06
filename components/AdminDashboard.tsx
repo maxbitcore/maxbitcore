@@ -100,11 +100,12 @@ function resolveAdminApiBaseUrl(): string {
 }
 
 function normalizePhpShopOrder(ord: any): AdminMergedOrder {
-  const key = String(ord.order_id ?? ord.id ?? ord.orderNumber ?? ord.order_number ?? '')
-    .trim()
-    .slice(0, 120);
+  /** Prefer human-readable order id (matches Stripe metadata.orderId / checkout orderNumber). */
+  const primary = String(
+    ord.orderNumber ?? ord.order_number ?? ord.order_id ?? ord.id ?? ''
+  ).trim();
   const fallbackKey = `php-${Number(ord.timestamp) || Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const id = key || fallbackKey;
+  const id = (primary || fallbackKey).slice(0, 120);
   const ts = Number(ord.timestamp);
   const created = ord.created_at ? Date.parse(String(ord.created_at)) : NaN;
   return {
@@ -150,6 +151,22 @@ function mergeAdminShopOrders(phpRows: any[], nodeRows: any[]): AdminMergedOrder
     if (n) map.set(n.key, n);
   }
   return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
+}
+
+/** Same value as server `ADMIN_ORDERS_SECRET`. Vite env at build time, or saved in this browser (see Orders tab). */
+const ADMIN_ORDERS_SECRET_LS_KEY = 'maxbit_admin_orders_secret';
+
+function getAdminOrdersSecret(): string {
+  const env =
+    typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
+      ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
+      : '';
+  if (env) return env;
+  try {
+    return localStorage.getItem(ADMIN_ORDERS_SECRET_LS_KEY)?.trim() || '';
+  } catch {
+    return '';
+  }
 }
 
 interface AdminDashboardProps {
@@ -334,6 +351,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
   const [shopOrders, setShopOrders] = useState<AdminMergedOrder[]>([]);
+  const [shopOrdersStripeError, setShopOrdersStripeError] = useState<string | null>(null);
+  const [ordersSecretDraft, setOrdersSecretDraft] = useState('');
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
@@ -381,10 +400,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   };
 
   const updateNodeOrderFulfillment = async (orderKey: string, status: FulfillmentStatus) => {
-    const adminSecret =
-      typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
-        ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
-        : '';
+    const adminSecret = getAdminOrdersSecret();
     if (!adminSecret) return;
     try {
       const r = await fetch(
@@ -412,10 +428,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   };
 
   const deleteNodeShopOrder = async (orderKey: string) => {
-    const adminSecret =
-      typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
-        ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
-        : '';
+    const adminSecret = getAdminOrdersSecret();
     if (!adminSecret) return;
     try {
       const r = await fetch(
@@ -523,10 +536,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           }
 
           let nodeOrders: any[] = [];
-          const adminSecret =
-            typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string'
-              ? import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
-              : '';
+          let stripeErr: string | null = null;
+          const adminSecret = getAdminOrdersSecret();
           if (adminSecret) {
             try {
               const nodeRes = await fetch(`${resolveAdminApiBaseUrl()}/shop-orders`, {
@@ -536,12 +547,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                 const nodeData = await nodeRes.json();
                 if (Array.isArray(nodeData)) nodeOrders = nodeData;
               } else {
-                console.warn('Shop orders API:', nodeRes.status, await nodeRes.text().catch(() => ''));
+                const body = await nodeRes.text().catch(() => '');
+                stripeErr = `Stripe orders API: HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
+                console.warn('Shop orders API:', nodeRes.status, body);
               }
             } catch (nodeErr) {
+              stripeErr =
+                nodeErr instanceof Error ? nodeErr.message : 'Could not reach Node server for shop orders.';
               console.error('Node shop orders fetch failed:', nodeErr);
             }
           }
+          setShopOrdersStripeError(adminSecret ? stripeErr : null);
 
           setShopOrders(mergeAdminShopOrders(phpOrders, nodeOrders));
         } catch (e) {
@@ -1450,6 +1466,69 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
             {/* ORDERS TAB */}
             {activeAdminTab === 'orders' && (
               <div className="space-y-6">
+                <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-5 space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Stripe orders (Node)
+                  </p>
+                  {!getAdminOrdersSecret() ? (
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Чтобы подтягивались оплаченные заказы Stripe (позиции, статус отправки, удаление), в сборке
+                        нужен{' '}
+                        <code className="text-cyan-400/90">VITE_ADMIN_ORDERS_SECRET</code> = тому же значению, что{' '}
+                        <code className="text-cyan-400/90">ADMIN_ORDERS_SECRET</code> на Node — затем{' '}
+                        <code className="text-slate-400">npm run build</code>. Либо введите секрет ниже (только в этом
+                        браузере).
+                      </p>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <input
+                          type="password"
+                          autoComplete="off"
+                          value={ordersSecretDraft}
+                          onChange={(e) => setOrdersSecretDraft(e.target.value)}
+                          placeholder="ADMIN_ORDERS_SECRET"
+                          className="min-w-[200px] flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:border-cyan-500/40 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const v = ordersSecretDraft.trim();
+                            if (!v) return;
+                            try {
+                              localStorage.setItem(ADMIN_ORDERS_SECRET_LS_KEY, v);
+                              setOrdersSecretDraft('');
+                              notifyUpdate();
+                            } catch {
+                              alert('Could not save to local storage.');
+                            }
+                          }}
+                          className="px-5 py-2.5 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[10px] font-black uppercase tracking-widest hover:bg-cyan-500/25"
+                        >
+                          Save & reload orders
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500">
+                      API: <span className="font-mono text-slate-400">{resolveAdminApiBaseUrl()}/shop-orders</span>
+                    </p>
+                  )}
+                  {shopOrdersStripeError ? (
+                    <p className="text-xs text-rose-400 font-mono break-all">{shopOrdersStripeError}</p>
+                  ) : null}
+                  {getAdminOrdersSecret() &&
+                  !shopOrdersStripeError &&
+                  shopOrders.length > 0 &&
+                  shopOrders.every((o) => !o.managedByNode) ? (
+                    <p className="text-[10px] text-amber-200/90 leading-relaxed">
+                      Заказы видны только из PHP — на Node списка Stripe пока нет. Проверьте: после оплаты открывался
+                      return URL (payment-status), на сервере есть{' '}
+                      <code className="text-slate-400">server/data/shop-orders.json</code>, переменные Stripe и
+                      перезапуск Node.
+                    </p>
+                  ) : null}
+                </div>
+
                 {shopOrders.length === 0 ? (
                   <div className="py-24 text-center border-2 border-dashed border-slate-800 rounded-3xl text-slate-600 font-bold uppercase tracking-widest"> No Orders Logged</div>
                 ) : (
@@ -1513,11 +1592,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                             {order.paymentStatus}
                           </div>
                           {order.fulfillmentStatus &&
-                          !(
-                            order.managedByNode &&
-                            typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string' &&
-                            import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim()
-                          ) ? (
+                          !(order.managedByNode && getAdminOrdersSecret()) ? (
                             <div className="text-[10px] font-bold uppercase px-4 py-1.5 rounded-full inline-block border bg-slate-800/80 text-slate-300 border-slate-700">
                               {order.fulfillmentStatus}
                             </div>
@@ -1527,9 +1602,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                           </div>
                         </div>
 
-                        {order.managedByNode &&
-                        typeof import.meta.env.VITE_ADMIN_ORDERS_SECRET === 'string' &&
-                        import.meta.env.VITE_ADMIN_ORDERS_SECRET.trim() ? (
+                        {order.managedByNode && getAdminOrdersSecret() ? (
                           <div className="flex flex-col gap-2 w-full sm:w-auto lg:w-48">
                             <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
                               Fulfillment

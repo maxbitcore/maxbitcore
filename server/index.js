@@ -169,17 +169,28 @@ const upsertShopOrderFromPaidSession = (session, opts = {}) => {
 
 const collectMaxbitProductIdsFromPaidSession = (session) => {
   const ids = [];
+  const metaRaw =
+    session && session.metadata && typeof session.metadata.maxbit_product_ids === 'string'
+      ? session.metadata.maxbit_product_ids
+      : '';
+  if (metaRaw.trim()) {
+    for (const part of metaRaw.split(',')) {
+      const id = cleanText(String(part || '')).slice(0, 120);
+      if (id) ids.push(id);
+    }
+  }
   const liData = session && session.line_items && session.line_items.data;
-  if (!Array.isArray(liData)) return ids;
-  for (const line of liData) {
-    const product =
-      line.price && typeof line.price === 'object' && line.price.product && typeof line.price.product === 'object'
-        ? line.price.product
-        : null;
-    if (!product || !product.metadata) continue;
-    const raw = product.metadata.maxbit_product_id || product.metadata.maxbitProductId;
-    const id = cleanText(String(raw || '')).slice(0, 120);
-    if (id) ids.push(id);
+  if (Array.isArray(liData)) {
+    for (const line of liData) {
+      const product =
+        line.price && typeof line.price === 'object' && line.price.product && typeof line.price.product === 'object'
+          ? line.price.product
+          : null;
+      if (!product || !product.metadata) continue;
+      const raw = product.metadata.maxbit_product_id || product.metadata.maxbitProductId;
+      const id = cleanText(String(raw || '')).slice(0, 120);
+      if (id) ids.push(id);
+    }
   }
   return [...new Set(ids)];
 };
@@ -188,7 +199,16 @@ const postMarkProductsSold = async (productIds) => {
   const secret = String(process.env.MARK_PRODUCTS_SOLD_SECRET || '').trim();
   const url = String(process.env.MARK_PRODUCTS_SOLD_URL || '').trim() ||
     'https://www.maxbitcore.com/api/mark-products-sold.php';
-  if (!secret || !Array.isArray(productIds) || productIds.length === 0) return;
+  if (!secret) {
+    console.warn('mark-products-sold: skipped — set MARK_PRODUCTS_SOLD_SECRET in server/.env');
+    return;
+  }
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    console.warn(
+      'mark-products-sold: skipped — no product IDs (new checkouts store them on the session; redeploy Node and try a new payment)'
+    );
+    return;
+  }
   try {
     const r = await fetch(url, {
       method: 'POST',
@@ -199,7 +219,21 @@ const postMarkProductsSold = async (productIds) => {
       body: JSON.stringify({ productIds }),
     });
     const text = await r.text();
-    if (!r.ok) console.warn('mark-products-sold:', r.status, text);
+    if (!r.ok) {
+      console.warn('mark-products-sold: HTTP', r.status, text.slice(0, 500));
+    } else {
+      try {
+        const j = JSON.parse(text);
+        if (j.updated === 0 && Array.isArray(j.ids) && j.ids.length) {
+          console.warn(
+            'mark-products-sold: 0 rows updated — product id(s) not found in products.json:',
+            j.ids.join(', ')
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
   } catch (e) {
     console.warn('mark-products-sold request failed:', e.message || e);
   }
@@ -438,6 +472,13 @@ const createCheckoutSession = async (req, res) => {
         quantity: 1,
       });
     }
+    /** Redundant with product_data.metadata — Stripe sometimes omits product metadata on line_items; session meta is reliable. */
+    const maxbitProductIdsMeta = items
+      .map((item) => cleanText(String(item.id || '')).slice(0, 80))
+      .filter(Boolean)
+      .join(',')
+      .slice(0, 500);
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items,
@@ -453,6 +494,7 @@ const createCheckoutSession = async (req, res) => {
       cancel_url: `${allowedOrigins[0]}/checkout`,
       metadata: {
         orderId: safeOrderId,
+        ...(maxbitProductIdsMeta ? { maxbit_product_ids: maxbitProductIdsMeta } : {}),
       },
     });
 
