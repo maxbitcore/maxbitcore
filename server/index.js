@@ -286,30 +286,59 @@ const formatStripeCaughtError = (error) => {
   return 'Failed to create checkout session.';
 };
 
-/** Stripe-hosted receipt (same page as “View receipt” in Dashboard). */
+/** Stripe-hosted receipt (charge.receipt_url). Tries several shapes — expanded PI, charges.data, charges.list. */
 async function resolveChargeReceiptUrlFromCheckoutSession(session) {
   if (!stripe || !session) return null;
   let pi = session.payment_intent;
   if (typeof pi === 'string' && pi) {
+    const piId = pi;
     try {
-      pi = await stripe.paymentIntents.retrieve(pi, { expand: ['latest_charge'] });
+      pi = await stripe.paymentIntents.retrieve(piId, { expand: ['latest_charge', 'charges.data'] });
     } catch (e) {
-      console.warn('paymentIntents.retrieve for receipt:', e.message || e);
-      return null;
+      console.warn('paymentIntents.retrieve (charges.data expand):', e.message || e);
+      try {
+        pi = await stripe.paymentIntents.retrieve(piId, { expand: ['latest_charge'] });
+      } catch (e2) {
+        console.warn('paymentIntents.retrieve for receipt:', e2.message || e2);
+        return null;
+      }
     }
   }
   if (!pi || typeof pi !== 'object') return null;
+
+  const fromCharge = (ch) => (ch && typeof ch === 'object' && ch.receipt_url ? ch.receipt_url : null);
+
   const lc = pi.latest_charge;
-  if (lc && typeof lc === 'object' && lc.receipt_url) return lc.receipt_url;
+  const u1 = fromCharge(lc);
+  if (u1) return u1;
   if (typeof lc === 'string' && lc) {
     try {
       const ch = await stripe.charges.retrieve(lc);
-      return ch.receipt_url || null;
+      if (ch.receipt_url) return ch.receipt_url;
     } catch (e) {
       console.warn('charges.retrieve for receipt_url:', e.message || e);
-      return null;
     }
   }
+
+  const chargeList = pi.charges && pi.charges.data;
+  if (Array.isArray(chargeList)) {
+    for (const ch of chargeList) {
+      const u = fromCharge(ch);
+      if (u) return u;
+    }
+  }
+
+  if (typeof pi.id === 'string' && pi.id.startsWith('pi_')) {
+    try {
+      const listed = await stripe.charges.list({ payment_intent: pi.id, limit: 5 });
+      for (const ch of listed.data || []) {
+        if (ch.receipt_url) return ch.receipt_url;
+      }
+    } catch (e) {
+      console.warn('charges.list for receipt_url:', e.message || e);
+    }
+  }
+
   return null;
 }
 

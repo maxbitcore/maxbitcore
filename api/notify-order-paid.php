@@ -1,12 +1,17 @@
 <?php
 /**
- * Receives paid-order JSON from the checkout page and emails info@maxbitcore.com.
+ * Receives paid-order JSON from the checkout page and emails info@maxbitcore.com + the customer.
  * Deploy to the same host as other api/*.php files.
+ *
+ * SMTP (recommended): vendor/ + order_mail_config.php (copy from order_mail_config.example.php).
+ * Or run: composer install in api/
  *
  * Optional anti-spam: define MAXBIT_ORDER_NOTIFY_SECRET (same value as VITE_ORDER_NOTIFY_SECRET) —
  * then the request must send header X-Maxbit-Order-Notify-Secret with that value.
  */
 ini_set('display_errors', '0');
+
+require_once __DIR__ . '/order_notify_mail.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -60,25 +65,35 @@ $body = isset($data['order_body']) && is_string($data['order_body']) && $data['o
 $to = 'info@maxbitcore.com';
 $subject = '[MaxBit] Paid order ' . $orderId;
 $customerEmail = isset($data['customerEmail']) ? trim((string) $data['customerEmail']) : '';
-$fromHeader = 'From: MaxBit Orders <noreply@maxbitcore.com>';
-$replyHeader = $customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)
-    ? 'Reply-To: ' . $customerEmail
-    : '';
+$shopFrom = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
+$shopFromName = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 
-$headers = [
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    $fromHeader,
-];
-if ($replyHeader !== '') {
-    $headers[] = $replyHeader;
-}
+$replyShop = ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) ? $customerEmail : null;
 
-$ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, implode("\r\n", $headers));
-if (!$ok) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'mail_failed']);
-    exit;
+if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
+    $r1 = maxbit_order_mail_send($to, $subject, $body, $replyShop);
+    if (!$r1['ok']) {
+        http_response_code(500);
+        echo json_encode([
+            'ok' => false,
+            'error' => 'smtp_failed',
+            'detail' => isset($r1['error']) ? substr((string) $r1['error'], 0, 400) : '',
+        ]);
+        exit;
+    }
+} else {
+    $ok = maxbit_order_mail_send_php_mail($to, $subject, $body, $shopFrom, $shopFromName, $replyShop);
+    if (!$ok) {
+        http_response_code(500);
+        echo json_encode([
+            'ok' => false,
+            'error' => 'mail_failed',
+            'hint' => maxbit_order_mail_smtp_ready() && !maxbit_order_mail_use_phpmailer()
+                ? 'Add api/vendor/ (PHPMailer autoload).'
+                : 'Configure order_mail_config.php (SMTP) or fix server mail.',
+        ]);
+        exit;
+    }
 }
 
 $customer_notified = false;
@@ -90,18 +105,29 @@ if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) 
     $custBody .= "Estimated delivery: 3–5 business days (US).\r\n\r\n";
     $custBody .= "Order details (for your records):\r\n\r\n" . $body . "\r\n";
     $custBody .= "\r\nQuestions? Contact info@maxbitcore.com.\r\n\r\n— MaxBit\r\n";
-    $custHeaders = [
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'From: MaxBit Orders <noreply@maxbitcore.com>',
-        'Reply-To: info@maxbitcore.com',
-    ];
-    $customer_notified = (bool) @mail(
-        $customerEmail,
-        '=?UTF-8?B?' . base64_encode($custSubject) . '?=',
-        $custBody,
-        implode("\r\n", $custHeaders)
-    );
+
+    if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
+        $r2 = maxbit_order_mail_send($customerEmail, $custSubject, $custBody, $shopFrom);
+        if ($r2['ok']) {
+            $customer_notified = true;
+        } else {
+            echo json_encode([
+                'ok' => true,
+                'customer_notified' => false,
+                'customer_mail_error' => isset($r2['error']) ? substr((string) $r2['error'], 0, 400) : '',
+            ]);
+            exit;
+        }
+    } else {
+        $customer_notified = maxbit_order_mail_send_php_mail(
+            $customerEmail,
+            $custSubject,
+            $custBody,
+            $shopFrom,
+            $shopFromName,
+            $shopFrom
+        );
+    }
 }
 
 echo json_encode(['ok' => true, 'customer_notified' => $customer_notified]);

@@ -230,12 +230,14 @@ function App() {
             note =
               'We could not notify our store by email. Please email info@maxbitcore.com with this order ID.';
           } else if (n.customerNotified === true) {
-            note = 'A confirmation email was sent. Our team at info@maxbitcore.com was notified.';
+            note =
+              'Our server handed your order to the mail system (you and info@maxbitcore.com). If nothing arrives within a few minutes, check spam — many hosts still block PHP mail(); contact info@maxbitcore.com with your order ID.';
           } else if (n.customerNotified === false) {
             note =
               'Our team was notified. The confirmation email to you may have failed — save this order ID.';
           } else {
-            note = 'Our team was notified. You may also receive a Stripe receipt by email.';
+            note =
+              'Our server reported the store notification was sent. Email delivery still depends on your host (PHP mail). If you get no message, write to info@maxbitcore.com with this order ID.';
           }
         }
       } catch {

@@ -689,7 +689,9 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               )}
               {orderEmailNotifyResult?.customerNotified === true && (
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  We&apos;ve sent a confirmation email to <strong>{email}</strong>. Check spam if you don&apos;t see it.
+                  Our server accepted sending a confirmation to <strong>{email}</strong> and the store inbox. If nothing
+                  arrives in a few minutes, check spam — PHP <code className="text-slate-500">mail()</code> often fails on
+                  hosting; contact <strong>info@maxbitcore.com</strong> with order <strong className="font-mono">{orderId}</strong>.
                 </p>
               )}
               {orderEmailNotifyResult?.customerNotified === false && (

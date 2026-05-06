@@ -1,0 +1,8 @@
+{
+  "name": "maxbit/api-mail",
+  "description": "PHPMailer for notify-order-paid.php (run: composer install in this folder)",
+  "require": {
+    "php": ">=7.4",
+    "phpmailer/phpmailer": "^6.9"
+  }
+}

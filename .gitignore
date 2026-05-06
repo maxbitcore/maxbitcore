@@ -27,3 +27,6 @@ dist-ssr
 .env.local
 node_modules/
 dist/
+
+# PHP: SMTP secrets (vendor/ is committed so hosting works without composer)
+api/order_mail_config.php
