@@ -464,14 +464,32 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                         </button>
                     )}
 
-                    <button 
-                        type="button"
-                        onClick={() => navigate('/dashboard')}
-                        className="flex flex-col items-end mr-0 sm:mr-2 group min-w-0 max-w-[7rem] sm:max-w-none"
-                    >
-                        <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter group-hover:text-white transition-colors truncate w-full text-right">System_Active</span>
-                        <span className="text-[9px] text-white font-bold uppercase truncate w-full text-right">{currentUser.firstName}</span>
-                    </button>
+                    {currentUser.role === 'admin' ? (
+                        <div
+                            className="flex flex-col items-end mr-0 sm:mr-2 min-w-0 max-w-[7rem] sm:max-w-none pointer-events-none select-none"
+                            aria-label="Сессия администратора"
+                        >
+                            <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter truncate w-full text-right">
+                                System_Active
+                            </span>
+                            <span className="text-[9px] text-white font-bold uppercase truncate w-full text-right">
+                                {currentUser.firstName}
+                            </span>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => navigate('/dashboard')}
+                            className="flex flex-col items-end mr-0 sm:mr-2 group min-w-0 max-w-[7rem] sm:max-w-none"
+                        >
+                            <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter group-hover:text-white transition-colors truncate w-full text-right">
+                                System_Active
+                            </span>
+                            <span className="text-[9px] text-white font-bold uppercase truncate w-full text-right">
+                                {currentUser.firstName}
+                            </span>
+                        </button>
+                    )}
 
                     <div className="h-4 w-px bg-slate-800 shrink-0" />
 
