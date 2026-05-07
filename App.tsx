@@ -87,9 +87,6 @@ function App() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
-  const [currentOrderId, setCurrentOrderId] = useState('');
-  const [paymentSuccessEmailNote, setPaymentSuccessEmailNote] = useState('');
   const [showRegSuccess, setShowRegSuccess] = useState(false);
   const [password, setPassword] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -217,35 +214,6 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('verified') === 'true') {
-      const orderId = params.get('orderId') || 'CONFIRMED';
-      setCurrentOrderId(orderId);
-
-      let note =
-        'Payment confirmed. You may get a receipt from Stripe or from us — check spam, or contact info@maxbitcore.com.';
-      try {
-        const raw = sessionStorage.getItem('maxbit_last_checkout_notify');
-        if (raw) {
-          const n = JSON.parse(raw) as { shopNotified?: boolean; customerNotified?: boolean | null };
-          if (n.shopNotified === false) {
-            note =
-              'We could not notify our store by email. Please email info@maxbitcore.com with this order ID.';
-          } else if (n.customerNotified === true) {
-            note =
-              'Our server handed your order to the mail system (you and info@maxbitcore.com). If nothing arrives within a few minutes, check spam — many hosts still block PHP mail(); contact info@maxbitcore.com with your order ID.';
-          } else if (n.customerNotified === false) {
-            note =
-              'Our team was notified. The confirmation email to you may have failed — save this order ID.';
-          } else {
-            note =
-              'Our server reported the store notification was sent. Email delivery still depends on your host (PHP mail). If you get no message, write to info@maxbitcore.com with this order ID.';
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-      setPaymentSuccessEmailNote(note);
-
-      setShowSuccessAlert(true);
       if (cartItems.length > 0) {
         setCartItems([]);
         localStorage.removeItem('cart');
@@ -321,7 +289,9 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('https://www.maxbitcore.com/api/products.php');
+        const response = await fetch('https://www.maxbitcore.com/api/products.php', {
+          cache: 'no-store',
+        });
         const data = await response.json();
         if (Array.isArray(data)) {
           const approved = data.filter((p) => p && p.isApproved && p.isPublished);
@@ -472,48 +442,21 @@ function App() {
       {sessionExpiredNotice && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4 animate-fade-in">
           <div className="bg-amber-500/95 text-slate-950 p-5 rounded-2xl border border-amber-400 shadow-xl flex flex-col gap-3 text-center">
-            <p className="text-sm font-black uppercase tracking-widest">Сессия истекла</p>
+            <p className="text-sm font-black uppercase tracking-widest">Session expired</p>
             <p className="text-xs font-bold text-slate-900/85">
-              Вы отсутствовали более часа. Войдите снова, чтобы продолжить.
+              You were inactive for over an hour. Please sign in again to continue.
             </p>
             <button
               type="button"
               onClick={() => setSessionExpiredNotice(false)}
               className="py-2.5 bg-slate-950 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-colors"
             >
-              Понятно
+              Got it
             </button>
           </div>
         </div>
       )}
       
-      {showSuccessAlert && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4 animate-fade-in">
-          <div className="bg-emerald-500 text-slate-950 p-6 rounded-3xl shadow-[0_0_50px_rgba(16,185,129,0.4)] border border-emerald-400 flex flex-col items-center text-center">
-            <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-4 border border-white/30">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-1">Payment Received</h2>
-            <p className="text-[10px] font-black opacity-90 uppercase tracking-widest mb-6 leading-relaxed max-w-xs">
-              ORDER ID: {currentOrderId} <br />
-              <span className="normal-case font-bold tracking-normal">{paymentSuccessEmailNote}</span>
-            </p>
-            <button 
-              onClick={() => {
-                setShowSuccessAlert(false);
-                setPaymentSuccessEmailNote('');
-                navigate('/gaming-pcs');
-              }}
-              className="w-full py-3 bg-slate-950 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-slate-800 transition-all active:scale-95"
-            >
-              Continue Shopping
-            </button>
-          </div>
-        </div>
-      )}
-
       <main className={`flex-grow ${mainTopClass}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />

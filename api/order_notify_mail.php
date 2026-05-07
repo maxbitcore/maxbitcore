@@ -113,6 +113,26 @@ function maxbit_order_mail_send(string $to, string $subject, string $body, ?stri
 }
 
 /**
+ * One retry after 1s — helps with transient SMTP / rate limits when sending several messages in one request.
+ *
+ * @return array{ok: bool, error?: string, retried?: bool}
+ */
+function maxbit_order_mail_send_retry(string $to, string $subject, string $body, ?string $replyTo = null, ?string $bcc = null): array
+{
+    $r = maxbit_order_mail_send($to, $subject, $body, $replyTo, $bcc);
+    if ($r['ok']) {
+        return $r;
+    }
+    sleep(1);
+    $r2 = maxbit_order_mail_send($to, $subject, $body, $replyTo, $bcc);
+    if ($r2['ok']) {
+        $r2['retried'] = true;
+        return $r2;
+    }
+    return ['ok' => false, 'error' => ($r2['error'] ?? '') ?: ($r['error'] ?? 'send_failed')];
+}
+
+/**
  * Fallback when SMTP is not set up: PHP mail() (often unreliable on shared hosting).
  */
 function maxbit_order_mail_send_php_mail(

@@ -88,7 +88,7 @@ if (
 }
 
 if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
-    $r1 = maxbit_order_mail_send($to, $subject, $body, $replyShop, $shopBcc !== '' ? $shopBcc : null);
+    $r1 = maxbit_order_mail_send_retry($to, $subject, $body, $replyShop, $shopBcc !== '' ? $shopBcc : null);
     if (!$r1['ok']) {
         http_response_code(500);
         echo json_encode([
@@ -99,6 +99,7 @@ if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
         exit;
     }
     maxbit_order_mail_send_shop_backup($subject, $body, $replyShop);
+    usleep(400000);
 } else {
     $ok = maxbit_order_mail_send_php_mail(
         $to,
@@ -121,20 +122,33 @@ if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
         exit;
     }
     maxbit_order_mail_send_shop_backup($subject, $body, $replyShop);
+    usleep(400000);
 }
 
 $customer_notified = false;
+/** Hidden copy of the buyer confirmation — set in order_mail_config.php (e.g. max@maxbitcore.com) if you want a backup in your inbox. */
+$customerMailBcc = trim(maxbit_order_mail_cfg('MAXBIT_CUSTOMER_ORDER_BCC', ''));
+if ($customerMailBcc !== '' && !filter_var($customerMailBcc, FILTER_VALIDATE_EMAIL)) {
+    $customerMailBcc = '';
+}
+
 if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
     $custSubject = '[MaxBit] Order confirmed — ' . $orderId;
     $custBody = "Thank you for your order.\r\n\r\n";
     $custBody .= "We received your payment. Your order is in the queue and will be prepared for assembly and testing.\r\n";
     $custBody .= "Estimated delivery: 3–5 business days (US).\r\n\r\n";
     $custBody .= "Order details (for your records):\r\n\r\n" . $customerBodyDetail . "\r\n";
-    $custBody .= "\r\nQuestions? Contact info@maxbitcore.com.\r\n\r\n";
+    $custBody .= "\r\nQuestions? Contact max@maxbitcore.com.\r\n\r\n";
     $custBody .= "Thank you for your purchase.\r\n\r\nKind regards,\r\nThe MaxBit team\r\n";
 
     if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
-        $r2 = maxbit_order_mail_send($customerEmail, $custSubject, $custBody, $shopFrom);
+        $r2 = maxbit_order_mail_send_retry(
+            $customerEmail,
+            $custSubject,
+            $custBody,
+            $shopFrom,
+            $customerMailBcc !== '' ? $customerMailBcc : null
+        );
         if ($r2['ok']) {
             $customer_notified = true;
         } else {
@@ -146,14 +160,28 @@ if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) 
             exit;
         }
     } else {
+        $custBccPhp = $customerMailBcc !== '' ? $customerMailBcc : null;
         $customer_notified = maxbit_order_mail_send_php_mail(
             $customerEmail,
             $custSubject,
             $custBody,
             $shopFrom,
             $shopFromName,
-            $shopFrom
+            $shopFrom,
+            $custBccPhp
         );
+        if (!$customer_notified) {
+            sleep(1);
+            $customer_notified = maxbit_order_mail_send_php_mail(
+                $customerEmail,
+                $custSubject,
+                $custBody,
+                $shopFrom,
+                $shopFromName,
+                $shopFrom,
+                $custBccPhp
+            );
+        }
     }
 }
 

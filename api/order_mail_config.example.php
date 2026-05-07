@@ -75,3 +75,9 @@ define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
  * Обязательно задайте, если на info@ ничего не приходит, а клиент получает письмо.
  */
 // define('MAXBIT_SHOP_ORDER_BACKUP_EMAIL', 'your@gmail.com');
+
+/**
+ * Скрытая копия письма ПОКУПАТЕЛЮ (текст подтверждения заказа) — на max@ или личную почту.
+ * Удобно, если основное письмо магазину не видно, а клиенту пришло: так вы всё равно получите копию их письма.
+ */
+// define('MAXBIT_CUSTOMER_ORDER_BCC', 'max@maxbitcore.com');

@@ -43,6 +43,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onAddToCart
     onAddToCart(product);
   };
 
+  const badgeLabel =
+    product.status === 'Sold Out'
+      ? 'OUT OF STOCK'
+      : product.status === 'In Stock'
+        ? 'IN STOCK'
+        : product.status;
+
   const plusVisual =
     product.status === 'Sold Out'
       ? 'bg-slate-800 text-slate-600'
@@ -78,7 +85,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onAddToCart
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                   </span>
                 )}
-                {product.status}
+                {badgeLabel}
             </span>
         </div>
       </div>

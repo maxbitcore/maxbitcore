@@ -162,7 +162,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   };
 
   const persistReviews = async (nextReviews: Review[]) => {
-    const res = await fetch('https://www.maxbitcore.com/api/products.php');
+    const res = await fetch('https://www.maxbitcore.com/api/products.php', { cache: 'no-store' });
     if (!res.ok) throw new Error('Could not load products');
     const freshProducts = await res.json();
 
@@ -309,7 +309,11 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                   product.status === 'Sold Out' ? 'bg-slate-950/90 border-rose-500/50 text-rose-400' :
                   'bg-slate-950/90 border-cyan-500/50 text-cyan-400'
                 }`}>
-                  {product.status}
+                  {product.status === 'Sold Out'
+                    ? 'OUT OF STOCK'
+                    : product.status === 'In Stock'
+                      ? 'IN STOCK'
+                      : product.status}
                 </span>
               </div>
             </div>

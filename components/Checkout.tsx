@@ -454,6 +454,16 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
 
             if (snapOk) clearPendingCheckoutSnapshot();
 
+            try {
+              const reloadCatalog = () =>
+                window.dispatchEvent(new CustomEvent('maxbit-update', { detail: { scope: 'catalog' } }));
+              reloadCatalog();
+              window.setTimeout(reloadCatalog, 2000);
+              window.setTimeout(reloadCatalog, 6000);
+            } catch {
+              /* ignore */
+            }
+
             setStep('success');
             navigate(`/checkout?verified=true&orderId=${encodeURIComponent(oid)}`, { replace: true });
             return;
@@ -681,45 +691,36 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <span>
-                    We could not send the automatic store notification. Please email{' '}
-                    <strong className="text-amber-100">info@maxbitcore.com</strong> with your order number{' '}
+                    We could not send the automatic store notification. Email{' '}
+                    <strong className="text-amber-100">max@maxbitcore.com</strong> with your order number{' '}
                     <strong className="font-mono">{orderId}</strong> so we can process it.
                   </span>
                 </div>
               )}
               {orderEmailNotifyResult?.customerNotified === true && (
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  Our server accepted sending a confirmation to <strong>{email}</strong> and the store inbox. If nothing
-                  arrives in a few minutes, check spam — PHP <code className="text-slate-500">mail()</code> often fails on
-                  hosting; contact <strong>info@maxbitcore.com</strong> with order <strong className="font-mono">{orderId}</strong>.
+                  We&apos;re sending a confirmation to <strong>{email}</strong> and we&apos;ve notified our team at{' '}
+                  <strong>max@maxbitcore.com</strong>. It can take a minute to arrive — check spam if needed. Questions?{' '}
+                  Email <strong>max@maxbitcore.com</strong> and include order <strong className="font-mono">{orderId}</strong>.
                 </p>
               )}
               {orderEmailNotifyResult?.customerNotified === false && (
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  We could not send an email to <strong>{email}</strong> from our server. Your payment still went through.
-                  Save this order number; you can also write to <strong>info@maxbitcore.com</strong>.
+                  We couldn&apos;t send an email to <strong>{email}</strong>, but your payment went through. Save this page
+                  or your order number — reach us at <strong>max@maxbitcore.com</strong>{' '}
+                  <strong className="font-mono">{orderId}</strong>.
                 </p>
               )}
               {orderEmailNotifyResult?.shopNotified === true && orderEmailNotifyResult.customerNotified === null && (
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  If you use card checkout, Stripe may send a separate receipt to <strong>{email}</strong>. If nothing arrives,
-                  check spam or contact <strong>info@maxbitcore.com</strong> with order <strong className="font-mono">{orderId}</strong>.
+                  Stripe may email you a separate payment receipt at <strong>{email}</strong>. For order questions, contact{' '}
+                  <strong>max@maxbitcore.com</strong> — reference <strong className="font-mono">{orderId}</strong>.
                 </p>
               )}
               {!orderEmailNotifyResult && (
                 <p className="text-slate-400 leading-relaxed text-sm">
                   Order <strong className="font-mono">{orderId}</strong> is confirmed. Keep this page or note your order number.
                 </p>
-              )}
-              {orderEmailNotifyResult?.shopNotified === true && (
-                <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20">
-                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="font-bold uppercase tracking-wide">
-                    Our team at max@maxbitcore.com has been notified
-                  </span>
-                </div>
               )}
               <p className="text-slate-500 text-xs">Your order is in the queue and will be prepared for assembly and testing.</p>
             </div>
@@ -745,7 +746,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               <button
                 type="button"
                 disabled
-                title="Stripe did not return a receipt link for this charge. Use your card statement or contact info@maxbitcore.com."
+                title="Stripe did not return a receipt link for this charge. Use your card statement or contact max@maxbitcore.com."
                 className="px-10 py-5 border border-slate-800 text-slate-500 font-black uppercase tracking-widest text-sm rounded-xl cursor-not-allowed opacity-60"
               >
                 View receipt (Stripe)

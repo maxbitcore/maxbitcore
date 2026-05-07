@@ -498,7 +498,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       console.log("DEBUG: loadAllData START");
       try {
         try {
-          const prodRes = await fetch('https://www.maxbitcore.com/api/products.php');
+          const prodRes = await fetch('https://www.maxbitcore.com/api/products.php', { cache: 'no-store' });
           if (prodRes.ok) {
             const prodData = await prodRes.json();
             if (Array.isArray(prodData)) {
@@ -1473,12 +1473,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                   {!getAdminOrdersSecret() ? (
                     <div className="space-y-3">
                       <p className="text-xs text-slate-300 leading-relaxed">
-                        Чтобы подтягивались оплаченные заказы Stripe (позиции, статус отправки, удаление), в сборке
-                        нужен{' '}
-                        <code className="text-cyan-400/90">VITE_ADMIN_ORDERS_SECRET</code> = тому же значению, что{' '}
-                        <code className="text-cyan-400/90">ADMIN_ORDERS_SECRET</code> на Node — затем{' '}
-                        <code className="text-slate-400">npm run build</code>. Либо введите секрет ниже (только в этом
-                        браузере).
+                        To load paid Stripe orders (items, fulfillment status, delete actions), your frontend build must
+                        include{' '}
+                        <code className="text-cyan-400/90">VITE_ADMIN_ORDERS_SECRET</code> with the same value as{' '}
+                        <code className="text-cyan-400/90">ADMIN_ORDERS_SECRET</code> on Node, then run{' '}
+                        <code className="text-slate-400">npm run build</code>. You can also enter the secret below (saved
+                        only in this browser).
                       </p>
                       <div className="flex flex-wrap gap-2 items-center">
                         <input
@@ -1521,10 +1521,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                   shopOrders.length > 0 &&
                   shopOrders.every((o) => !o.managedByNode) ? (
                     <p className="text-[10px] text-amber-200/90 leading-relaxed">
-                      Заказы видны только из PHP — на Node списка Stripe пока нет. Проверьте: после оплаты открывался
-                      return URL (payment-status), на сервере есть{' '}
-                      <code className="text-slate-400">server/data/order.json</code>, переменные Stripe и
-                      перезапуск Node.
+                      Orders are currently coming only from PHP, while the Node Stripe list is empty. Check that after
+                      payment the return URL (`payment-status`) opened,{' '}
+                      <code className="text-slate-400">server/data/order.json</code> exists on the server, Stripe env
+                      variables are set, and Node was restarted.
                     </p>
                   ) : null}
                 </div>

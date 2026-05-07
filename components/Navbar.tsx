@@ -337,7 +337,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
             type="button"
             onClick={() => onTabChange('home')}
             className="flex items-center hover:scale-[1.03] active:scale-95 transition-all duration-300"
-            aria-label="На главную"
+            aria-label="Go to homepage"
           >
             {logoContent}
           </button>
@@ -467,7 +467,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                     {currentUser.role === 'admin' ? (
                         <div
                             className="flex flex-col items-end mr-0 sm:mr-2 min-w-0 max-w-[7rem] sm:max-w-none pointer-events-none select-none"
-                            aria-label="Сессия администратора"
+                            aria-label="Administrator session"
                         >
                             <span className="text-[7px] text-cyan-500 font-black uppercase tracking-tighter truncate w-full text-right">
                                 System_Active

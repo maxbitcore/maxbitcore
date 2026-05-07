@@ -206,6 +206,29 @@ const collectMaxbitProductIdsFromPaidSession = (session) => {
   return [...new Set(ids)];
 };
 
+/**
+ * If session.line_items were empty or products not expanded, Stripe still returns IDs via listLineItems.
+ */
+const collectMaxbitProductIdsWithLineItemsFallback = async (session) => {
+  let ids = collectMaxbitProductIdsFromPaidSession(session);
+  if (ids.length > 0 || !stripe || !session || !session.id) return ids;
+  try {
+    const listed = await stripe.checkout.sessions.listLineItems(session.id, {
+      limit: 100,
+      expand: ['data.price.product'],
+    });
+    const merged = {
+      ...session,
+      metadata: session.metadata || {},
+      line_items: { data: listed.data || [] },
+    };
+    ids = collectMaxbitProductIdsFromPaidSession(merged);
+  } catch (e) {
+    console.warn('listLineItems for mark-sold:', e.message || e);
+  }
+  return ids;
+};
+
 const postMarkProductsSold = async (productIds) => {
   const secret = String(process.env.MARK_PRODUCTS_SOLD_SECRET || '').trim();
   const url = String(process.env.MARK_PRODUCTS_SOLD_URL || '').trim() ||
@@ -458,7 +481,8 @@ const webhookHandler = async (req, res) => {
           }
           upsertShopOrderFromPaidSession(fullSession, { receiptUrl });
           try {
-            await postMarkProductsSold(collectMaxbitProductIdsFromPaidSession(fullSession));
+            const ids = await collectMaxbitProductIdsWithLineItemsFallback(fullSession);
+            await postMarkProductsSold(ids);
           } catch (e) {
             console.warn('mark products sold (webhook):', e.message || e);
           }
@@ -666,7 +690,8 @@ const paymentStatusHandler = async (req, res) => {
           console.warn('shop order upsert (payment-status):', e.message || e);
         }
         try {
-          await postMarkProductsSold(collectMaxbitProductIdsFromPaidSession(session));
+          const ids = await collectMaxbitProductIdsWithLineItemsFallback(session);
+          await postMarkProductsSold(ids);
         } catch (e) {
           console.warn('mark products sold (payment-status):', e.message || e);
         }
