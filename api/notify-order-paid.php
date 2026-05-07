@@ -62,6 +62,11 @@ $body = isset($data['order_body']) && is_string($data['order_body']) && $data['o
     ? $data['order_body']
     : json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
+$customerBodyDetail = isset($data['customer_order_body']) && is_string($data['customer_order_body'])
+        && $data['customer_order_body'] !== ''
+    ? $data['customer_order_body']
+    : $body;
+
 $to = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
 $shopBcc = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BCC', '');
 $subject = '[MaxBit] Paid order ' . $orderId;
@@ -109,11 +114,11 @@ $customer_notified = false;
 if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
     $custSubject = '[MaxBit] Order confirmed — ' . $orderId;
     $custBody = "Thank you for your order.\r\n\r\n";
-    $custBody .= 'Order ID: ' . $orderId . "\r\n\r\n";
     $custBody .= "We received your payment. Your order is in the queue and will be prepared for assembly and testing.\r\n";
     $custBody .= "Estimated delivery: 3–5 business days (US).\r\n\r\n";
-    $custBody .= "Order details (for your records):\r\n\r\n" . $body . "\r\n";
-    $custBody .= "\r\nQuestions? Contact info@maxbitcore.com.\r\n\r\n— MaxBit\r\n";
+    $custBody .= "Order details (for your records):\r\n\r\n" . $customerBodyDetail . "\r\n";
+    $custBody .= "\r\nQuestions? Contact info@maxbitcore.com.\r\n\r\n";
+    $custBody .= "Thank you for your purchase.\r\n\r\nKind regards,\r\nThe MaxBit team\r\n";
 
     if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
         $r2 = maxbit_order_mail_send($customerEmail, $custSubject, $custBody, $shopFrom);

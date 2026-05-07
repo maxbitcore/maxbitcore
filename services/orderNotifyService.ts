@@ -56,14 +56,20 @@ const formatMoney = (amount: number, currency: string) => {
   }
 };
 
-export function buildPaidOrderPlainText(p: PaidOrderNotifyPayload): string {
+function buildOrderPlainText(p: PaidOrderNotifyPayload, variant: 'shop' | 'customer'): string {
+  const header: string[] =
+    variant === 'shop'
+      ? [
+          'New paid order (MaxBit checkout)',
+          '',
+          `Order ID: ${p.orderId}`,
+          `Stripe session: ${p.stripeSessionId}`,
+          `Stripe mode: ${p.stripeLivemode ? 'live' : 'test'}`,
+          '',
+        ]
+      : ['Order confirmed (MaxBit)', '', `Order ID: ${p.orderId}`, ''];
   const lines: string[] = [
-    'New paid order (MaxBit checkout)',
-    '',
-    `Order ID: ${p.orderId}`,
-    `Stripe session: ${p.stripeSessionId}`,
-    `Stripe mode: ${p.stripeLivemode ? 'live' : 'test'}`,
-    '',
+    ...header,
     'Customer',
     `  Name: ${p.customerName}`,
     `  Email: ${p.customerEmail}`,
@@ -80,17 +86,23 @@ export function buildPaidOrderPlainText(p: PaidOrderNotifyPayload): string {
   }
   lines.push(
     '',
-    'Totals (cart at checkout)',
-    `  Subtotal: ${formatMoney(p.subtotal, p.currency)}`,
-    `  Estimated tax: ${formatMoney(p.estimatedTax, p.currency)}`,
-    `  Total: ${formatMoney(p.cartTotal, p.currency)}`,
-    '',
-    'Stripe charge',
-    `  Amount total: ${formatMoney(stripeMinorToMajor(p.stripeAmountTotal, p.currency), p.currency)}`,
-    `  Amount tax (Stripe): ${formatMoney(stripeMinorToMajor(p.stripeAmountTax, p.currency), p.currency)}`,
+    'Totals at checkout',
+    `Subtotal: ${formatMoney(p.subtotal, p.currency)}`,
+    `Amount tax: ${formatMoney(stripeMinorToMajor(p.stripeAmountTax, p.currency), p.currency)} (со Stripe)`,
+    `Amount total: ${formatMoney(stripeMinorToMajor(p.stripeAmountTotal, p.currency), p.currency)} (со Stripe)`,
     ''
   );
   return lines.join('\n');
+}
+
+/** Full text for the store inbox (includes Stripe session / mode). */
+export function buildPaidOrderPlainText(p: PaidOrderNotifyPayload): string {
+  return buildOrderPlainText(p, 'shop');
+}
+
+/** Customer-friendly text: same items and totals, no Stripe session or test/live line. */
+export function buildCustomerOrderPlainText(p: PaidOrderNotifyPayload): string {
+  return buildOrderPlainText(p, 'customer');
 }
 
 export type OrderNotifyResult = {
@@ -105,7 +117,11 @@ async function sendViaHttp(p: PaidOrderNotifyPayload, url: string, secret: strin
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ ...p, order_body: buildPaidOrderPlainText(p) }),
+    body: JSON.stringify({
+      ...p,
+      order_body: buildPaidOrderPlainText(p),
+      customer_order_body: buildCustomerOrderPlainText(p),
+    }),
   });
   const t = await res.text().catch(() => '');
   let data: { ok?: boolean; customer_notified?: boolean; error?: string } = {};
