@@ -58,10 +58,20 @@ define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 
 /**
  * Куда слать уведомление магазину (первое письмо с деталями заказа).
- * По умолчанию info@… — но многие SMTP не кладут во «Входящие» письмо «с того же ящика на тот же»
- * (From и To совпадают). Если дубликаты не видите — задайте BCC ниже или отдельный ящик/алиас.
+ * Если From и To оба info@ — часть хостингов НЕ кладёт такое письмо во входящие (SMTP принимает, ящик пустой).
+ * Решения (любое одно или несколько):
+ *   A) В cPanel → Forwarders создайте orders@maxbitcore.com → forward на info@ и задайте ниже MAXBIT_SHOP_ORDER_TO = orders@...
+ *   B) MAXBIT_SHOP_ORDER_BCC — скрытая копия на личный Gmail.
+ *   C) MAXBIT_SHOP_ORDER_BACKUP_EMAIL — второе отдельное письмо на внешний ящик (самый надёжный вариант).
  */
-// define('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
+/** По умолчанию в коде — max@maxbitcore.com (другой получатель, чем From info@ — письма стабильнее во входящих). */
+// define('MAXBIT_SHOP_ORDER_TO', 'max@maxbitcore.com');
 
-/** Доп. копия уведомления о заказе (Gmail и т.д.). Несколько адресов через запятую. */
+/** Скрытая копия того же письма магазину (несколько адресов через запятую). */
 // define('MAXBIT_SHOP_ORDER_BCC', 'your@gmail.com');
+
+/**
+ * Полная копия уведомления о заказе на ДРУГОЙ адрес (обычно личный Gmail).
+ * Обязательно задайте, если на info@ ничего не приходит, а клиент получает письмо.
+ */
+// define('MAXBIT_SHOP_ORDER_BACKUP_EMAIL', 'your@gmail.com');

@@ -1,6 +1,6 @@
 <?php
 /**
- * Receives paid-order JSON from the checkout page and emails info@maxbitcore.com + the customer.
+ * Receives paid-order JSON from the checkout page and emails the shop inbox + the customer (default shop: max@maxbitcore.com).
  * Deploy to the same host as other api/*.php files.
  *
  * SMTP (recommended): vendor/ + order_mail_config.php (copy from order_mail_config.example.php).
@@ -67,7 +67,7 @@ $customerBodyDetail = isset($data['customer_order_body']) && is_string($data['cu
     ? $data['customer_order_body']
     : $body;
 
-$to = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
+$to = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'max@maxbitcore.com');
 $shopBcc = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BCC', '');
 $subject = '[MaxBit] Paid order ' . $orderId;
 $customerEmail = isset($data['customerEmail']) ? trim((string) $data['customerEmail']) : '';
@@ -75,6 +75,17 @@ $shopFrom = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
 $shopFromName = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 
 $replyShop = ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) ? $customerEmail : null;
+
+if (
+    strcasecmp($to, $shopFrom) === 0
+    && trim($shopBcc) === ''
+    && trim(maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BACKUP_EMAIL', '')) === ''
+) {
+    error_log(
+        'maxbit notify-order-paid: shop mail uses To === From (same mailbox) without BCC or BACKUP_EMAIL — '
+        . 'inbox copy often missing; set MAXBIT_SHOP_ORDER_BCC or MAXBIT_SHOP_ORDER_BACKUP_EMAIL in order_mail_config.php'
+    );
+}
 
 if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
     $r1 = maxbit_order_mail_send($to, $subject, $body, $replyShop, $shopBcc !== '' ? $shopBcc : null);
@@ -87,6 +98,7 @@ if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
         ]);
         exit;
     }
+    maxbit_order_mail_send_shop_backup($subject, $body, $replyShop);
 } else {
     $ok = maxbit_order_mail_send_php_mail(
         $to,
@@ -108,6 +120,7 @@ if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
         ]);
         exit;
     }
+    maxbit_order_mail_send_shop_backup($subject, $body, $replyShop);
 }
 
 $customer_notified = false;

@@ -147,3 +147,33 @@ function maxbit_order_mail_send_php_mail(
     }
     return (bool) @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, implode("\r\n", $headers));
 }
+
+/**
+ * Second copy of the shop order mail to an external inbox (e.g. Gmail).
+ * Many hosts do not deliver "From info@ → To info@" into the same mailbox; backup To is a different RCPT and usually arrives.
+ * Failures are logged only — does not fail the request.
+ */
+function maxbit_order_mail_send_shop_backup(string $subject, string $body, ?string $replyTo): void
+{
+    $backup = trim(maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BACKUP_EMAIL', ''));
+    if ($backup === '' || !filter_var($backup, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+    $primaryTo = trim(maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'max@maxbitcore.com'));
+    if ($primaryTo !== '' && strcasecmp($backup, $primaryTo) === 0) {
+        return;
+    }
+    $shopFrom = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
+    $shopFromName = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
+    if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
+        $r = maxbit_order_mail_send($backup, $subject, $body, $replyTo, null);
+        if (!$r['ok']) {
+            error_log('MaxBit shop backup email failed: ' . ($r['error'] ?? 'unknown'));
+        }
+        return;
+    }
+    $ok = maxbit_order_mail_send_php_mail($backup, $subject, $body, $shopFrom, $shopFromName, $replyTo, null);
+    if (!$ok) {
+        error_log('MaxBit shop backup email failed (php mail)');
+    }
+}

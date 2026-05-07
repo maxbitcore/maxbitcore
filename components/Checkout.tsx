@@ -717,7 +717,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <span className="font-bold uppercase tracking-wide">
-                    Our team at info@maxbitcore.com has been notified
+                    Our team at max@maxbitcore.com has been notified
                   </span>
                 </div>
               )}

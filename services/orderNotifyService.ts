@@ -88,8 +88,8 @@ function buildOrderPlainText(p: PaidOrderNotifyPayload, variant: 'shop' | 'custo
     '',
     'Totals at checkout',
     `Subtotal: ${formatMoney(p.subtotal, p.currency)}`,
-    `Amount tax: ${formatMoney(stripeMinorToMajor(p.stripeAmountTax, p.currency), p.currency)} (со Stripe)`,
-    `Amount total: ${formatMoney(stripeMinorToMajor(p.stripeAmountTotal, p.currency), p.currency)} (со Stripe)`,
+    `Amount tax: ${formatMoney(stripeMinorToMajor(p.stripeAmountTax, p.currency), p.currency)} `,
+    `Amount total: ${formatMoney(stripeMinorToMajor(p.stripeAmountTotal, p.currency), p.currency)} `,
     ''
   );
   return lines.join('\n');
@@ -142,7 +142,7 @@ async function sendViaHttp(p: PaidOrderNotifyPayload, url: string, secret: strin
 /**
  * After Stripe marks the session paid: POST JSON to notify-order-paid.php.
  * The script sends two messages via PHP mail() (host SMTP / relay — e.g. to Gmail / Google Workspace):
- * 1) full details to info@maxbitcore.com
+ * 1) full details to shop inbox (default max@maxbitcore.com via notify-order-paid.php)
  * 2) confirmation to the customer email
  */
 export async function notifyPaidOrderEmails(p: PaidOrderNotifyPayload): Promise<OrderNotifyResult> {
