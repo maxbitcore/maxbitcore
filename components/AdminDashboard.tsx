@@ -59,9 +59,12 @@ function trafficSessionDurationSec(session: VisitorSession): number {
 /** Stable key to merge repeat visits from the same actor in Live Traffic. */
 function trafficGroupKey(session: VisitorSession): string {
   const u = String(session?.user || '').trim().toLowerCase();
-  if (!u || u === 'guest') return '__guest__';
+  const sid = String(session?.id || '').trim();
+  if (!u || u === 'guest') return sid ? `guest:${sid}` : `guest:${Number(session?.startTime || 0)}`;
   if (u === 'admin') return '__admin__';
-  if (u === 'registered_user') return '__registered__';
+  if (u === 'registered_user') {
+    return sid ? `registered:${sid}` : `registered:${Number(session?.startTime || 0)}`;
+  }
   return u;
 }
 
@@ -94,7 +97,7 @@ function resolveAdminApiBaseUrl(): string {
     return fromEnv.trim().replace(/\/+$/, '');
   }
   if (import.meta.env.PROD && typeof window !== 'undefined') {
-    return `${window.location.origin.replace(/\/+$/, '')}/server`;
+    return `${window.location.origin.replace(/\/+$/, '')}`;
   }
   return 'http://localhost:4242';
 }
@@ -399,20 +402,61 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     window.dispatchEvent(new CustomEvent('configurator-updated'));
   };
 
+  const getAdminApiBaseCandidates = (): string[] => {
+    const primary = resolveAdminApiBaseUrl().replace(/\/+$/, '');
+    const candidates = [primary];
+    if (/\/server$/i.test(primary)) {
+      candidates.push(primary.replace(/\/server$/i, ''));
+    } else {
+      candidates.push(`${primary}/server`);
+    }
+    return [...new Set(candidates.filter(Boolean))];
+  };
+
+  const fetchNodeOrdersApi = async (
+    path: string,
+    init: RequestInit,
+    adminSecret: string
+  ): Promise<{ response: Response; base: string }> => {
+    const bases = getAdminApiBaseCandidates();
+    const headers = {
+      ...(init.headers || {}),
+      'X-Maxbit-Admin-Orders-Secret': adminSecret,
+    } as Record<string, string>;
+
+    let lastResponse: Response | null = null;
+    let lastError: unknown = null;
+    for (const base of bases) {
+      try {
+        const response = await fetch(`${base}${path}`, { ...init, headers });
+        if (response.status === 404) {
+          lastResponse = response;
+          continue;
+        }
+        return { response, base };
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (lastResponse) {
+      return { response: lastResponse, base: bases[0] || '' };
+    }
+    throw (lastError instanceof Error ? lastError : new Error('Could not reach Node orders API.'));
+  };
+
   const updateNodeOrderFulfillment = async (orderKey: string, status: FulfillmentStatus) => {
     const adminSecret = getAdminOrdersSecret();
     if (!adminSecret) return;
     try {
-      const r = await fetch(
-        `${resolveAdminApiBaseUrl()}/shop-orders/${encodeURIComponent(orderKey)}`,
+      const { response: r } = await fetchNodeOrdersApi(
+        `/shop-orders/${encodeURIComponent(orderKey)}`,
         {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Maxbit-Admin-Orders-Secret': adminSecret,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fulfillmentStatus: status }),
-        }
+        },
+        adminSecret
       );
       if (!r.ok) {
         const t = await r.text();
@@ -431,12 +475,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     const adminSecret = getAdminOrdersSecret();
     if (!adminSecret) return;
     try {
-      const r = await fetch(
-        `${resolveAdminApiBaseUrl()}/shop-orders/${encodeURIComponent(orderKey)}`,
-        {
-          method: 'DELETE',
-          headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
-        }
+      const { response: r } = await fetchNodeOrdersApi(
+        `/shop-orders/${encodeURIComponent(orderKey)}`,
+        { method: 'DELETE' },
+        adminSecret
       );
       if (!r.ok) {
         const t = await r.text();
@@ -540,15 +582,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           const adminSecret = getAdminOrdersSecret();
           if (adminSecret) {
             try {
-              const nodeRes = await fetch(`${resolveAdminApiBaseUrl()}/shop-orders`, {
-                headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
-              });
+              const { response: nodeRes, base } = await fetchNodeOrdersApi(
+                '/shop-orders',
+                { method: 'GET' },
+                adminSecret
+              );
               if (nodeRes.ok) {
                 const nodeData = await nodeRes.json();
                 if (Array.isArray(nodeData)) nodeOrders = nodeData;
               } else {
                 const body = await nodeRes.text().catch(() => '');
-                stripeErr = `Stripe orders API: HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
+                stripeErr = `Stripe orders API (${base}): HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
                 console.warn('Shop orders API:', nodeRes.status, body);
               }
             } catch (nodeErr) {
@@ -1664,7 +1708,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                   </div>
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                     <div className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-2">Unit Views</div>
-                    <div className="text-3xl font-black text-white italic"> {Object.values(analytics?.views || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0)} </div>
+                    <div className="text-3xl font-black text-white italic"> {Object.values(analytics?.productViews || analytics?.views || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0)} </div>
                     <div className="text-[9px] text-slate-500 uppercase mt-1">Total product interactions</div>
                   </div>
                   <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
@@ -1686,8 +1730,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                    </div>
                  </div>
 
-                 <div className="h-[300px] w-full">
-                   <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[300px] w-full min-h-[300px] min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={280} minHeight={240}>
                      <AreaChart data={chartData}>
                        <defs>
                          <linearGradient id="cyberCyan" x1="0" y1="0" x2="0" y2="1">
@@ -1737,10 +1781,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                     {publishedProducts
                       .map(p => ({
                         ...p,
-                        viewCount: analytics?.views?.[p.id] || 0
+                        viewCount: analytics?.productViews?.[p.id] || analytics?.views?.[p.id] || 0
                       }))
                       .sort((a, b) => b.viewCount - a.viewCount)
-                      .slice(0, 5)
                       .map((product, idx) => (
                         <div key={product.id} className="group flex items-center justify-between p-3 rounded-2xl bg-slate-950/40 border border-slate-800/50 hover:border-cyan-500/30 transition-all">
                           <div className="flex items-center gap-4">

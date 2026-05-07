@@ -33,10 +33,10 @@ const DEFAULT_CONFIG = {
 };
 
 const DEFAULT_CASE_IMAGES: Record<string, string> = {
-  'Panoramic': "/panoramic_sketch.jpg",
-  'Airflow': "https://storage.googleapis.com/static.aistudio.google.com/content/file-2.png",
-  'Stealth': "https://storage.googleapis.com/static.aistudio.google.com/content/file-0.png",
-  'Dual-Chamber': "https://storage.googleapis.com/static.aistudio.google.com/content/file-3.png",
+  'Panoramic': "https://www.maxbitcore.com/uploads/panoramic.png",
+  'Airflow': "https://www.maxbitcore.com/uploads/airflow.png",
+  'Stealth': "https://www.maxbitcore.com/uploads/stealth.png",
+  'Dual-Chamber': "https://www.maxbitcore.com/uploads/dual-chamber.png",
   'Not Specified': "" 
 };
 

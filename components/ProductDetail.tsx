@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { trackCartAddition, logAction } from '../services/analyticsService';
+import { trackCartAddition, trackProductView, logAction } from '../services/analyticsService';
 import { Product, Review } from '../types';
 import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
@@ -136,6 +136,11 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     ).trim();
     setIsWishlisted(em ? checkIsWishlisted(product.id, em) : false);
   }, [product, currentUserProp?.email, authCtx?.currentUser?.email, email]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    trackProductView(product.id, String(product.name || 'Product'));
+  }, [product?.id]);
 
   useEffect(() => {
     const registered = hasRegisteredSession(currentUserProp, authCtx?.currentUser);
