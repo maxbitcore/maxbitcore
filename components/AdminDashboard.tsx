@@ -82,6 +82,8 @@ type AdminMergedOrder = {
   key: string;
   orderNumber: string;
   customerEmail: string;
+  /** Same currency amount as `amount` when set (e.g. from API `total` / `totalMajor`). */
+  total?: number;
   amount: number;
   timestamp: number;
   paymentStatus: string;
@@ -425,6 +427,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     return [...new Set(candidates.filter(Boolean))];
   };
 
+  const shopOrdersPathCandidatesForBase = (base: string): string[] => {
+    const b = base.replace(/\/+$/, '');
+    if (/\/server$/i.test(b)) return ['/shop-orders'];
+    return ['/shop-orders', '/server/shop-orders'];
+  };
+
+  const shopOrdersPathVariantsForFetch = (base: string, path: string): string[] => {
+    if (!path.startsWith('/shop-orders')) return [path];
+    const suffix = path.slice('/shop-orders'.length);
+    return shopOrdersPathCandidatesForBase(base).map((p) => `${p}${suffix}`);
+  };
+
   const fetchNodeOrdersApi = async (
     path: string,
     init: RequestInit,
@@ -439,15 +453,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     let lastResponse: Response | null = null;
     let lastError: unknown = null;
     for (const base of bases) {
-      try {
-        const response = await fetch(`${base}${path}`, { ...init, headers });
-        if (response.status === 404) {
-          lastResponse = response;
-          continue;
+      const b = base.replace(/\/+$/, '');
+      for (const p of shopOrdersPathVariantsForFetch(b, path)) {
+        try {
+          const response = await fetch(`${b}${p}`, { ...init, headers });
+          if (response.status === 404) {
+            lastResponse = response;
+            continue;
+          }
+          return { response, base: b };
+        } catch (e) {
+          lastError = e;
         }
-        return { response, base };
-      } catch (e) {
-        lastError = e;
       }
     }
 
@@ -596,33 +613,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
             try {
               const bases = getAdminApiBaseCandidates();
               let loaded = false;
-              for (const base of bases) {
-                const nodeRes = await fetch(`${base}/shop-orders`, {
-                  method: 'GET',
-                  headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
-                });
-                const body = await nodeRes.text().catch(() => '');
-                if (!nodeRes.ok) {
-                  stripeErr = `Stripe orders API (${base}): HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
-                  if (nodeRes.status === 404) continue;
-                  continue;
-                }
-                // Some hosts rewrite unknown routes to index.html with HTTP 200.
-                if (/^\s*</.test(body)) {
-                  stripeErr = `Stripe orders API (${base}): returned HTML instead of JSON`;
-                  continue;
-                }
-                try {
-                  const nodeData = JSON.parse(body);
-                  if (Array.isArray(nodeData)) {
-                    nodeOrders = nodeData;
-                    loaded = true;
-                    stripeErr = null;
-                    break;
+              outer: for (const base of bases) {
+                const b = base.replace(/\/+$/, '');
+                for (const ordersPath of shopOrdersPathCandidatesForBase(b)) {
+                  const nodeRes = await fetch(`${b}${ordersPath}`, {
+                    method: 'GET',
+                    headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
+                  });
+                  const body = await nodeRes.text().catch(() => '');
+                  if (!nodeRes.ok) {
+                    stripeErr = `Stripe orders API (${b}${ordersPath}): HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
+                    if (nodeRes.status === 404) continue;
+                    continue;
                   }
-                  stripeErr = `Stripe orders API (${base}): unexpected JSON payload`;
-                } catch (e) {
-                  stripeErr = `Stripe orders API (${base}): invalid JSON`;
+                  // Some hosts rewrite unknown routes to index.html with HTTP 200.
+                  if (/^\s*</.test(body)) {
+                    stripeErr = `Stripe orders API (${b}${ordersPath}): returned HTML instead of JSON`;
+                    continue;
+                  }
+                  try {
+                    const nodeData = JSON.parse(body);
+                    if (Array.isArray(nodeData)) {
+                      nodeOrders = nodeData;
+                      loaded = true;
+                      stripeErr = null;
+                      break outer;
+                    }
+                    stripeErr = `Stripe orders API (${b}${ordersPath}): unexpected JSON payload`;
+                  } catch (e) {
+                    stripeErr = `Stripe orders API (${b}${ordersPath}): invalid JSON`;
+                  }
                 }
               }
               if (!loaded && stripeErr) console.warn('Shop orders API:', stripeErr);

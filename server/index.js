@@ -17,6 +17,24 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
 
 app.disable('x-powered-by');
 
+/**
+ * cPanel / Passenger mounts this app at https://host/server, so Express often sees
+ * paths like /server/shop-orders while routes are registered as /shop-orders.
+ * Strip the mount prefix once so a single route table works everywhere.
+ */
+app.use((req, _res, next) => {
+  const raw = req.url || '/';
+  if (!raw.startsWith('/server')) return next();
+  let pathAndQuery = raw.slice('/server'.length);
+  if (!pathAndQuery || pathAndQuery[0] === '?') {
+    req.url = '/' + pathAndQuery;
+    return next();
+  }
+  if (!pathAndQuery.startsWith('/')) pathAndQuery = `/${pathAndQuery}`;
+  req.url = pathAndQuery;
+  return next();
+});
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const cleanText = (value = '') => String(value).replace(/<[^>]*>?/gm, '').trim();
 const safeImageUrl = (value = '') => {
