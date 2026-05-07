@@ -62,7 +62,8 @@ $body = isset($data['order_body']) && is_string($data['order_body']) && $data['o
     ? $data['order_body']
     : json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-$to = 'info@maxbitcore.com';
+$to = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
+$shopBcc = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BCC', '');
 $subject = '[MaxBit] Paid order ' . $orderId;
 $customerEmail = isset($data['customerEmail']) ? trim((string) $data['customerEmail']) : '';
 $shopFrom = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
@@ -71,7 +72,7 @@ $shopFromName = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 $replyShop = ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) ? $customerEmail : null;
 
 if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
-    $r1 = maxbit_order_mail_send($to, $subject, $body, $replyShop);
+    $r1 = maxbit_order_mail_send($to, $subject, $body, $replyShop, $shopBcc !== '' ? $shopBcc : null);
     if (!$r1['ok']) {
         http_response_code(500);
         echo json_encode([
@@ -82,7 +83,15 @@ if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
         exit;
     }
 } else {
-    $ok = maxbit_order_mail_send_php_mail($to, $subject, $body, $shopFrom, $shopFromName, $replyShop);
+    $ok = maxbit_order_mail_send_php_mail(
+        $to,
+        $subject,
+        $body,
+        $shopFrom,
+        $shopFromName,
+        $replyShop,
+        $shopBcc !== '' ? $shopBcc : null
+    );
     if (!$ok) {
         http_response_code(500);
         echo json_encode([

@@ -55,3 +55,13 @@ define('MAXBIT_SMTP_PASS', 'PASTE_MAILBOX_PASSWORD_HERE');
 /** Должен совпадать с ящиком, от имени которого логинитесь по SMTP */
 define('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
 define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
+
+/**
+ * Куда слать уведомление магазину (первое письмо с деталями заказа).
+ * По умолчанию info@… — но многие SMTP не кладут во «Входящие» письмо «с того же ящика на тот же»
+ * (From и To совпадают). Если дубликаты не видите — задайте BCC ниже или отдельный ящик/алиас.
+ */
+// define('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
+
+/** Доп. копия уведомления о заказе (Gmail и т.д.). Несколько адресов через запятую. */
+// define('MAXBIT_SHOP_ORDER_BCC', 'your@gmail.com');

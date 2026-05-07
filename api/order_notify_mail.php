@@ -51,9 +51,10 @@ function maxbit_order_mail_use_phpmailer(): bool
 /**
  * Send plain-text email. From address is always the domain mailbox (info@…).
  *
+ * @param string|null $bcc Optional comma/space-separated BCC addresses (e.g. backup inbox).
  * @return array{ok: bool, error?: string}
  */
-function maxbit_order_mail_send(string $to, string $subject, string $body, ?string $replyTo = null): array
+function maxbit_order_mail_send(string $to, string $subject, string $body, ?string $replyTo = null, ?string $bcc = null): array
 {
     if (!maxbit_order_mail_smtp_ready()) {
         return ['ok' => false, 'error' => 'smtp_not_configured'];
@@ -91,6 +92,14 @@ function maxbit_order_mail_send(string $to, string $subject, string $body, ?stri
 
         $mail->setFrom($from, $fromName);
         $mail->addAddress($to);
+        if ($bcc !== null && $bcc !== '') {
+            foreach (preg_split('/[,;\s]+/', $bcc, -1, PREG_SPLIT_NO_EMPTY) as $piece) {
+                $addr = trim((string) $piece);
+                if ($addr !== '' && filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                    $mail->addBCC($addr);
+                }
+            }
+        }
         if ($replyTo !== null && $replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
             $mail->addReplyTo($replyTo);
         }
@@ -112,7 +121,8 @@ function maxbit_order_mail_send_php_mail(
     string $body,
     string $fromEmail,
     string $fromName,
-    ?string $replyTo = null
+    ?string $replyTo = null,
+    ?string $bcc = null
 ): bool {
     $fromHeader = 'From: ' . $fromName . ' <' . $fromEmail . '>';
     $headers = [
@@ -122,6 +132,18 @@ function maxbit_order_mail_send_php_mail(
     ];
     if ($replyTo !== null && $replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
         $headers[] = 'Reply-To: ' . $replyTo;
+    }
+    if ($bcc !== null && $bcc !== '') {
+        $parts = [];
+        foreach (preg_split('/[,;\s]+/', $bcc, -1, PREG_SPLIT_NO_EMPTY) as $piece) {
+            $addr = trim((string) $piece);
+            if ($addr !== '' && filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                $parts[] = $addr;
+            }
+        }
+        if ($parts !== []) {
+            $headers[] = 'Bcc: ' . implode(', ', $parts);
+        }
     }
     return (bool) @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, implode("\r\n", $headers));
 }
