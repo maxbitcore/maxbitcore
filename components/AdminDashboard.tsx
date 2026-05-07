@@ -71,6 +71,13 @@ function trafficGroupKey(session: VisitorSession): string {
 const FULFILLMENT_STATUSES = ['Processing', 'Shipped', 'Delivered', 'Cancelled'] as const;
 type FulfillmentStatus = (typeof FULFILLMENT_STATUSES)[number];
 
+const DEFAULT_CASE_STYLE_ASSETS: Record<string, string> = {
+  Panoramic: 'https://www.maxbitcore.com/uploads/panoramic.png',
+  Airflow: 'https://www.maxbitcore.com/uploads/airflow.png',
+  Stealth: 'https://www.maxbitcore.com/uploads/stealth.jpg',
+  'Dual-Chamber': 'https://www.maxbitcore.com/uploads/dual_chamber.png',
+};
+
 type AdminMergedOrder = {
   key: string;
   orderNumber: string;
@@ -350,7 +357,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [newSectionKeyDraft, setNewSectionKeyDraft] = useState('');
   const [newSectionTitleDraft, setNewSectionTitleDraft] = useState('');
   const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
-  const [caseStyles, setCaseStyles] = useState<Record<string, string>>({});
+  const [caseStyles, setCaseStyles] = useState<Record<string, string>>({
+    ...DEFAULT_CASE_STYLE_ASSETS,
+  });
 
   const [submissions, setSubmissions] = useState<BuildSubmission[]>([]);
   const [shopOrders, setShopOrders] = useState<AdminMergedOrder[]>([]);
@@ -404,10 +413,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   const getAdminApiBaseCandidates = (): string[] => {
     const primary = resolveAdminApiBaseUrl().replace(/\/+$/, '');
-    const candidates = [primary];
+    const candidates: string[] = [];
     if (/\/server$/i.test(primary)) {
+      // Prefer non-/server first in production (common reverse-proxy setup).
       candidates.push(primary.replace(/\/server$/i, ''));
+      candidates.push(primary);
     } else {
+      candidates.push(primary);
       candidates.push(`${primary}/server`);
     }
     return [...new Set(candidates.filter(Boolean))];
@@ -582,19 +594,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           const adminSecret = getAdminOrdersSecret();
           if (adminSecret) {
             try {
-              const { response: nodeRes, base } = await fetchNodeOrdersApi(
-                '/shop-orders',
-                { method: 'GET' },
-                adminSecret
-              );
-              if (nodeRes.ok) {
-                const nodeData = await nodeRes.json();
-                if (Array.isArray(nodeData)) nodeOrders = nodeData;
-              } else {
+              const bases = getAdminApiBaseCandidates();
+              let loaded = false;
+              for (const base of bases) {
+                const nodeRes = await fetch(`${base}/shop-orders`, {
+                  method: 'GET',
+                  headers: { 'X-Maxbit-Admin-Orders-Secret': adminSecret },
+                });
                 const body = await nodeRes.text().catch(() => '');
-                stripeErr = `Stripe orders API (${base}): HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
-                console.warn('Shop orders API:', nodeRes.status, body);
+                if (!nodeRes.ok) {
+                  stripeErr = `Stripe orders API (${base}): HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
+                  if (nodeRes.status === 404) continue;
+                  continue;
+                }
+                // Some hosts rewrite unknown routes to index.html with HTTP 200.
+                if (/^\s*</.test(body)) {
+                  stripeErr = `Stripe orders API (${base}): returned HTML instead of JSON`;
+                  continue;
+                }
+                try {
+                  const nodeData = JSON.parse(body);
+                  if (Array.isArray(nodeData)) {
+                    nodeOrders = nodeData;
+                    loaded = true;
+                    stripeErr = null;
+                    break;
+                  }
+                  stripeErr = `Stripe orders API (${base}): unexpected JSON payload`;
+                } catch (e) {
+                  stripeErr = `Stripe orders API (${base}): invalid JSON`;
+                }
               }
+              if (!loaded && stripeErr) console.warn('Shop orders API:', stripeErr);
             } catch (nodeErr) {
               stripeErr =
                 nodeErr instanceof Error ? nodeErr.message : 'Could not reach Node server for shop orders.';
@@ -642,10 +673,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         const normalized = Object.fromEntries(
           Object.entries(parsed || {}).map(([k, v]) => [k, resolveSiteAssetUrl(String(v || ''))])
         );
-        setCaseStyles(normalized);
+        setCaseStyles({
+          ...DEFAULT_CASE_STYLE_ASSETS,
+          ...normalized,
+        });
       } catch {
-        setCaseStyles({});
+        setCaseStyles({ ...DEFAULT_CASE_STYLE_ASSETS });
       }
+    } else {
+      setCaseStyles({ ...DEFAULT_CASE_STYLE_ASSETS });
     }
     
     const analyticsData = getAnalytics();

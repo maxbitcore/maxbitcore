@@ -35,8 +35,8 @@ const DEFAULT_CONFIG = {
 const DEFAULT_CASE_IMAGES: Record<string, string> = {
   'Panoramic': "https://www.maxbitcore.com/uploads/panoramic.png",
   'Airflow': "https://www.maxbitcore.com/uploads/airflow.png",
-  'Stealth': "https://www.maxbitcore.com/uploads/stealth.png",
-  'Dual-Chamber': "https://www.maxbitcore.com/uploads/dual-chamber.png",
+  'Stealth': "https://www.maxbitcore.com/uploads/stealth.jpg",
+  'Dual-Chamber': "https://www.maxbitcore.com/uploads/dual_chamber.png",
   'Not Specified': "" 
 };
 
