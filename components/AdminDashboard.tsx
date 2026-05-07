@@ -1523,7 +1523,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                     <p className="text-[10px] text-amber-200/90 leading-relaxed">
                       Заказы видны только из PHP — на Node списка Stripe пока нет. Проверьте: после оплаты открывался
                       return URL (payment-status), на сервере есть{' '}
-                      <code className="text-slate-400">server/data/shop-orders.json</code>, переменные Stripe и
+                      <code className="text-slate-400">server/data/order.json</code>, переменные Stripe и
                       перезапуск Node.
                     </p>
                   ) : null}

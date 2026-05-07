@@ -26,7 +26,9 @@ const safeImageUrl = (value = '') => {
 
 const DATA_DIR = path.join(__dirname, 'data');
 const PAYMENTS_FILE = path.join(DATA_DIR, 'stripe-payments.json');
-const SHOP_ORDERS_FILE = path.join(DATA_DIR, 'shop-orders.json');
+/** Persisted shop orders (Stripe-paid rows for admin UI). */
+const SHOP_ORDERS_FILE = path.join(DATA_DIR, 'order.json');
+const LEGACY_SHOP_ORDERS_FILE = path.join(DATA_DIR, 'shop-orders.json');
 
 const ZERO_DECIMAL_CURRENCIES = new Set([
   'bif',
@@ -57,7 +59,15 @@ const stripeMinorToMajorUnits = (minor, currency) => {
 const ensureShopOrdersStore = () => {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(SHOP_ORDERS_FILE)) {
-    fs.writeFileSync(SHOP_ORDERS_FILE, JSON.stringify({ orders: {} }, null, 2));
+    if (fs.existsSync(LEGACY_SHOP_ORDERS_FILE)) {
+      try {
+        fs.renameSync(LEGACY_SHOP_ORDERS_FILE, SHOP_ORDERS_FILE);
+      } catch (e) {
+        fs.copyFileSync(LEGACY_SHOP_ORDERS_FILE, SHOP_ORDERS_FILE);
+      }
+    } else {
+      fs.writeFileSync(SHOP_ORDERS_FILE, JSON.stringify({ orders: {} }, null, 2));
+    }
   }
 };
 
@@ -85,7 +95,8 @@ const writeShopOrdersStore = (store) => {
  */
 const upsertShopOrderFromPaidSession = (session, opts = {}) => {
   if (!session) return null;
-  const orderId = cleanText((session.metadata && session.metadata.orderId) || '');
+  const fromMeta = cleanText((session.metadata && session.metadata.orderId) || '');
+  const orderId = fromMeta || cleanText(opts.orderId || '');
   if (!orderId) return null;
 
   const store = readShopOrdersStore();
@@ -286,10 +297,32 @@ const formatStripeCaughtError = (error) => {
   return 'Failed to create checkout session.';
 };
 
-/** Stripe-hosted receipt (charge.receipt_url). Tries several shapes — expanded PI, charges.data, charges.list. */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Receipt URL comes from Charge.receipt_url or Invoice.hosted_invoice_url — not from Checkout Session directly.
+ * Stripe may leave receipt_url empty for some methods, or fill it slightly after success; we retry charge.retrieve.
+ * ACH / bank debits often have no hosted receipt in the API the same way as cards.
+ */
 async function resolveChargeReceiptUrlFromCheckoutSession(session) {
   if (!stripe || !session) return null;
+
+  const invRaw = session.invoice;
+  if (invRaw && typeof invRaw === 'object' && invRaw.hosted_invoice_url) {
+    return invRaw.hosted_invoice_url;
+  }
+  if (typeof invRaw === 'string' && invRaw.startsWith('in_')) {
+    try {
+      const inv = await stripe.invoices.retrieve(invRaw);
+      if (inv.hosted_invoice_url) return inv.hosted_invoice_url;
+      if (inv.invoice_pdf && /^https:\/\//i.test(inv.invoice_pdf)) return inv.invoice_pdf;
+    } catch (e) {
+      console.warn('invoice retrieve for receipt URL:', e.message || e);
+    }
+  }
+
   let pi = session.payment_intent;
+  if (!pi) return null;
   if (typeof pi === 'string' && pi) {
     const piId = pi;
     try {
@@ -308,31 +341,55 @@ async function resolveChargeReceiptUrlFromCheckoutSession(session) {
 
   const fromCharge = (ch) => (ch && typeof ch === 'object' && ch.receipt_url ? ch.receipt_url : null);
 
+  const tryChargeWithRetries = async (chargeId) => {
+    if (typeof chargeId !== 'string' || !chargeId.startsWith('ch_')) return null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await sleep(650);
+      try {
+        const ch = await stripe.charges.retrieve(chargeId);
+        if (ch.receipt_url) return ch.receipt_url;
+      } catch (e) {
+        console.warn('charges.retrieve for receipt_url:', e.message || e);
+        return null;
+      }
+    }
+    return null;
+  };
+
   const lc = pi.latest_charge;
   const u1 = fromCharge(lc);
   if (u1) return u1;
   if (typeof lc === 'string' && lc) {
-    try {
-      const ch = await stripe.charges.retrieve(lc);
-      if (ch.receipt_url) return ch.receipt_url;
-    } catch (e) {
-      console.warn('charges.retrieve for receipt_url:', e.message || e);
-    }
+    const u = await tryChargeWithRetries(lc);
+    if (u) return u;
   }
 
   const chargeList = pi.charges && pi.charges.data;
   if (Array.isArray(chargeList)) {
+    let retriedOne = false;
     for (const ch of chargeList) {
       const u = fromCharge(ch);
       if (u) return u;
+      if (!retriedOne && ch && ch.id) {
+        retriedOne = true;
+        const u2 = await tryChargeWithRetries(ch.id);
+        if (u2) return u2;
+      }
     }
   }
 
   if (typeof pi.id === 'string' && pi.id.startsWith('pi_')) {
     try {
       const listed = await stripe.charges.list({ payment_intent: pi.id, limit: 5 });
+      let retriedOne = false;
       for (const ch of listed.data || []) {
-        if (ch.receipt_url) return ch.receipt_url;
+        const u = fromCharge(ch);
+        if (u) return u;
+        if (!retriedOne && ch && ch.id) {
+          retriedOne = true;
+          const u2 = await tryChargeWithRetries(ch.id);
+          if (u2) return u2;
+        }
       }
     } catch (e) {
       console.warn('charges.list for receipt_url:', e.message || e);
@@ -391,7 +448,7 @@ const webhookHandler = async (req, res) => {
       if (session.id) {
         try {
           const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
-            expand: ['line_items.data.price.product', 'payment_intent.latest_charge'],
+            expand: ['line_items.data.price.product', 'payment_intent.latest_charge', 'invoice'],
           });
           let receiptUrl = null;
           try {
@@ -561,7 +618,7 @@ const paymentStatusHandler = async (req, res) => {
     }
 
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items.data.price.product', 'payment_intent.latest_charge'],
+      expand: ['line_items.data.price.product', 'payment_intent.latest_charge', 'invoice'],
     });
     const metaOrderId = cleanText((session.metadata && session.metadata.orderId) || '');
     const queryOrderId = cleanText((req.query && req.query.orderId) || '');
@@ -604,7 +661,7 @@ const paymentStatusHandler = async (req, res) => {
       receiptUrl = await resolveChargeReceiptUrlFromCheckoutSession(session);
       if (orderId) {
         try {
-          upsertShopOrderFromPaidSession(session, { receiptUrl });
+          upsertShopOrderFromPaidSession(session, { receiptUrl, orderId });
         } catch (e) {
           console.warn('shop order upsert (payment-status):', e.message || e);
         }

@@ -41,10 +41,11 @@
  * Оформите тестовый заказ. В браузере F12 → Network → запрос к notify-order-paid.php
  * должен вернуть JSON {"ok":true,...}. Если "smtp_failed" — смотрите поле "detail".
  *
- * MAXBIT_SMTP_HOST: без префикса ssl:// — только имя хоста, например mail.maxbitcore.com
+ * MAXBIT_SMTP_HOST: только имя хоста (без ssl://). В cPanel «Connect Devices» часто указано:
+ *   Outgoing server = maxbitcore.com, port 465 — или mail.домен — возьмите ТОЧНО как в инструкции хостера.
  */
 
-define('MAXBIT_SMTP_HOST', 'mail.maxbitcore.com');
+define('MAXBIT_SMTP_HOST', 'maxbitcore.com');
 define('MAXBIT_SMTP_PORT', 465);
 /** 'ssl' для порта 465, 'tls' для порта 587 */
 define('MAXBIT_SMTP_ENCRYPTION', 'ssl');
