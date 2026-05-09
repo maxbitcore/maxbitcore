@@ -7,6 +7,11 @@ const path = require('path');
 const crypto = require('crypto');
 
 const POOL_FILE = path.join(__dirname, 'data', 'serial-pool.json');
+try {
+  console.log('[serialPool] writes to', path.resolve(POOL_FILE));
+} catch {
+  /* ignore */
+}
 const POOL_TTL_MS = Math.max(
   5 * 60 * 1000,
   Number(process.env.SERIAL_RESERVATION_TTL_MS || 90 * 60 * 1000)

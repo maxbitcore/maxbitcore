@@ -580,38 +580,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setSerialPoolLoading(true);
     try {
       const bases = getAdminApiBaseCandidates();
+      const tried: string[] = [];
+      let imported = false;
+      let stoppedEarly = false;
       outer: for (const base of bases) {
         const b = base.replace(/\/+$/, '');
         const urls = /\/server$/i.test(b)
           ? [`${b}/serial-pool`]
           : [`${b}/serial-pool`, `${b}/server/serial-pool`];
         for (const url of urls) {
-          const body = serialImportAsBundle
-            ? { productId: pid, bundle: serialImportText }
-            : {
-                productId: pid,
-                serials: serialImportText.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean),
-              };
-          const r = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Maxbit-Admin-Orders-Secret': secret,
-            },
-            body: JSON.stringify(body),
-          });
+          tried.push(url);
+          let r: Response;
+          try {
+            const body = serialImportAsBundle
+              ? { productId: pid, bundle: serialImportText }
+              : {
+                  productId: pid,
+                  serials: serialImportText.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean),
+                };
+            r = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Maxbit-Admin-Orders-Secret': secret,
+              },
+              body: JSON.stringify(body),
+            });
+          } catch (err) {
+            stoppedEarly = true;
+            alert(
+              `Network error calling ${url}: ${err instanceof Error ? err.message : String(err)}. Check VITE_API_URL / Node URL.`
+            );
+            break outer;
+          }
           const text = await r.text();
           if (r.ok) {
             setSerialImportText('');
             await refreshSerialPool();
             alert('Serial numbers added to the pool.');
+            imported = true;
             break outer;
           }
           if (r.status !== 404) {
+            stoppedEarly = true;
             alert(text.slice(0, 220) || 'Import failed.');
             break outer;
           }
         }
+      }
+      if (!imported && !stoppedEarly && tried.length) {
+        alert(
+          `Serial pool API not found (404 on all URLs). Tried:\n${tried.join('\n')}\n\nSet VITE_API_URL to your Node base URL and redeploy the frontend, or open the site URL that proxies to Passenger.`
+        );
       }
     } finally {
       setSerialPoolLoading(false);
