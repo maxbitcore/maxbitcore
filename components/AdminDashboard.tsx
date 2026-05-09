@@ -341,7 +341,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   // 2. NAVIGATION STATE
   const [activeAdminTab, setActiveAdminTab] = useState<'submissions' | 'orders' | 'catalog' | 'analytics' | 'comments'>('submissions');
-  const [catalogMode, setCatalogMode] = useState<'products' | 'options' | 'assets' | 'serials'>('products');
+  const [catalogMode, setCatalogMode] = useState<'products' | 'configurator' | 'serials'>('products');
   const [serialPoolSnapshot, setSerialPoolSnapshot] = useState<{
     pools: Record<string, number>;
     reservations: number;
@@ -350,6 +350,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [serialPoolLoading, setSerialPoolLoading] = useState(false);
   const [serialImportProductId, setSerialImportProductId] = useState('');
   const [serialImportText, setSerialImportText] = useState('');
+  /** true = one multiline block = one PC in pool (all lines on one invoice). false = legacy one SN per line. */
+  const [serialImportAsBundle, setSerialImportAsBundle] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -569,8 +571,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     const secret = getAdminOrdersSecret();
     const pid = serialImportProductId.trim();
     if (!secret || !pid) return;
-    const serials = serialImportText.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean);
-    if (!serials.length) return;
+    const trimmedText = serialImportText.trim();
+    if (!trimmedText) return;
+    if (!serialImportAsBundle) {
+      const serials = serialImportText.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean);
+      if (!serials.length) return;
+    }
     setSerialPoolLoading(true);
     try {
       const bases = getAdminApiBaseCandidates();
@@ -580,13 +586,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           ? [`${b}/serial-pool`]
           : [`${b}/serial-pool`, `${b}/server/serial-pool`];
         for (const url of urls) {
+          const body = serialImportAsBundle
+            ? { productId: pid, bundle: serialImportText }
+            : {
+                productId: pid,
+                serials: serialImportText.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean),
+              };
           const r = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'X-Maxbit-Admin-Orders-Secret': secret,
             },
-            body: JSON.stringify({ productId: pid, serials }),
+            body: JSON.stringify(body),
           });
           const text = await r.text();
           if (r.ok) {
@@ -1283,8 +1295,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                   <div className="lg:col-span-3 mb-4">
                      <div className="flex flex-wrap gap-2 p-1 bg-slate-900/50 rounded-xl w-fit border border-slate-800">
                          <button type="button" onClick={() => setCatalogMode('products')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'products' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Inventory</button>
-                         <button type="button" onClick={() => setCatalogMode('options')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'options' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator chapters</button>
-                         <button type="button" onClick={() => setCatalogMode('assets')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'assets' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Case visuals</button>
+                         <button type="button" onClick={() => setCatalogMode('configurator')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'configurator' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator</button>
                          <button type="button" onClick={() => setCatalogMode('serials')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'serials' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Serial pool</button>
                      </div>
                   </div>
@@ -1398,8 +1409,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                     </>
                   )}
 
-                  {catalogMode === 'options' && (
-                    <div className="lg:col-span-3 animate-fade-in-up">
+                  {catalogMode === 'configurator' && (
+                    <div className="lg:col-span-3 animate-fade-in-up space-y-14">
                       <div className="space-y-8 max-w-4xl">
                         <h2 className="text-xl font-black text-white italic uppercase pl-2">Configurator chapters</h2>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
@@ -1517,12 +1528,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                           ))}
                         </div>
                       </div>
-                    </div>
-                  )}
-                  {catalogMode === 'assets' && (
-                    <div className="lg:col-span-3 animate-fade-in-up">
-                      <div className="space-y-8 max-w-2xl">
-                        <h2 className="text-xl font-black text-white italic uppercase pl-2">Case Style Assets</h2>
+
+                      <div className="space-y-8 max-w-2xl border-t border-slate-800 pt-14">
+                        <h2 className="text-xl font-black text-white italic uppercase pl-2">Case visuals</h2>
                         <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl space-y-6">
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-4">Map case types to visual sketches</p>
                           <div className="grid grid-cols-1 gap-4">
@@ -1611,14 +1619,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                                 placeholder="e.g. PUB-1739123456789"
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-mono text-xs outline-none focus:border-cyan-500"
                               />
+                              <label className="flex items-center gap-3 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={serialImportAsBundle}
+                                  onChange={(e) => setSerialImportAsBundle(e.target.checked)}
+                                  className="rounded border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+                                />
+                                <span className="text-xs text-slate-400">
+                                  One PC per paste (all lines stay together for invoice)
+                                </span>
+                              </label>
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
-                                Serial numbers (one per line)
+                                {serialImportAsBundle
+                                  ? 'Serial numbers for one PC (one line per part)'
+                                  : 'Serial numbers — one per line or comma'}
                               </label>
                               <textarea
                                 value={serialImportText}
                                 onChange={(e) => setSerialImportText(e.target.value)}
                                 rows={6}
-                                placeholder={'SN-ABC123\nSN-ABC124'}
+                                placeholder={
+                                  serialImportAsBundle
+                                    ? 'SN-GPU-...\nSN-CPU-...\nSN-RAM-...\n…'
+                                    : 'SN-ABC123\nSN-ABC124'
+                                }
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-mono text-xs outline-none focus:border-cyan-500"
                               />
                               <button

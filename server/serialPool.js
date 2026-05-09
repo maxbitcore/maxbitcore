@@ -57,6 +57,18 @@ const saveState = (state) => {
 const releaseReservationSync = (state, reservationId) => {
   const r = state.reservations[reservationId];
   if (!r) return;
+  /** Prefer whole bundle(s) so multi-line PC kits go back as one pool entry. */
+  if (Array.isArray(r.bundles) && r.bundles.length > 0) {
+    for (const b of r.bundles) {
+      const pid = cleanPid(b.productId);
+      const raw = String(b.raw || '').trim();
+      if (!pid || !raw) continue;
+      if (!state.pools[pid]) state.pools[pid] = [];
+      state.pools[pid].push(raw);
+    }
+    delete state.reservations[reservationId];
+    return;
+  }
   for (const line of r.items || []) {
     const pid = cleanPid(line.productId);
     const sn = String(line.serial || '').trim();
@@ -77,10 +89,18 @@ const expireStaleSync = (state) => {
   for (const id of ids) releaseReservationSync(state, id);
 };
 
-/** Chunk serial list into Stripe Invoice custom_fields (max 4 × 140 chars). */
+/** Split one pool entry: multiline bundle or single-line legacy SN. */
+const expandPoolEntryToPartLines = (rawEntry) => {
+  const s = String(rawEntry || '').trim();
+  if (!s) return [];
+  const lines = s.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  return lines.length ? lines : [s];
+};
+
+/** Chunk part lines into Stripe Invoice custom_fields (max 4 × 140 chars). */
 const linesToInvoiceCustomFields = (lines) => {
   if (!lines.length) return [];
-  const full = lines.map((l) => `${cleanPid(l.productId)}:${String(l.serial).trim()}`).join('; ');
+  const full = lines.map((l) => String(l.serial || '').trim()).join('; ');
   const out = [];
   for (let i = 0; i < full.length && out.length < MAX_CF; i += MAX_VAL) {
     const slice = full.slice(i, i + MAX_VAL);
@@ -109,7 +129,8 @@ const reserveForCheckout = ({ orderId, items, strict }) =>
     }
     const pendingRollback = [];
 
-    const lines = [];
+    const flatLines = [];
+    const bundles = [];
     for (const item of items || []) {
       const pid = cleanPid(item.id);
       if (!pid) continue;
@@ -118,18 +139,22 @@ const reserveForCheckout = ({ orderId, items, strict }) =>
         if (strict) {
           for (const rb of pendingRollback.reverse()) {
             if (!state.pools[rb.pid]) state.pools[rb.pid] = [];
-            state.pools[rb.pid].unshift(rb.serial);
+            state.pools[rb.pid].unshift(rb.raw);
           }
           throw new Error(`Serial pool empty for product "${pid}". Add serials in Admin or serial-pool.json.`);
         }
         continue;
       }
-      const serial = String(pool.shift()).trim();
-      pendingRollback.push({ pid, serial });
-      lines.push({ productId: pid, serial });
+      const rawEntry = pool.shift();
+      const rawStr = String(rawEntry != null ? rawEntry : '').trim();
+      pendingRollback.push({ pid, raw: rawStr });
+      bundles.push({ productId: pid, raw: rawStr });
+      for (const part of expandPoolEntryToPartLines(rawStr)) {
+        flatLines.push({ productId: pid, serial: part });
+      }
     }
 
-    if (lines.length === 0) {
+    if (flatLines.length === 0) {
       saveState(state);
       return { reservationId: null, lines: [], customFields: [] };
     }
@@ -138,7 +163,8 @@ const reserveForCheckout = ({ orderId, items, strict }) =>
     state.reservations[reservationId] = {
       orderId: oid,
       stripeSessionId: null,
-      items: lines,
+      bundles,
+      items: flatLines,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + POOL_TTL_MS).toISOString(),
     };
@@ -146,8 +172,8 @@ const reserveForCheckout = ({ orderId, items, strict }) =>
 
     return {
       reservationId,
-      lines,
-      customFields: linesToInvoiceCustomFields(lines),
+      lines: flatLines,
+      customFields: linesToInvoiceCustomFields(flatLines),
     };
   });
 
@@ -238,6 +264,28 @@ const pushSerials = (productId, serials) =>
     return { added, totalInPool: state.pools[pid].length };
   });
 
+/**
+ * One pool entry = one sold unit (e.g. full PC): multiline string, all lines go to invoice together.
+ */
+const pushBundle = (productId, multiline) =>
+  withLock(() => {
+    const pid = cleanPid(productId);
+    if (!pid) throw new Error('Missing productId.');
+    const raw = String(multiline || '').trim();
+    if (!raw) throw new Error('Empty bundle.');
+    if (raw.length > 12000) throw new Error('Bundle text too long.');
+    const state = loadState();
+    if (!state.pools[pid]) state.pools[pid] = [];
+    const key = raw.toLowerCase();
+    const dup = state.pools[pid].some((x) => String(x).toLowerCase() === key);
+    if (dup) {
+      return { added: 0, totalInPool: state.pools[pid].length };
+    }
+    state.pools[pid].push(raw);
+    saveState(state);
+    return { added: 1, totalInPool: state.pools[pid].length };
+  });
+
 module.exports = {
   isSerialPoolEnabled: isEnabled,
   reserveForCheckout,
@@ -248,5 +296,6 @@ module.exports = {
   peekReservation,
   getAdminSnapshot,
   pushSerials,
+  pushBundle,
   linesToInvoiceCustomFields,
 };

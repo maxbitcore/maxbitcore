@@ -926,6 +926,11 @@ const serialPoolGetHandler = (req, res) => {
 const serialPoolPostHandler = async (req, res) => {
   try {
     const productId = cleanText((req.body && req.body.productId) || '');
+    if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'bundle')) {
+      const bundle = typeof req.body.bundle === 'string' ? req.body.bundle : String(req.body.bundle || '');
+      const result = await serialPool.pushBundle(productId, bundle);
+      return res.json(result);
+    }
     const raw = req.body && req.body.serials;
     const arr = Array.isArray(raw)
       ? raw
