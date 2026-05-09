@@ -427,6 +427,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     window.dispatchEvent(new CustomEvent('configurator-updated'));
   };
 
+  /** Many hosts serve index.html with HTTP 200 for unknown routes — breaks response.json(). */
+  const adminBodyLooksLikeHtml = (body: string) => /^\s*</.test(body || '');
+
   const getAdminApiBaseCandidates = (): string[] => {
     const primary = resolveAdminApiBaseUrl().replace(/\/+$/, '');
     const candidates: string[] = [];
@@ -553,10 +556,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           const r = await fetch(url, {
             headers: { 'X-Maxbit-Admin-Orders-Secret': secret },
           });
-          if (r.ok) {
-            setSerialPoolSnapshot(await r.json());
+          const text = await r.text();
+          if (!r.ok) continue;
+          if (adminBodyLooksLikeHtml(text)) continue;
+          try {
+            const data = JSON.parse(text) as {
+              pools: Record<string, number>;
+              reservations: number;
+              ttlMinutes: number;
+            };
+            setSerialPoolSnapshot(data);
             found = true;
             break outer;
+          } catch {
+            continue;
           }
         }
       }
@@ -583,6 +596,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       const tried: string[] = [];
       let imported = false;
       let stoppedEarly = false;
+      let okWasHtml = false;
       outer: for (const base of bases) {
         const b = base.replace(/\/+$/, '');
         const urls = /\/server$/i.test(b)
@@ -615,6 +629,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           }
           const text = await r.text();
           if (r.ok) {
+            if (adminBodyLooksLikeHtml(text)) {
+              okWasHtml = true;
+              continue;
+            }
+            try {
+              JSON.parse(text);
+            } catch {
+              continue;
+            }
             setSerialImportText('');
             await refreshSerialPool();
             alert('Serial numbers added to the pool.');
@@ -630,7 +653,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       }
       if (!imported && !stoppedEarly && tried.length) {
         alert(
-          `Serial pool API not found (404 on all URLs). Tried:\n${tried.join('\n')}\n\nSet VITE_API_URL to your Node base URL and redeploy the frontend, or open the site URL that proxies to Passenger.`
+          okWasHtml
+            ? `Serial pool URL returned HTML (SPA/index), not the Node API — JSON parse failed.\nTried:\n${tried.join(
+                '\n'
+              )}\n\nSet VITE_API_URL in .env to the real Node/Passenger base URL (the one that serves /serial-pool), rebuild, redeploy.`
+            : `Serial pool API not found (404 on all URLs). Tried:\n${tried.join(
+                '\n'
+              )}\n\nSet VITE_API_URL to your Node base URL and redeploy the frontend, or open the site URL that proxies to Passenger.`
         );
       }
     } finally {
@@ -696,10 +725,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         try {
           const prodRes = await fetch('https://www.maxbitcore.com/api/products.php', { cache: 'no-store' });
           if (prodRes.ok) {
-            const prodData = await prodRes.json();
-            if (Array.isArray(prodData)) {
-              setPublishedProducts(prodData);
-              localStorage.setItem('maxbit_published_products_v2', JSON.stringify(prodData));
+            const prodText = await prodRes.text();
+            if (!adminBodyLooksLikeHtml(prodText)) {
+              try {
+                const prodData = JSON.parse(prodText);
+                if (Array.isArray(prodData)) {
+                  setPublishedProducts(prodData);
+                  localStorage.setItem('maxbit_published_products_v2', JSON.stringify(prodData));
+                }
+              } catch {
+                /* ignore malformed JSON */
+              }
             }
           }
         } catch (e) {
@@ -727,8 +763,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           let phpOrders: any[] = [];
           const orderRes = await fetch('https://www.maxbitcore.com/api/get-orders.php');
           if (orderRes.ok) {
-            const orderData = await orderRes.json();
-            if (Array.isArray(orderData)) phpOrders = orderData;
+            const orderText = await orderRes.text();
+            if (!adminBodyLooksLikeHtml(orderText)) {
+              try {
+                const orderData = JSON.parse(orderText);
+                if (Array.isArray(orderData)) phpOrders = orderData;
+              } catch {
+                /* ignore */
+              }
+            }
           }
 
           let nodeOrders: any[] = [];
@@ -1029,7 +1072,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }) 
       });
-      const result = await response.json();
+      const rawDelete = await response.text();
+      if (adminBodyLooksLikeHtml(rawDelete)) {
+        alert('Server returned HTML instead of JSON. Check API URL.');
+        return;
+      }
+      let result: { status?: string };
+      try {
+        result = JSON.parse(rawDelete);
+      } catch {
+        alert('Invalid server response.');
+        return;
+      }
       if (result.status === 'success') {
         setSubmissions(prev => prev.filter(s => s.id !== id));
         notifyUpdate();
