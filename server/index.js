@@ -7,6 +7,7 @@ const path = require('path');
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecret ? require('stripe')(stripeSecret) : null;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const serialPool = require('./serialPool');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -16,24 +17,6 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
   .filter(Boolean);
 
 app.disable('x-powered-by');
-
-/**
- * cPanel / Passenger mounts this app at https://host/server, so Express often sees
- * paths like /server/shop-orders while routes are registered as /shop-orders.
- * Strip the mount prefix once so a single route table works everywhere.
- */
-app.use((req, _res, next) => {
-  const raw = req.url || '/';
-  if (!raw.startsWith('/server')) return next();
-  let pathAndQuery = raw.slice('/server'.length);
-  if (!pathAndQuery || pathAndQuery[0] === '?') {
-    req.url = '/' + pathAndQuery;
-    return next();
-  }
-  if (!pathAndQuery.startsWith('/')) pathAndQuery = `/${pathAndQuery}`;
-  req.url = pathAndQuery;
-  return next();
-});
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const cleanText = (value = '') => String(value).replace(/<[^>]*>?/gm, '').trim();
@@ -189,6 +172,9 @@ const upsertShopOrderFromPaidSession = (session, opts = {}) => {
     fulfillmentStatus,
     paymentStatus: 'paid',
     receiptUrl,
+    ...(opts.serialAllocations !== undefined
+      ? { serialAllocations: opts.serialAllocations }
+      : {}),
     updatedAt: new Date().toISOString(),
   };
 
@@ -338,7 +324,73 @@ const formatStripeCaughtError = (error) => {
   return 'Failed to create checkout session.';
 };
 
+/** Stripe Invoice `custom_fields`: max 4 pairs; label/value length caps (API). */
+const STRIPE_INV_CF_MAX = 4;
+const STRIPE_INV_CF_NAME_MAX = 40;
+const STRIPE_INV_CF_VALUE_MAX = 140;
+
+const parseInvoiceCustomFieldsInput = (input) => {
+  if (input == null || input === '') return [];
+  if (typeof input === 'string') {
+    try {
+      const j = JSON.parse(input);
+      return Array.isArray(j) ? j : [];
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(input) ? input : [];
+};
+
+/**
+ * Body fields first (per-checkout), then env JSON. Skips duplicate names (case-insensitive). Max 4 rows.
+ */
+const buildStripeInvoiceCustomFields = (bodyRaw, envRaw) => {
+  const rows = [...parseInvoiceCustomFieldsInput(bodyRaw), ...parseInvoiceCustomFieldsInput(envRaw)];
+  const out = [];
+  const seen = new Set();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const name = cleanText(String(row.name ?? row.label ?? '')).slice(0, STRIPE_INV_CF_NAME_MAX);
+    const value = cleanText(String(row.value ?? row.val ?? '')).slice(0, STRIPE_INV_CF_VALUE_MAX);
+    if (!name || !value) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, value });
+    if (out.length >= STRIPE_INV_CF_MAX) break;
+  }
+  return out.length ? out : undefined;
+};
+
+/** Pool-generated serial rows first (invoice), then body/env custom fields. Max 4 total. */
+const mergeInvoiceCustomFieldsWithSerials = (bodyRaw, envRaw, serialFieldRows) => {
+  const serial =
+    Array.isArray(serialFieldRows) && serialFieldRows.length
+      ? serialFieldRows
+          .map((row) => ({
+            name: cleanText(String(row.name || '')).slice(0, STRIPE_INV_CF_NAME_MAX),
+            value: cleanText(String(row.value || '')).slice(0, STRIPE_INV_CF_VALUE_MAX),
+          }))
+          .filter((row) => row.name && row.value)
+      : [];
+  const base = buildStripeInvoiceCustomFields(bodyRaw, envRaw) || [];
+  const merged = [...serial, ...base];
+  if (!merged.length) return undefined;
+  return merged.slice(0, STRIPE_INV_CF_MAX);
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Peek allocated serials then commit reservation (paid). Returns items or undefined. */
+async function takeSerialAllocationsFromSession(session) {
+  const rid = session.metadata && session.metadata.serialReservationId;
+  if (!rid) return undefined;
+  const peek = serialPool.peekReservation(rid);
+  const items = peek && Array.isArray(peek.items) && peek.items.length ? peek.items : undefined;
+  await serialPool.commitReservation(rid);
+  return items;
+}
 
 /**
  * Receipt URL comes from Charge.receipt_url or Invoice.hosted_invoice_url — not from Checkout Session directly.
@@ -464,6 +516,18 @@ const webhookHandler = async (req, res) => {
     return res.status(200).json({ received: true, duplicate: true });
   }
 
+  if (event.type === 'checkout.session.expired') {
+    const sessionObj = event.data.object;
+    const rid = sessionObj.metadata && sessionObj.metadata.serialReservationId;
+    if (rid) {
+      try {
+        await serialPool.releaseReservation(rid);
+      } catch (e) {
+        console.warn('serial pool release (checkout.session.expired):', e.message || e);
+      }
+    }
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const orderId = cleanText((session && session.metadata && session.metadata.orderId) || '');
@@ -497,7 +561,13 @@ const webhookHandler = async (req, res) => {
           } catch (e) {
             console.warn('receipt URL in webhook:', e.message || e);
           }
-          upsertShopOrderFromPaidSession(fullSession, { receiptUrl });
+          let serialAllocations = null;
+          try {
+            serialAllocations = await takeSerialAllocationsFromSession(fullSession);
+          } catch (se) {
+            console.warn('serial reservation (webhook):', se.message || se);
+          }
+          upsertShopOrderFromPaidSession(fullSession, { receiptUrl, serialAllocations });
           try {
             const ids = await collectMaxbitProductIdsWithLineItemsFallback(fullSession);
             await postMarkProductsSold(ids);
@@ -551,7 +621,7 @@ const createCheckoutSession = async (req, res) => {
       return res.status(500).json({ error: 'Stripe is not configured.' });
     }
 
-    const { items, email, shipping, orderId } = req.body;
+    const { items, email, shipping, orderId, invoiceCustomFields, invoice_custom_fields } = req.body;
     if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
       return res.status(400).json({ error: 'Invalid items payload.' });
     }
@@ -569,24 +639,46 @@ const createCheckoutSession = async (req, res) => {
       return res.status(400).json({ error: 'Invalid order identifier.' });
     }
 
-    const line_items = items.map((item) => {
+    /** Stripe Checkout line item: catalog Price id (`price_...`) or dynamic `price_data` (legacy). */
+    const STRIPE_PRICE_ID_RE = /^price_[a-zA-Z0-9]+$/;
+    const line_items = [];
+
+    for (const item of items) {
+      const rawPriceId = cleanText(String(item.stripePriceId || item.stripe_price_id || '')).trim();
+      if (rawPriceId) {
+        if (!STRIPE_PRICE_ID_RE.test(rawPriceId)) {
+          return res.status(400).json({
+            error:
+              'Invalid Stripe Price id. Use the Price id from Stripe Dashboard (starts with price_).',
+          });
+        }
+        line_items.push({ price: rawPriceId, quantity: 1 });
+        continue;
+      }
+
       const maxbitId = cleanText(String(item.id || '')).slice(0, 120);
       const product_data = {
         name: cleanText(item.name).slice(0, 120) || 'MaxBit Item',
         images: safeImageUrl(item.imageUrl) ? [safeImageUrl(item.imageUrl)] : [],
         ...(maxbitId ? { metadata: { maxbit_product_id: maxbitId } } : {}),
       };
-      return {
+      line_items.push({
         price_data: {
           currency: 'usd',
           product_data,
           unit_amount: Math.round(Number(item.price) * 100),
         },
         quantity: 1,
-      };
-    });
+      });
+    }
 
-    if (line_items.some((line) => !Number.isFinite(line.price_data.unit_amount) || line.price_data.unit_amount <= 0)) {
+    const dynamicLines = line_items.filter((line) => line.price_data);
+    if (
+      dynamicLines.some(
+        (line) =>
+          !Number.isFinite(line.price_data.unit_amount) || line.price_data.unit_amount <= 0
+      )
+    ) {
       return res.status(400).json({ error: 'Invalid item pricing.' });
     }
 
@@ -607,24 +699,96 @@ const createCheckoutSession = async (req, res) => {
       .join(',')
       .slice(0, 500);
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items,
-      mode: 'payment',
-      customer_email: String(email).trim().toLowerCase(),
-      payment_intent_data: {
-        receipt_email: String(email).trim().toLowerCase(),
-      },
-      billing_address_collection: 'required',
-      // Stripe Tax must be enabled in Dashboard + origin address; otherwise sessions.create fails.
-      ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
-      success_url: `${allowedOrigins[0]}/checkout?success=true&session_id={CHECKOUT_SESSION_ID}&orderId=${encodeURIComponent(safeOrderId)}`,
-      cancel_url: `${allowedOrigins[0]}/checkout`,
-      metadata: {
+    await serialPool.expireStaleReservations();
+
+    let serialReserve = null;
+    try {
+      serialReserve = await serialPool.reserveForCheckout({
         orderId: safeOrderId,
-        ...(maxbitProductIdsMeta ? { maxbit_product_ids: maxbitProductIdsMeta } : {}),
-      },
-    });
+        items,
+        strict:
+          String(process.env.SERIAL_POOL_STRICT || '')
+            .trim()
+            .toLowerCase() === 'true',
+      });
+    } catch (poolErr) {
+      return res.status(409).json({
+        error: poolErr.message || 'Serial pool error.',
+      });
+    }
+
+    /** After successful payment, Stripe generates a real Invoice (PDF + hosted page). Set STRIPE_CHECKOUT_INVOICE=false to disable. */
+    const invoiceCustomFieldsMerged = mergeInvoiceCustomFieldsWithSerials(
+      invoiceCustomFields ?? invoice_custom_fields,
+      process.env.STRIPE_INVOICE_CUSTOM_FIELDS,
+      serialReserve && serialReserve.customFields && serialReserve.customFields.length
+        ? serialReserve.customFields
+        : null
+    );
+    const checkoutInvoiceCreation =
+      String(process.env.STRIPE_CHECKOUT_INVOICE || '')
+        .trim()
+        .toLowerCase() === 'false'
+        ? null
+        : {
+            enabled: true,
+            invoice_data: {
+              description: (
+                process.env.STRIPE_INVOICE_DESCRIPTION ||
+                `MaxBit order ${safeOrderId}`
+              ).slice(0, 500),
+              ...(process.env.STRIPE_INVOICE_FOOTER
+                ? { footer: String(process.env.STRIPE_INVOICE_FOOTER).slice(0, 5000) }
+                : {}),
+              metadata: {
+                orderId: safeOrderId.slice(0, 500),
+              },
+              ...(invoiceCustomFieldsMerged ? { custom_fields: invoiceCustomFieldsMerged } : {}),
+            },
+          };
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items,
+        mode: 'payment',
+        customer_email: String(email).trim().toLowerCase(),
+        payment_intent_data: {
+          receipt_email: String(email).trim().toLowerCase(),
+        },
+        billing_address_collection: 'required',
+        ...(checkoutInvoiceCreation ? { invoice_creation: checkoutInvoiceCreation } : {}),
+        // Stripe Tax must be enabled in Dashboard + origin address; otherwise sessions.create fails.
+        ...(process.env.STRIPE_AUTOMATIC_TAX === 'true' ? { automatic_tax: { enabled: true } } : {}),
+        success_url: `${allowedOrigins[0]}/checkout?success=true&session_id={CHECKOUT_SESSION_ID}&orderId=${encodeURIComponent(safeOrderId)}`,
+        cancel_url: `${allowedOrigins[0]}/checkout`,
+        metadata: {
+          orderId: safeOrderId,
+          ...(maxbitProductIdsMeta ? { maxbit_product_ids: maxbitProductIdsMeta } : {}),
+          ...(serialReserve && serialReserve.reservationId
+            ? { serialReservationId: serialReserve.reservationId }
+            : {}),
+        },
+      });
+    } catch (stripeCreateErr) {
+      if (serialReserve && serialReserve.reservationId) {
+        try {
+          await serialPool.releaseReservation(serialReserve.reservationId);
+        } catch (rele) {
+          console.warn('serial pool rollback after Stripe session error:', rele.message || rele);
+        }
+      }
+      throw stripeCreateErr;
+    }
+
+    if (serialReserve && serialReserve.reservationId) {
+      try {
+        await serialPool.bindSession(serialReserve.reservationId, session.id);
+      } catch (bindErr) {
+        console.warn('serial pool bindSession:', bindErr.message || bindErr);
+      }
+    }
 
     let checkoutUrl = session.url || null;
     if (!checkoutUrl && session.id) {
@@ -703,7 +867,15 @@ const paymentStatusHandler = async (req, res) => {
       receiptUrl = await resolveChargeReceiptUrlFromCheckoutSession(session);
       if (orderId) {
         try {
-          upsertShopOrderFromPaidSession(session, { receiptUrl, orderId });
+          let serialAllocations = undefined;
+          if (session.metadata && session.metadata.serialReservationId) {
+            try {
+              serialAllocations = await takeSerialAllocationsFromSession(session);
+            } catch (se) {
+              console.warn('serial reservation (payment-status):', se.message || se);
+            }
+          }
+          upsertShopOrderFromPaidSession(session, { receiptUrl, orderId, serialAllocations });
         } catch (e) {
           console.warn('shop order upsert (payment-status):', e.message || e);
         }
@@ -740,6 +912,37 @@ const paymentStatusHandler = async (req, res) => {
 
 ['/payment-status', '/server/payment-status'].forEach((routePath) => {
   app.get(routePath, paymentStatusHandler);
+});
+
+const serialPoolGetHandler = (req, res) => {
+  try {
+    return res.json(serialPool.getAdminSnapshot());
+  } catch (e) {
+    console.error('serial-pool GET:', e);
+    return res.status(500).json({ error: 'Failed to read serial pool.' });
+  }
+};
+
+const serialPoolPostHandler = async (req, res) => {
+  try {
+    const productId = cleanText((req.body && req.body.productId) || '');
+    const raw = req.body && req.body.serials;
+    const arr = Array.isArray(raw)
+      ? raw
+      : typeof raw === 'string'
+        ? raw.split(/[\r\n,]+/)
+        : [];
+    const cleaned = arr.map((s) => cleanText(String(s))).filter(Boolean);
+    const result = await serialPool.pushSerials(productId, cleaned);
+    return res.json(result);
+  } catch (e) {
+    return res.status(400).json({ error: e.message || 'Import failed.' });
+  }
+};
+
+['/serial-pool', '/server/serial-pool'].forEach((base) => {
+  app.get(base, requireAdminOrders, serialPoolGetHandler);
+  app.post(base, requireAdminOrders, serialPoolPostHandler);
 });
 
 const shopOrdersListHandler = (req, res) => {
@@ -791,6 +994,7 @@ const shopOrdersDeleteHandler = (req, res) => {
   app.patch(`${base}/:id`, requireAdminOrders, shopOrdersPatchHandler);
   app.delete(`${base}/:id`, requireAdminOrders, shopOrdersDeleteHandler);
 });
+console.log('[maxbit-stripe] Shop orders API:', ['/shop-orders', '/server/shop-orders'].join(', '));
 
 // cPanel + Passenger: often request path is /server/...; local dev is /...
 const healthHandler = (req, res) => {
@@ -807,4 +1011,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4242;
-app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log('[maxbit-stripe] ADMIN_ORDERS_SECRET:', process.env.ADMIN_ORDERS_SECRET ? '(set)' : '(missing — /shop-orders returns 503)');
+});

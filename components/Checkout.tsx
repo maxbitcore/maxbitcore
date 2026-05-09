@@ -41,7 +41,7 @@ type PendingCheckoutSnapshot = {
   usState: string;
   zip: string;
   countryLabel: string;
-  items: { id: string; name: string; price: number; imageUrl?: string }[];
+  items: { id: string; name: string; price: number; imageUrl?: string; stripePriceId?: string }[];
   subtotal: number;
   estimatedTax: number;
   total: number;
@@ -143,7 +143,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
   const [email, setEmail] = useState('');
   /** Set after paid session verify — drives honest copy on success screen */
   const [orderEmailNotifyResult, setOrderEmailNotifyResult] = useState<OrderNotifyResult | null>(null);
-  /** Official Stripe receipt page (charge.receipt_url) — open / print / save as PDF */
+  /** Stripe hosted invoice URL (preferred) or charge receipt URL — open / print / save as PDF */
   const [stripeReceiptUrl, setStripeReceiptUrl] = useState<string | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -532,11 +532,12 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json'},
       body: JSON.stringify({
-        items: checkoutItems.map(item => ({
+        items: checkoutItems.map((item) => ({
           id: item.id,
           name: item.name.replace(/<[^>]*>?/gm, ''),
           price: item.price,
-          imageUrl: item.imageUrl
+          imageUrl: item.imageUrl,
+          ...(item.stripePriceId?.trim() ? { stripePriceId: item.stripePriceId.trim() } : {}),
         })),
         email: email,
         shipping: shippingCost,
@@ -595,6 +596,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
               name: item.name.replace(/<[^>]*>?/gm, ''),
               price: item.price,
               imageUrl: item.imageUrl || '',
+              ...(item.stripePriceId?.trim() ? { stripePriceId: item.stripePriceId.trim() } : {}),
             })),
             subtotal,
             estimatedTax,
@@ -740,16 +742,16 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                 rel="noopener noreferrer"
                 className="px-10 py-5 border border-slate-800 text-white font-black uppercase tracking-widest text-sm rounded-xl hover:bg-slate-900 transition-all inline-flex items-center justify-center"
               >
-                View receipt (Stripe)
+                View invoice / receipt (Stripe)
               </a>
             ) : (
               <button
                 type="button"
                 disabled
-                title="Stripe did not return a receipt link for this charge. Use your card statement or contact max@maxbitcore.com."
+                title="Stripe did not return an invoice or receipt link for this payment. Use your card statement or contact max@maxbitcore.com."
                 className="px-10 py-5 border border-slate-800 text-slate-500 font-black uppercase tracking-widest text-sm rounded-xl cursor-not-allowed opacity-60"
               >
-                View receipt (Stripe)
+                View invoice / receipt (Stripe)
               </button>
             )}
           </div>

@@ -98,6 +98,8 @@ type AdminMergedOrder = {
     productId?: string;
   }[];
   currency?: string;
+  /** Allocated unit serials ({ productId, serial }) when serial pool was used. */
+  serialAllocations?: { productId: string; serial: string }[];
 };
 
 function resolveAdminApiBaseUrl(): string {
@@ -149,6 +151,7 @@ function normalizeNodeShopOrder(o: any): AdminMergedOrder | null {
     managedByNode: true,
     lineItems: Array.isArray(o.lineItems) ? o.lineItems : undefined,
     currency: o.currency,
+    serialAllocations: Array.isArray(o.serialAllocations) ? o.serialAllocations : undefined,
   };
 }
 
@@ -338,7 +341,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   // 2. NAVIGATION STATE
   const [activeAdminTab, setActiveAdminTab] = useState<'submissions' | 'orders' | 'catalog' | 'analytics' | 'comments'>('submissions');
-  const [catalogMode, setCatalogMode] = useState<'products' | 'options' | 'assets'>('products');
+  const [catalogMode, setCatalogMode] = useState<'products' | 'options' | 'assets' | 'serials'>('products');
+  const [serialPoolSnapshot, setSerialPoolSnapshot] = useState<{
+    pools: Record<string, number>;
+    reservations: number;
+    ttlMinutes: number;
+  } | null>(null);
+  const [serialPoolLoading, setSerialPoolLoading] = useState(false);
+  const [serialImportProductId, setSerialImportProductId] = useState('');
+  const [serialImportText, setSerialImportText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [publishedProducts, setPublishedProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -350,6 +361,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [newProductGallery, setNewProductGallery] = useState<string[]>([]);
   const [newProductComponents, setNewProductComponents] = useState('');
   const [newProductDesc, setNewProductDesc] = useState('');
+  const [newProductStripePriceId, setNewProductStripePriceId] = useState('');
 
   // Configurator Assets State
   const [config, setConfig] = useState<Record<string, string[]>>(() => ({
@@ -520,10 +532,91 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     }
   };
 
+  const refreshSerialPool = async () => {
+    const secret = getAdminOrdersSecret();
+    if (!secret) {
+      setSerialPoolSnapshot(null);
+      return;
+    }
+    setSerialPoolLoading(true);
+    try {
+      const bases = getAdminApiBaseCandidates();
+      let found = false;
+      outer: for (const base of bases) {
+        const b = base.replace(/\/+$/, '');
+        const urls = /\/server$/i.test(b)
+          ? [`${b}/serial-pool`]
+          : [`${b}/serial-pool`, `${b}/server/serial-pool`];
+        for (const url of urls) {
+          const r = await fetch(url, {
+            headers: { 'X-Maxbit-Admin-Orders-Secret': secret },
+          });
+          if (r.ok) {
+            setSerialPoolSnapshot(await r.json());
+            found = true;
+            break outer;
+          }
+        }
+      }
+      if (!found) setSerialPoolSnapshot(null);
+    } finally {
+      setSerialPoolLoading(false);
+    }
+  };
+
+  const submitSerialImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const secret = getAdminOrdersSecret();
+    const pid = serialImportProductId.trim();
+    if (!secret || !pid) return;
+    const serials = serialImportText.split(/[\r\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (!serials.length) return;
+    setSerialPoolLoading(true);
+    try {
+      const bases = getAdminApiBaseCandidates();
+      outer: for (const base of bases) {
+        const b = base.replace(/\/+$/, '');
+        const urls = /\/server$/i.test(b)
+          ? [`${b}/serial-pool`]
+          : [`${b}/serial-pool`, `${b}/server/serial-pool`];
+        for (const url of urls) {
+          const r = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Maxbit-Admin-Orders-Secret': secret,
+            },
+            body: JSON.stringify({ productId: pid, serials }),
+          });
+          const text = await r.text();
+          if (r.ok) {
+            setSerialImportText('');
+            await refreshSerialPool();
+            alert('Serial numbers added to the pool.');
+            break outer;
+          }
+          if (r.status !== 404) {
+            alert(text.slice(0, 220) || 'Import failed.');
+            break outer;
+          }
+        }
+      }
+    } finally {
+      setSerialPoolLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeAdminTab === 'catalog' && catalogMode === 'serials') {
+      refreshSerialPool();
+    }
+  }, [activeAdminTab, catalogMode]);
+
   const resetProductForm = () => {
     setEditingId(null);
     setNewProductName('');
     setNewProductPrice('');
+    setNewProductStripePriceId('');
     setNewProductImage('');
     setNewProductGallery([]);
     setNewProductComponents('');
@@ -762,10 +855,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     const now = Date.now();
     const existing = publishedProducts.find(p => p.id === editingId);
 
+    const stripePid = newProductStripePriceId.trim();
     const productData: Product = {
       id: editingId || `PUB-${now}`,
       name: newProductName,
       price: parseFloat(newProductPrice),
+      ...(stripePid ? { stripePriceId: stripePid } : {}),
       category: newProductCategory,
       status: newProductStatus,
       imageUrl: newProductImage || (newProductGallery.length > 0 ? newProductGallery[0] : ''),
@@ -862,6 +957,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setEditingId(p.id); 
     setNewProductName(p.name); 
     setNewProductPrice(p.price.toString());
+    setNewProductStripePriceId(p.stripePriceId?.trim() || '');
     setNewProductImage(p.imageUrl); 
     setNewProductGallery(p.gallery || []);
     setNewProductComponents(p.components || ''); 
@@ -1189,6 +1285,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                          <button type="button" onClick={() => setCatalogMode('products')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'products' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Inventory</button>
                          <button type="button" onClick={() => setCatalogMode('options')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'options' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Configurator chapters</button>
                          <button type="button" onClick={() => setCatalogMode('assets')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'assets' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Case visuals</button>
+                         <button type="button" onClick={() => setCatalogMode('serials')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${catalogMode === 'serials' ? 'bg-cyan-500 text-slate-950 shadow-lg' : 'text-slate-500 hover:text-white'}`}>Serial pool</button>
                      </div>
                   </div>
 
@@ -1220,6 +1317,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                             <div className="space-y-2">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Credits (Price)</label>
                               <input required value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-mono" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">
+                                Stripe Price id (optional)
+                              </label>
+                              <input
+                                value={newProductStripePriceId}
+                                onChange={(e) => setNewProductStripePriceId(e.target.value)}
+                                type="text"
+                                placeholder="price_..."
+                                autoComplete="off"
+                                spellCheck={false}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500 font-mono text-xs"
+                              />
+                              <p className="text-[9px] text-slate-500 leading-relaxed">
+                                From Stripe Dashboard → Product → Pricing → copy <span className="font-mono text-slate-400">price_…</span>.
+                                Checkout charges this Price; site price stays for display. Put the same{' '}
+                                <span className="font-mono text-slate-400">maxbit_product_id</span> in the Stripe Product metadata as your site product <span className="font-mono text-slate-400">id</span> so fulfillment stays in sync.
+                                Serial numbers are not stored on the Product in Stripe — use Payment metadata when fulfilling or extend order records.
+                              </p>
                             </div>
                             <div className="space-y-4">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Visual Evidence</label>
@@ -1262,6 +1379,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               <div>
                                 <h3 className="font-black text-white text-sm uppercase leading-tight mb-2 italic tracking-tighter h-10 overflow-hidden line-clamp-2">{(p.name || '').replace(/<[^>]*>/g, '')}</h3>
                                 <div className="text-sm font-black text-cyan-400 font-mono tracking-tighter">${p.price}</div>
+                                {p.stripePriceId ? (
+                                  <div className="text-[9px] font-mono text-emerald-500/90 truncate mt-0.5" title={p.stripePriceId}>
+                                    {p.stripePriceId}
+                                  </div>
+                                ) : null}
                                 <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">{(p as any).isPublished ? 'DEPLOYED' : 'IN ARMORY'}</div>
                               </div>
                               <div className="flex gap-4">
@@ -1423,6 +1545,92 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                             <input type="file" ref={assetImageRef} onChange={handleAssetImageUpload} multiple className="hidden" accept="image/*" />
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  )}
+                  {catalogMode === 'serials' && (
+                    <div className="lg:col-span-3 space-y-6 animate-fade-in-up">
+                      <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 shadow-xl space-y-4">
+                        <h2 className="text-xl font-black text-white italic uppercase">Serial number pool</h2>
+                        <p className="text-[10px] text-slate-500 leading-relaxed max-w-3xl">
+                          Free serials per site product <span className="font-mono text-slate-400">id</span> (same as in inventory JSON).
+                          At Checkout one serial is reserved per cart line and printed on the Stripe invoice (
+                          <span className="font-mono text-slate-400">invoice_creation</span>). Abandoned sessions release SNs after TTL or when Stripe fires{' '}
+                          <span className="font-mono text-slate-400">checkout.session.expired</span>. Requires{' '}
+                          <span className="font-mono text-slate-400">ADMIN_ORDERS_SECRET</span> (same as Stripe orders API).
+                        </p>
+                        {!getAdminOrdersSecret() ? (
+                          <p className="text-xs text-amber-200/90">Save the admin orders secret in the Orders tab first.</p>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => refreshSerialPool()}
+                                disabled={serialPoolLoading}
+                                className="px-5 py-2 rounded-xl bg-slate-800 text-[10px] font-black uppercase tracking-widest text-white border border-slate-700 hover:border-cyan-500/40 disabled:opacity-50"
+                              >
+                                {serialPoolLoading ? 'Loading…' : 'Refresh counts'}
+                              </button>
+                              {serialPoolSnapshot ? (
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  Reservations (pending checkout): {serialPoolSnapshot.reservations} · TTL ~{' '}
+                                  {serialPoolSnapshot.ttlMinutes} min
+                                </span>
+                              ) : null}
+                            </div>
+                            {serialPoolSnapshot && Object.keys(serialPoolSnapshot.pools).length > 0 ? (
+                              <div className="border border-slate-800 rounded-2xl overflow-hidden">
+                                <table className="w-full text-left text-[11px]">
+                                  <thead className="bg-slate-950 text-[9px] font-black uppercase tracking-widest text-slate-500">
+                                    <tr>
+                                      <th className="px-4 py-2">Product id</th>
+                                      <th className="px-4 py-2">Available SNs</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-800">
+                                    {Object.entries(serialPoolSnapshot.pools).map(([pid, count]) => (
+                                      <tr key={pid} className="font-mono text-slate-300">
+                                        <td className="px-4 py-2 break-all">{pid}</td>
+                                        <td className="px-4 py-2 text-cyan-400">{count}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-600 font-mono">No pool data yet — import serials below or add server/data/serial-pool.json</p>
+                            )}
+                            <form onSubmit={submitSerialImport} className="space-y-4 pt-4 border-t border-slate-800">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
+                                Product id
+                              </label>
+                              <input
+                                value={serialImportProductId}
+                                onChange={(e) => setSerialImportProductId(e.target.value)}
+                                placeholder="e.g. PUB-1739123456789"
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-mono text-xs outline-none focus:border-cyan-500"
+                              />
+                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
+                                Serial numbers (one per line)
+                              </label>
+                              <textarea
+                                value={serialImportText}
+                                onChange={(e) => setSerialImportText(e.target.value)}
+                                rows={6}
+                                placeholder={'SN-ABC123\nSN-ABC124'}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white font-mono text-xs outline-none focus:border-cyan-500"
+                              />
+                              <button
+                                type="submit"
+                                disabled={serialPoolLoading}
+                                className="w-full py-3 rounded-xl maxbit-gradient text-slate-950 font-black uppercase text-xs disabled:opacity-50"
+                              >
+                                Add to pool
+                              </button>
+                            </form>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1655,6 +1863,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                         <p className="text-xs text-slate-500 font-mono tracking-tight break-all">
                           CUSTOMER: {order.customerEmail || '—'}
                         </p>
+                        {order.serialAllocations && order.serialAllocations.length > 0 ? (
+                          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 space-y-1">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-amber-400/90">
+                              Serial numbers (allocated)
+                            </div>
+                            <ul className="text-[10px] font-mono text-amber-100/95 space-y-0.5">
+                              {order.serialAllocations.map((row, idx) => (
+                                <li key={idx}>
+                                  <span className="text-slate-500">{row.productId}</span> → {row.serial}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
                         {order.lineItems && order.lineItems.length > 0 ? (
                           <ul className="text-[10px] text-slate-400 space-y-1 border-t border-slate-800/80 pt-3 mt-2">
                             {order.lineItems.map((li) => (

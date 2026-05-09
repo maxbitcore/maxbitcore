@@ -1,0 +1,6 @@
+{
+  "pools": {
+    "PUB-YOUR-PRODUCT-ID": ["SN-001", "SN-002"]
+  },
+  "reservations": {}
+}

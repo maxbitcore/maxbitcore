@@ -23,10 +23,21 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Must match server/.env MARK_PRODUCTS_SOLD_SECRET and the same path save_products.php uses for the catalog JSON.
+// Must match Node MARK_PRODUCTS_SOLD_SECRET. PHP getenv() is often empty on shared hosting — use api/mark_products_sold.local.php (see example).
+$markSoldSecretLocal = '';
+$localSecretFile = __DIR__ . '/mark_products_sold.local.php';
+if (is_readable($localSecretFile)) {
+    $v = include $localSecretFile;
+    if (is_string($v)) {
+        $markSoldSecretLocal = trim($v);
+    }
+}
 if (!defined('MARK_PRODUCTS_SOLD_SECRET')) {
     $env = getenv('MARK_PRODUCTS_SOLD_SECRET');
-    define('MARK_PRODUCTS_SOLD_SECRET', is_string($env) ? $env : '');
+    define(
+        'MARK_PRODUCTS_SOLD_SECRET',
+        (is_string($env) && $env !== '') ? $env : $markSoldSecretLocal
+    );
 }
 if (!defined('PRODUCTS_JSON')) {
     define('PRODUCTS_JSON', __DIR__ . '/products.json');

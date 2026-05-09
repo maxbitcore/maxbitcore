@@ -16,6 +16,8 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  /** Stripe Price id from Dashboard (e.g. price_xxx). Checkout uses this so the paid line matches your Stripe catalog. */
+  stripePriceId?: string;
   category: string;
   // Fix: Renamed from ProductStatus to status to match component usage and error reports
   status: ProductStatus; 
