@@ -155,16 +155,83 @@ function normalizeNodeShopOrder(o: any): AdminMergedOrder | null {
   };
 }
 
-function mergeAdminShopOrders(phpRows: any[], nodeRows: any[]): AdminMergedOrder[] {
-  const map = new Map<string, AdminMergedOrder>();
-  for (const ord of phpRows) {
-    const p = normalizePhpShopOrder(ord);
-    map.set(p.key, p);
+/** Orders removed only from Node still reappear from PHP get-orders.php after refresh — hide by id until cleared (this browser). */
+const DELETED_SHOP_ORDER_IDS_LS_KEY = 'maxbit_admin_deleted_order_ids';
+
+function getDeletedShopOrderTombstones(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_SHOP_ORDER_IDS_LS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.map((x) => String(x || '').trim()).filter(Boolean) : []);
+  } catch {
+    return new Set();
   }
+}
+
+function addDeletedShopOrderTombstone(key: string) {
+  const k = String(key || '').trim();
+  if (!k) return;
+  try {
+    const s = getDeletedShopOrderTombstones();
+    s.add(k);
+    localStorage.setItem(DELETED_SHOP_ORDER_IDS_LS_KEY, JSON.stringify([...s]));
+  } catch {
+    /* quota */
+  }
+}
+
+function orderKeyDeleted(key: string, tombstones: Set<string>): boolean {
+  if (!key || !tombstones.size) return false;
+  if (tombstones.has(key)) return true;
+  const kl = key.toLowerCase();
+  for (const t of tombstones) {
+    if (t && t.toLowerCase() === kl) return true;
+  }
+  return false;
+}
+
+/** Match PHP vs Node rows when keys differ (Stripe session id vs site order number). */
+function normShopOrderNum(s: string | undefined): string {
+  return String(s ?? '').trim().toLowerCase();
+}
+
+function mergeAdminShopOrders(
+  phpRows: any[],
+  nodeRows: any[],
+  tombstones?: Set<string>
+): AdminMergedOrder[] {
+  const ts = tombstones ?? new Set<string>();
+
+  const nodeOrders: AdminMergedOrder[] = [];
+  const nodeIds = new Set<string>();
+  const nodeOrderNums = new Set<string>();
+
   for (const row of nodeRows) {
     const n = normalizeNodeShopOrder(row);
-    if (n) map.set(n.key, n);
+    if (!n || orderKeyDeleted(n.key, ts)) continue;
+    nodeOrders.push(n);
+    nodeIds.add(n.key);
+    const on = normShopOrderNum(n.orderNumber);
+    if (on) nodeOrderNums.add(on);
   }
+
+  const map = new Map<string, AdminMergedOrder>();
+
+  for (const ord of phpRows) {
+    const p = normalizePhpShopOrder(ord);
+    if (orderKeyDeleted(p.key, ts)) continue;
+    if (nodeIds.has(p.key)) continue;
+    const pNum = normShopOrderNum(p.orderNumber);
+    const pKeyAsNum = normShopOrderNum(p.key);
+    if (pNum && nodeOrderNums.has(pNum)) continue;
+    if (pKeyAsNum && nodeOrderNums.has(pKeyAsNum)) continue;
+    map.set(p.key, p);
+  }
+
+  for (const n of nodeOrders) {
+    map.set(n.key, n);
+  }
+
   return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
 }
 
@@ -564,6 +631,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         }
         throw new Error(detail);
       }
+      addDeletedShopOrderTombstone(orderKey);
       setShopOrders((prev) => prev.filter((o) => o.key !== orderKey));
     } catch (err) {
       console.error('Order delete failed:', err);
@@ -857,7 +925,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           }
           setShopOrdersStripeError(adminSecret ? stripeErr : null);
 
-          setShopOrders(mergeAdminShopOrders(phpOrders, nodeOrders));
+          setShopOrders(mergeAdminShopOrders(phpOrders, nodeOrders, getDeletedShopOrderTombstones()));
         } catch (e) {
           console.error("Orders Sync Failed:", e);
         }
