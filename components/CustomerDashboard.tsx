@@ -29,10 +29,25 @@ const ORDER_STRIPE_SESSION_LS_PREFIX = 'maxbit_order_cs_';
 function resolveNodeApiBaseCandidates(): string[] {
   const fromEnv = import.meta.env.VITE_API_URL;
   const candidates: string[] = [];
+  /** Prefer same-origin `/server` first in prod — a mis-set VITE_API_URL often points at an empty/stale Node while the live host proxies the real store. */
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    const o = window.location.origin.replace(/\/+$/, '');
+    candidates.push(`${o}/server`);
+    try {
+      const u = new URL(o);
+      const alt =
+        u.hostname.startsWith('www.') ?
+          `${u.protocol}//${u.hostname.replace(/^www\./i, '')}${u.port ? `:${u.port}` : ''}`
+        : `${u.protocol}//www.${u.hostname}${u.port ? `:${u.port}` : ''}`;
+      candidates.push(`${alt}/server`);
+    } catch {
+      /* ignore */
+    }
+  }
   if (typeof fromEnv === 'string' && fromEnv.trim()) {
     candidates.push(fromEnv.trim().replace(/\/+$/, ''));
   }
-  if (import.meta.env.PROD && typeof window !== 'undefined') {
+  if (!import.meta.env.PROD && typeof window !== 'undefined') {
     const o = window.location.origin.replace(/\/+$/, '');
     candidates.push(`${o}/server`);
     try {
@@ -124,6 +139,8 @@ async function fetchFulfillmentFromNodeSingle(
   const em = email.toLowerCase().trim();
   const body = JSON.stringify({ email: em, orderIds });
   const bases = resolveNodeApiBaseCandidates();
+  /** Merge every successful JSON response — the first host may return `{ matches: {} }` from an empty store while another base has the real shop-orders file. */
+  const merged: Record<string, { fulfillmentStatus: string }> = {};
   for (const base of bases) {
     const b = base.replace(/\/+$/, '');
     const urls = /\/server$/i.test(b)
@@ -143,13 +160,15 @@ async function fetchFulfillmentFromNodeSingle(
         const data = JSON.parse(text) as {
           matches?: Record<string, { fulfillmentStatus: string }>;
         };
-        if (data.matches && typeof data.matches === 'object') return data.matches;
+        if (data.matches && typeof data.matches === 'object') {
+          Object.assign(merged, data.matches);
+        }
       } catch {
         continue;
       }
     }
   }
-  return {};
+  return merged;
 }
 
 async function fetchFulfillmentFromNode(
