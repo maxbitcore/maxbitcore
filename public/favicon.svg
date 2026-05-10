@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="MaxBit">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee"/>
+      <stop offset="100%" style="stop-color:#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="10" fill="#0b0f1a"/>
+  <path fill="url(#g)" d="M12 34V14h5l6 11 6-11h5v20h-5V22l-6 11h-2l-6-11v12h-5z"/>
+</svg>
