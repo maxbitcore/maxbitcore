@@ -395,7 +395,8 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
                   subtotal: lineSubtotalSum,
                   tax: stripeTaxCharged,
                   currency: payCurrency,
-                }
+                },
+                sessionId
               );
             }
 

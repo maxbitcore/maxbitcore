@@ -979,8 +979,8 @@ const resolveCustomerOrderForEmail = (store, email, requestedId) => {
       return { resolvedKey, o };
     }
   }
-  const q = cleanText(String(requestedId || '')).slice(0, 120);
-  const ql = q.toLowerCase();
+  let q = cleanText(String(requestedId || '')).slice(0, 120);
+  let ql = q.toLowerCase().replace(/^order\s+/i, '').trim();
   if (!ql) return null;
   for (const [k, o] of Object.entries(ordersMap)) {
     if (String(o.customerEmail || '').trim().toLowerCase() !== email) continue;
@@ -988,6 +988,18 @@ const resolveCustomerOrderForEmail = (store, email, requestedId) => {
       .filter(Boolean)
       .map((x) => String(x).toLowerCase());
     if (hay.some((h) => h === ql)) return { resolvedKey: k, o };
+  }
+  /** Loose match: prefixes / minor spelling differences between PHP id and metadata orderId (long ids only). */
+  for (const [k, o] of Object.entries(ordersMap)) {
+    if (String(o.customerEmail || '').trim().toLowerCase() !== email) continue;
+    const candidates = [k, o.id, o.orderNumber, o.stripeSessionId].filter(Boolean).map((x) => String(x));
+    for (const c of candidates) {
+      const cl = c.toLowerCase();
+      if (cl === ql) return { resolvedKey: k, o };
+      if (ql.length >= 10 && cl.length >= 10 && (cl.includes(ql) || ql.includes(cl))) {
+        return { resolvedKey: k, o };
+      }
+    }
   }
   return null;
 };
@@ -1016,7 +1028,7 @@ const customerOrdersLookupHandler = (req, res) => {
       ...new Set(
         orderIds.map((x) => cleanText(String(x || '')).slice(0, 120)).filter(Boolean)
       ),
-    ].slice(0, 50);
+    ].slice(0, 128);
     if (!ids.length) {
       return res.json({ matches: {} });
     }

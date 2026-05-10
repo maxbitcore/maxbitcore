@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Narrow CSP via meta (full policy should also be set on the server). Mitigates base-tag hijack & legacy embeds. -->
+    <meta http-equiv="Content-Security-Policy" content="base-uri 'self'; object-src 'none'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <!-- favicon.ico must live in public/favicon.ico → copied to dist root on build -->
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -64,7 +67,7 @@
       }
     </style>
 
-    <script type="module" crossorigin src="/assets/index-DzOlkEBp.js"></script>
+    <script type="module" crossorigin src="/assets/index-P2l_qN4h.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-BuqMdKp-.css">
   </head>
   <body>

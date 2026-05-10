@@ -734,6 +734,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           prev.map((o) => (o.key === orderKey ? { ...o, fulfillmentStatus: status } : o))
         )
       );
+      try {
+        localStorage.setItem('maxbit_fulfillment_revision', String(Date.now()));
+      } catch {
+        /* ignore */
+      }
+      window.dispatchEvent(new CustomEvent('maxbit-update'));
     } catch (err) {
       console.error('Fulfillment update failed:', err);
       const msg = err instanceof Error ? err.message : String(err);

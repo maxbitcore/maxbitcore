@@ -30,7 +30,18 @@ function resolveNodeApiBaseCandidates(): string[] {
     candidates.push(fromEnv.trim().replace(/\/+$/, ''));
   }
   if (import.meta.env.PROD && typeof window !== 'undefined') {
-    candidates.push(`${window.location.origin.replace(/\/+$/, '')}/server`);
+    const o = window.location.origin.replace(/\/+$/, '');
+    candidates.push(`${o}/server`);
+    try {
+      const u = new URL(o);
+      const alt =
+        u.hostname.startsWith('www.') ?
+          `${u.protocol}//${u.hostname.replace(/^www\./i, '')}${u.port ? `:${u.port}` : ''}`
+        : `${u.protocol}//www.${u.hostname}${u.port ? `:${u.port}` : ''}`;
+      candidates.push(`${alt}/server`);
+    } catch {
+      /* ignore */
+    }
   }
   candidates.push('http://localhost:4242');
   return [...new Set(candidates.filter(Boolean))];
@@ -73,6 +84,7 @@ async function fetchFulfillmentFromNode(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,
+          cache: 'no-store',
         });
         if (!r.ok) continue;
         const text = await r.text();
@@ -176,7 +188,7 @@ function expandIdsForFulfillmentLookup(rows: Iterable<UserPurchaseLog>): string[
       }
     }
   }
-  return [...out].slice(0, 80);
+  return [...out].slice(0, 128);
 }
 
 interface UserPurchaseLog {
@@ -258,9 +270,14 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
           if (mail !== em) continue;
           const id = String(o.id || '').trim() || `local-${o.timestamp}`;
           const key = id.toLowerCase();
+          const analyticsSid =
+            typeof (o as { stripeSessionId?: string }).stripeSessionId === 'string'
+              ? String((o as { stripeSessionId?: string }).stripeSessionId).trim()
+              : '';
           const row: UserPurchaseLog = {
             id,
             orderNumber: id,
+            ...(analyticsSid ? { stripeSessionId: analyticsSid } : {}),
             total: Number(o.total) || 0,
             subtotal: typeof o.subtotal === 'number' ? o.subtotal : undefined,
             tax: typeof o.tax === 'number' ? o.tax : undefined,
@@ -372,11 +389,20 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       void loadPurchases();
     };
 
+    const onFulfillmentStorage = (e: StorageEvent) => {
+      if (e.key === 'maxbit_fulfillment_revision') {
+        loadSubmissions();
+        void loadPurchases();
+      }
+    };
+
     window.addEventListener('maxbit-submissions-updated', refreshLog);
     window.addEventListener('maxbit-update', refreshLog);
+    window.addEventListener('storage', onFulfillmentStorage);
     return () => {
       window.removeEventListener('maxbit-submissions-updated', refreshLog);
       window.removeEventListener('maxbit-update', refreshLog);
+      window.removeEventListener('storage', onFulfillmentStorage);
     };
   }, [currentUser?.email]);
 

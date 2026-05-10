@@ -15,7 +15,18 @@ export const sanitizeHtml = (input: string | undefined | null): string => {
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,
     FORBID_TAGS: ['script', 'style'],
-    FORBID_ATTR: ['onerror', 'onclick', 'onload', 'onmouseover'],
+    FORBID_ATTR: [
+      'onerror',
+      'onclick',
+      'onload',
+      'onmouseover',
+      'onpointerdown',
+      'onpointerup',
+      'ontouchstart',
+      'ontouchend',
+      'onanimationstart',
+      'onanimationend',
+    ],
   });
 };
 
@@ -127,6 +138,12 @@ export const sanitizeProductComponentsHtml = (input: string | undefined | null):
         'oninput',
         'onkeydown',
         'onkeyup',
+        'onpointerdown',
+        'onpointerup',
+        'ontouchstart',
+        'ontouchend',
+        'onanimationstart',
+        'onanimationend',
       ],
     });
   } finally {

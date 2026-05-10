@@ -2,6 +2,8 @@ import { Product } from '../types';
 
 export interface OrderRecord {
   id: string;
+  /** Stripe Checkout session id — links customer dashboard fulfillment to Node shop order. */
+  stripeSessionId?: string;
   items: { id: string; name: string; price: number; imageUrl?: string }[];
   /** Charged total in major units (e.g. USD), aligned with Stripe session amount_total */
   total: number;
@@ -203,15 +205,18 @@ export const trackOrder = (
   items: Product[],
   total: number,
   customerData: { name: string; email: string; address: string },
-  stripeBreakdown?: { subtotal: number; tax: number; currency: string }
+  stripeBreakdown?: { subtotal: number; tax: number; currency: string },
+  stripeSessionId?: string
 ) => {
   const data = getAnalytics();
   if (!orderId.trim()) return;
   if (data.orders.some((o) => o.id === orderId)) {
     return;
   }
+  const sid = typeof stripeSessionId === 'string' ? stripeSessionId.trim() : '';
   const record: OrderRecord = {
     id: orderId,
+    ...(sid ? { stripeSessionId: sid } : {}),
     total,
     timestamp: Date.now(),
     items: items.map((i) => ({
