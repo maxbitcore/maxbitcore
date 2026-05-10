@@ -371,16 +371,19 @@ const buildStripeInvoiceCustomFields = (bodyRaw, envRaw) => {
   return out.length ? out : undefined;
 };
 
-/** Stripe allows long line descriptions on Checkout + Invoice; keeps full SN list off tiny custom_fields. */
-const STRIPE_CHECKOUT_LINE_DESCRIPTION_MAX = 4500;
-
 /**
- * Put allocated pool serials under each product line (invoice Description column), not invoice header custom_fields.
+ * Stripe forbids line_items.description on Checkout; serials go under the product title via
+ * price_data.product_data.description (shown on invoice line detail).
+ * Product.description max length is tight — truncate; catalog Price lines can't use this → caller uses custom_fields.
  */
-const applySerialPoolLinesToCheckoutLineItems = (line_items, cartItems, flatLines) => {
+const STRIPE_PRODUCT_DESC_MAX = 999;
+
+const applySerialPoolToProductDescriptions = (line_items, cartItems, flatLines) => {
   if (!Array.isArray(line_items) || !Array.isArray(cartItems) || !Array.isArray(flatLines)) return;
   const n = Math.min(cartItems.length, line_items.length);
   for (let i = 0; i < n; i++) {
+    const line = line_items[i];
+    if (!line || !line.price_data || !line.price_data.product_data) continue;
     const pid = cleanText(String(cartItems[i].id || '')).slice(0, 120);
     if (!pid) continue;
     const parts = flatLines
@@ -388,9 +391,25 @@ const applySerialPoolLinesToCheckoutLineItems = (line_items, cartItems, flatLine
       .map((l) => cleanText(String(l.serial || '')))
       .filter(Boolean);
     if (!parts.length) continue;
-    const block = parts.join('\n').slice(0, STRIPE_CHECKOUT_LINE_DESCRIPTION_MAX);
-    line_items[i].description = block;
+    const block = parts.join('\n').slice(0, STRIPE_PRODUCT_DESC_MAX);
+    line.price_data.product_data.description = block;
   }
+};
+
+/** True if any line with pool serials uses catalog `price` (no price_data) — need invoice custom_fields for those SNs. */
+const serialsNeedInvoiceCustomFields = (items, line_items, flatLines) => {
+  if (!Array.isArray(items) || !Array.isArray(line_items) || !Array.isArray(flatLines)) return false;
+  for (let i = 0; i < items.length && i < line_items.length; i++) {
+    const pid = cleanText(String(items[i].id || '')).slice(0, 120);
+    if (!pid) continue;
+    const hasSerial = flatLines.some(
+      (l) => cleanText(String(l.productId || '')).slice(0, 120) === pid
+    );
+    if (!hasSerial) continue;
+    const line = line_items[i];
+    if (line && line.price && !line.price_data) return true;
+  }
+  return false;
 };
 
 /** Pool-generated serial rows first (invoice), then body/env custom fields. Max 4 total. */
@@ -798,16 +817,26 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    if (serialReserve && serialReserve.lines && serialReserve.lines.length) {
-      applySerialPoolLinesToCheckoutLineItems(line_items, items, serialReserve.lines);
+    /** Serials: under product name via product_data.description when all SN lines use dynamic price_data; else Serial #1… in header (catalog price_…). */
+    const needHeaderSerialCf =
+      serialReserve &&
+      serialReserve.lines &&
+      serialReserve.lines.length &&
+      serialsNeedInvoiceCustomFields(items, line_items, serialReserve.lines);
+    if (serialReserve && serialReserve.lines && serialReserve.lines.length && !needHeaderSerialCf) {
+      applySerialPoolToProductDescriptions(line_items, items, serialReserve.lines);
     }
+    const useCfSerials =
+      serialReserve &&
+      serialReserve.customFields &&
+      serialReserve.customFields.length &&
+      needHeaderSerialCf;
 
     /** After successful payment, Stripe generates a real Invoice (PDF + hosted page). Set STRIPE_CHECKOUT_INVOICE=false to disable. */
-    /** Pool serials go on line item `description` (see above), not invoice custom_fields — avoids header + 140-char chunks. */
     const invoiceCustomFieldsMerged = mergeInvoiceCustomFieldsWithSerials(
       invoiceCustomFields ?? invoice_custom_fields,
       process.env.STRIPE_INVOICE_CUSTOM_FIELDS,
-      null
+      useCfSerials ? serialReserve.customFields : null
     );
     const checkoutInvoiceCreation =
       String(process.env.STRIPE_CHECKOUT_INVOICE || '')
