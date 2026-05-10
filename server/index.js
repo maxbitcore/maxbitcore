@@ -969,6 +969,9 @@ const resolveShopOrderStoreKey = (store, requestedId) => {
   return null;
 };
 
+/** Stripe Checkout Session id — unguessable; safe to match without email (login vs checkout email mismatch). */
+const STRIPE_CHECKOUT_SESSION_ID_RE = /^cs_(live|test)_[A-Za-z0-9]+$/;
+
 /** PHP get-orders often uses a different id than Node store key — match by email + orderNumber / Stripe session. */
 const resolveCustomerOrderForEmail = (store, email, requestedId) => {
   const ordersMap = store.orders || {};
@@ -984,6 +987,24 @@ const resolveCustomerOrderForEmail = (store, email, requestedId) => {
   let q = cleanText(String(requestedId || '')).slice(0, 120);
   let ql = q.toLowerCase().replace(/^order\s+/i, '').trim();
   if (!ql) return null;
+
+  /** Match by Stripe session id before email-filtered scans (those skip rows when cust !== email). */
+  if (STRIPE_CHECKOUT_SESSION_ID_RE.test(q)) {
+    const qsid = q.trim().toLowerCase();
+    for (const [k, o] of Object.entries(ordersMap)) {
+      const sid = String(o.stripeSessionId || '').trim().toLowerCase();
+      if (sid && sid === qsid) return { resolvedKey: k, o };
+    }
+  }
+
+  /** Exact order id / store key match — login email may differ from Stripe customer_details.email on the same order. */
+  const exactKey = resolveShopOrderStoreKey(store, requestedId);
+  if (exactKey && ordersMap[exactKey]) {
+    const o = ordersMap[exactKey];
+    const ids = [exactKey, o.id, o.orderNumber].filter(Boolean).map((x) => String(x).toLowerCase());
+    if (ids.some((id) => id === ql)) return { resolvedKey: exactKey, o };
+  }
+
   for (const [k, o] of Object.entries(ordersMap)) {
     const cust = String(o.customerEmail || '').trim().toLowerCase();
     if (cust && cust !== email) continue;

@@ -27,6 +27,8 @@ const apiBaseUrl = resolveApiBaseUrl();
 
 const PENDING_CHECKOUT_KEY = 'maxbit_pending_checkout_v1';
 const ORDER_ADMIN_NOTIFY_SENT_PREFIX = 'maxbit_order_admin_notify:';
+/** Persist Stripe Checkout session id by order key so the dashboard can sync fulfillment when PHP omits session id. */
+const ORDER_STRIPE_SESSION_LS_PREFIX = 'maxbit_order_cs_';
 const STRIPE_RECEIPT_STORAGE_KEY = 'maxbit_last_stripe_receipt';
 
 type PendingCheckoutSnapshot = {
@@ -398,6 +400,17 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
                 },
                 sessionId
               );
+            }
+            try {
+              if (sessionId.startsWith('cs_') && oid) {
+                const norm = String(oid)
+                  .trim()
+                  .toLowerCase()
+                  .replace(/^order\s+/i, '');
+                localStorage.setItem(`${ORDER_STRIPE_SESSION_LS_PREFIX}${norm}`, sessionId);
+              }
+            } catch {
+              /* private mode */
             }
 
             let emailNotifySnapshot: OrderNotifyResult | null = null;

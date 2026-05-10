@@ -22,6 +22,9 @@ function resolvePurchaseLineImageUrl(
   return resolveSiteAssetUrl(img);
 }
 
+/** Maps order id → Stripe Checkout session id written on successful return from Stripe (see Checkout.tsx). */
+const ORDER_STRIPE_SESSION_LS_PREFIX = 'maxbit_order_cs_';
+
 /** Match Checkout / Admin: Node API base for Stripe pool + fulfillment lookup. */
 function resolveNodeApiBaseCandidates(): string[] {
   const fromEnv = import.meta.env.VITE_API_URL;
@@ -194,6 +197,27 @@ function mergePurchaseRow(prev: UserPurchaseLog, next: UserPurchaseLog): UserPur
 /** UI shows "Order MAX-…"; PHP may use numeric id — same purchase must merge before Node fulfillment lookup. */
 function stripOrderLabelPrefix(s: string): string {
   return String(s || '').trim().replace(/^ORDER\s+/i, '').trim();
+}
+
+function hydrateStripeSessionFromLocalStorage(row: UserPurchaseLog): UserPurchaseLog {
+  if (row.stripeSessionId) return row;
+  try {
+    const keys = new Set<string>();
+    const a = String(row.id || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^order\s+/i, '');
+    const b = stripOrderLabelPrefix(String(row.orderNumber || row.id)).toLowerCase();
+    if (a) keys.add(a);
+    if (b) keys.add(b);
+    for (const k of keys) {
+      const sid = localStorage.getItem(`${ORDER_STRIPE_SESSION_LS_PREFIX}${k}`);
+      if (typeof sid === 'string' && sid.startsWith('cs_')) return { ...row, stripeSessionId: sid };
+    }
+  } catch {
+    /* ignore */
+  }
+  return row;
 }
 
 function dedupePurchasesByOrderKey(map: Map<string, UserPurchaseLog>): Map<string, UserPurchaseLog> {
@@ -421,6 +445,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       }
 
       byId = dedupePurchasesByOrderKey(byId);
+      {
+        const hydrated = new Map<string, UserPurchaseLog>();
+        for (const [k, v] of byId) {
+          hydrated.set(k, hydrateStripeSessionFromLocalStorage(v));
+        }
+        byId = hydrated;
+      }
 
       try {
         const orderIdList = expandIdsForFulfillmentLookup(byId.values());
