@@ -11,19 +11,28 @@ import { useAuth } from '../contexts/AuthContext';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
-/** Same-origin /server in prod if VITE_API_URL was omitted at build time (common deploy mistake). */
-function resolveApiBaseUrl(): string {
-  const fromEnv = import.meta.env.VITE_API_URL;
-  if (typeof fromEnv === 'string' && fromEnv.trim()) {
-    return fromEnv.trim().replace(/\/+$/, '');
-  }
-  if (import.meta.env.PROD && typeof window !== 'undefined') {
-    return `${window.location.origin.replace(/\/+$/, '')}/server`;
-  }
-  return 'http://localhost:4242';
+function checkoutBodyLooksLikeHtml(t: string): boolean {
+  return /^\s*</.test(t || '');
 }
 
-const apiBaseUrl = resolveApiBaseUrl();
+/**
+ * Try current tab origin first (www vs apex), then VITE_API_URL — same failure mode as admin shop-orders (HTML instead of JSON).
+ */
+function getCheckoutApiBaseCandidates(): string[] {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  const candidates: string[] = [];
+  if (typeof window !== 'undefined' && import.meta.env.PROD) {
+    candidates.push(`${window.location.origin.replace(/\/+$/, '')}/server`);
+  }
+  if (typeof fromEnv === 'string' && fromEnv.trim()) {
+    candidates.push(fromEnv.trim().replace(/\/+$/, ''));
+  }
+  if (typeof window !== 'undefined' && !import.meta.env.PROD) {
+    candidates.push(`${window.location.origin.replace(/\/+$/, '')}/server`);
+  }
+  candidates.push('http://localhost:4242');
+  return [...new Set(candidates.filter(Boolean))];
+}
 
 const PENDING_CHECKOUT_KEY = 'maxbit_pending_checkout_v1';
 const ORDER_ADMIN_NOTIFY_SENT_PREFIX = 'maxbit_order_admin_notify:';
@@ -297,8 +306,28 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
 
       for (let i = 0; i < attempts; i++) {
         try {
-          const response = await fetch(`${apiBaseUrl}/payment-status?${params.toString()}`);
-          const data = await response.json().catch(() => ({}));
+          let response: Response | null = null;
+          let data: Record<string, unknown> = {};
+          for (const base of getCheckoutApiBaseCandidates()) {
+            const r = await fetch(`${base}/payment-status?${params.toString()}`);
+            const rawText = await r.text();
+            if (checkoutBodyLooksLikeHtml(rawText)) continue;
+            try {
+              data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {};
+            } catch {
+              continue;
+            }
+            response = r;
+            break;
+          }
+          if (!response) {
+            lastError = 'Store API returned a web page instead of payment status.';
+            if (i < attempts - 1) {
+              await new Promise((r) => setTimeout(r, delayMs));
+              continue;
+            }
+            throw new Error(lastError);
+          }
           if (response.status === 429) {
             throw new Error('Too many checks at once. Wait a minute, then refresh this page.');
           }
@@ -542,88 +571,107 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
       throw new Error('Online payments are not set up on this site yet. Please contact the store.');
     }
 
-    const response = await fetch(`${apiBaseUrl}/create-checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        items: checkoutItems.map((item) => ({
-          id: item.id,
-          name: item.name.replace(/<[^>]*>?/gm, ''),
-          price: item.price,
-          imageUrl: item.imageUrl,
-          ...(item.stripePriceId?.trim() ? { stripePriceId: item.stripePriceId.trim() } : {}),
-        })),
-        email: email,
-        shipping: shippingCost,
-        orderId: orderId
-      }),
-    });
+    const payload = {
+      items: checkoutItems.map((item) => ({
+        id: item.id,
+        name: item.name.replace(/<[^>]*>?/gm, ''),
+        price: item.price,
+        imageUrl: item.imageUrl,
+        ...(item.stripePriceId?.trim() ? { stripePriceId: item.stripePriceId.trim() } : {}),
+      })),
+      email: email,
+      shipping: shippingCost,
+      orderId: orderId,
+    };
 
-    const rawText = await response.text();
-    let session: { id?: string; error?: string; url?: string } = {};
-    try {
-      session = rawText ? JSON.parse(rawText) : {};
-    } catch {
-      session = {};
-    }
+    let lastCheckoutFailure = '';
 
-    if (response.status === 429) {
-      throw new Error('Too many attempts. Please wait a few minutes and try again.');
-    }
+    for (const base of getCheckoutApiBaseCandidates()) {
+      const response = await fetch(`${base}/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const rawText = await response.text();
 
-    if (!response.ok) {
-      const fromJson =
-        typeof session.error === 'string'
-          ? session.error
-          : session.error && typeof session.error === 'object' && (session.error as { message?: string }).message
-            ? String((session.error as { message?: string }).message)
-            : '';
-      const snippet = rawText.trim().startsWith('{')
-        ? ''
-        : rawText.replace(/\s+/g, ' ').slice(0, 180);
-      throw new Error(
-        fromJson ||
-          snippet ||
-          `Payment could not be started (${response.status}). Try again or contact the store.`
-      );
-    }
-
-    if (session.error) throw new Error(session.error);
-    if (session.url && typeof session.url === 'string') {
-      try {
-        sessionStorage.setItem(
-          PENDING_CHECKOUT_KEY,
-          JSON.stringify({
-            v: 1,
-            orderId,
-            email: email.trim(),
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            address: address.trim(),
-            addressUnit: addressUnit.trim(),
-            city: city.trim(),
-            usState: resolvedState,
-            zip: zip.trim(),
-            countryLabel,
-            items: checkoutItems.map((item) => ({
-              id: item.id,
-              name: item.name.replace(/<[^>]*>?/gm, ''),
-              price: item.price,
-              imageUrl: item.imageUrl || '',
-              ...(item.stripePriceId?.trim() ? { stripePriceId: item.stripePriceId.trim() } : {}),
-            })),
-            subtotal,
-            estimatedTax,
-            total,
-          } satisfies PendingCheckoutSnapshot)
-        );
-      } catch {
-        /* storage unavailable */
+      if (response.status === 429) {
+        throw new Error('Too many attempts. Please wait a few minutes and try again.');
       }
-      window.location.assign(session.url);
-      return;
+
+      if (checkoutBodyLooksLikeHtml(rawText)) {
+        lastCheckoutFailure =
+          'The store API returned a web page instead of payment data (wrong host or proxy).';
+        continue;
+      }
+
+      let session: { id?: string; error?: string; url?: string } = {};
+      try {
+        session = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        lastCheckoutFailure = 'Invalid response from payment service.';
+        continue;
+      }
+
+      if (!response.ok) {
+        const fromJson =
+          typeof session.error === 'string'
+            ? session.error
+            : session.error && typeof session.error === 'object' && (session.error as { message?: string }).message
+              ? String((session.error as { message?: string }).message)
+              : '';
+        if (fromJson) throw new Error(fromJson);
+        const snippet = rawText.trim().startsWith('{')
+          ? ''
+          : rawText.replace(/\s+/g, ' ').slice(0, 180);
+        lastCheckoutFailure =
+          snippet ||
+          `Payment could not be started (${response.status}). Try again or contact the store.`;
+        continue;
+      }
+
+      if (session.error) throw new Error(String(session.error));
+      if (session.url && typeof session.url === 'string') {
+        try {
+          sessionStorage.setItem(
+            PENDING_CHECKOUT_KEY,
+            JSON.stringify({
+              v: 1,
+              orderId,
+              email: email.trim(),
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              address: address.trim(),
+              addressUnit: addressUnit.trim(),
+              city: city.trim(),
+              usState: resolvedState,
+              zip: zip.trim(),
+              countryLabel,
+              items: checkoutItems.map((item) => ({
+                id: item.id,
+                name: item.name.replace(/<[^>]*>?/gm, ''),
+                price: item.price,
+                imageUrl: item.imageUrl || '',
+                ...(item.stripePriceId?.trim() ? { stripePriceId: item.stripePriceId.trim() } : {}),
+              })),
+              subtotal,
+              estimatedTax,
+              total,
+            } satisfies PendingCheckoutSnapshot)
+          );
+        } catch {
+          /* storage unavailable */
+        }
+        window.location.assign(session.url);
+        return;
+      }
+      lastCheckoutFailure =
+        'We could not open the payment page. Please try again or contact the store.';
     }
-    throw new Error('We could not open the payment page. Please try again or contact the store.');
+
+    throw new Error(
+      lastCheckoutFailure ||
+        'We could not open the payment page. Please try again or contact the store.'
+    );
 
   } catch (err: any) {
     console.error("Payment Error:", err);
