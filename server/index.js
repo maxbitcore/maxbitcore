@@ -5,7 +5,9 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecret ? require('stripe')(stripeSecret) : null;
+/** Pin API version so Checkout line_items shape stays consistent (see Stripe “migrating prices”). */
+const stripeApiVersion = process.env.STRIPE_API_VERSION || '2024-06-20';
+const stripe = stripeSecret ? require('stripe')(stripeSecret, { apiVersion: stripeApiVersion }) : null;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 const serialPool = require('./serialPool');
 
@@ -241,6 +243,36 @@ const collectMaxbitProductIdsWithLineItemsFallback = async (session) => {
   return ids;
 };
 
+/** Product ids from serial-pool rows at payment — same strings as `products.json` `id` when pool reserved SNs. */
+const collectProductIdsFromSerialAllocations = (allocations) => {
+  if (!Array.isArray(allocations)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const row of allocations) {
+    if (!row || typeof row !== 'object') continue;
+    const id = cleanText(String(row.productId || '')).slice(0, 120);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+};
+
+/** Stripe metadata / line items + serial pool (fallback when Stripe omits maxbit ids). */
+const mergeMarkSoldProductIds = async (session, serialAllocations) => {
+  const fromStripe = await collectMaxbitProductIdsWithLineItemsFallback(session);
+  const fromPool = collectProductIdsFromSerialAllocations(serialAllocations);
+  const seen = new Set();
+  const merged = [];
+  for (const id of [...fromStripe, ...fromPool]) {
+    const t = cleanText(String(id || '')).slice(0, 120);
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    merged.push(t);
+  }
+  return merged;
+};
+
 const postMarkProductsSold = async (productIds) => {
   const secret = String(process.env.MARK_PRODUCTS_SOLD_SECRET || '').trim();
   const url = String(process.env.MARK_PRODUCTS_SOLD_URL || '').trim() ||
@@ -371,45 +403,58 @@ const buildStripeInvoiceCustomFields = (bodyRaw, envRaw) => {
   return out.length ? out : undefined;
 };
 
-/**
- * Stripe forbids line_items.description on Checkout; serials go under the product title via
- * price_data.product_data.description (shown on invoice line detail).
- * Product.description max length is tight — truncate; catalog Price lines can't use this → caller uses custom_fields.
- */
+/** Max length for optional `price_data.product_data.description` (shop copy — never used for serial numbers). */
 const STRIPE_PRODUCT_DESC_MAX = 999;
 
-const applySerialPoolToProductDescriptions = (line_items, cartItems, flatLines) => {
-  if (!Array.isArray(line_items) || !Array.isArray(cartItems) || !Array.isArray(flatLines)) return;
-  const n = Math.min(cartItems.length, line_items.length);
-  for (let i = 0; i < n; i++) {
-    const line = line_items[i];
-    if (!line || !line.price_data || !line.price_data.product_data) continue;
-    const pid = cleanText(String(cartItems[i].id || '')).slice(0, 120);
-    if (!pid) continue;
-    const parts = flatLines
-      .filter((l) => cleanText(String(l.productId || '')).slice(0, 120) === pid)
-      .map((l) => cleanText(String(l.serial || '')))
-      .filter(Boolean);
-    if (!parts.length) continue;
-    const block = parts.join('\n').slice(0, STRIPE_PRODUCT_DESC_MAX);
-    line.price_data.product_data.description = block;
+/**
+ * Stripe rejects legacy top-level line_items.{amount,currency,name,description,images}.
+ * Emit only { price, quantity } or { price_data: { currency, unit_amount, product_data }, quantity }.
+ */
+const sanitizeCheckoutLineItemsForStripe = (raw) => {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const line of raw) {
+    const qty = Math.max(1, Math.min(99, Number(line.quantity) || 1));
+    if (line.price && typeof line.price === 'string' && /^price_[a-zA-Z0-9]+$/.test(line.price)) {
+      out.push({ price: line.price, quantity: qty });
+      continue;
+    }
+    const pdIn = line.price_data;
+    if (!pdIn || typeof pdIn !== 'object') {
+      throw new Error('Each checkout line must include catalog price id or price_data.');
+    }
+    const currency = String(pdIn.currency || 'usd')
+      .toLowerCase()
+      .slice(0, 3);
+    const unitAmount = Number(pdIn.unit_amount);
+    if (!Number.isFinite(unitAmount)) {
+      throw new Error('Invalid price_data.unit_amount.');
+    }
+    const pr = pdIn.product_data && typeof pdIn.product_data === 'object' ? pdIn.product_data : {};
+    const name = cleanText(String(pr.name || 'Item')).slice(0, 120) || 'Item';
+    const product_data = { name };
+    const desc = cleanText(String(pr.description || '')).slice(0, STRIPE_PRODUCT_DESC_MAX);
+    if (desc) product_data.description = desc;
+    const imgs = Array.isArray(pr.images)
+      ? pr.images
+          .map((u) => String(u || '').trim())
+          .filter((u) => /^https?:\/\//i.test(u))
+          .slice(0, 8)
+      : [];
+    if (imgs.length) product_data.images = imgs;
+    if (pr.metadata && typeof pr.metadata === 'object' && Object.keys(pr.metadata).length) {
+      product_data.metadata = pr.metadata;
+    }
+    out.push({
+      quantity: qty,
+      price_data: {
+        currency,
+        unit_amount: Math.round(unitAmount),
+        product_data,
+      },
+    });
   }
-};
-
-/** True if any line with pool serials uses catalog `price` (no price_data) — need invoice custom_fields for those SNs. */
-const serialsNeedInvoiceCustomFields = (items, line_items, flatLines) => {
-  if (!Array.isArray(items) || !Array.isArray(line_items) || !Array.isArray(flatLines)) return false;
-  for (let i = 0; i < items.length && i < line_items.length; i++) {
-    const pid = cleanText(String(items[i].id || '')).slice(0, 120);
-    if (!pid) continue;
-    const hasSerial = flatLines.some(
-      (l) => cleanText(String(l.productId || '')).slice(0, 120) === pid
-    );
-    if (!hasSerial) continue;
-    const line = line_items[i];
-    if (line && line.price && !line.price_data) return true;
-  }
-  return false;
+  return out;
 };
 
 /** Pool-generated serial rows first (invoice), then body/env custom fields. Max 4 total. */
@@ -618,7 +663,7 @@ const webhookHandler = async (req, res) => {
           }
           upsertShopOrderFromPaidSession(fullSession, { receiptUrl, serialAllocations });
           try {
-            const ids = await collectMaxbitProductIdsWithLineItemsFallback(fullSession);
+            const ids = await mergeMarkSoldProductIds(fullSession, serialAllocations);
             await postMarkProductsSold(ids);
           } catch (e) {
             console.warn('mark products sold (webhook):', e.message || e);
@@ -817,20 +862,14 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    /** Serials: under product name via product_data.description when all SN lines use dynamic price_data; else Serial #1… in header (catalog price_…). */
-    const needHeaderSerialCf =
-      serialReserve &&
-      serialReserve.lines &&
-      serialReserve.lines.length &&
-      serialsNeedInvoiceCustomFields(items, line_items, serialReserve.lines);
-    if (serialReserve && serialReserve.lines && serialReserve.lines.length && !needHeaderSerialCf) {
-      applySerialPoolToProductDescriptions(line_items, items, serialReserve.lines);
-    }
+    /** Serials never go into line item description (visible in Checkout before pay). With invoices on, they merge into Invoice custom_fields (PDF/hosted invoice after payment); fulfillment still uses reservation + webhook. */
+    const invoiceCreationEnabled =
+      String(process.env.STRIPE_CHECKOUT_INVOICE || '').trim().toLowerCase() !== 'false';
     const useCfSerials =
+      invoiceCreationEnabled &&
       serialReserve &&
-      serialReserve.customFields &&
-      serialReserve.customFields.length &&
-      needHeaderSerialCf;
+      Array.isArray(serialReserve.customFields) &&
+      serialReserve.customFields.length > 0;
 
     /** After successful payment, Stripe generates a real Invoice (PDF + hosted page). Set STRIPE_CHECKOUT_INVOICE=false to disable. */
     const invoiceCustomFieldsMerged = mergeInvoiceCustomFieldsWithSerials(
@@ -860,11 +899,25 @@ const createCheckoutSession = async (req, res) => {
             },
           };
 
+    let safeLineItems;
+    try {
+      safeLineItems = sanitizeCheckoutLineItemsForStripe(line_items);
+    } catch (sanitizeErr) {
+      if (serialReserve && serialReserve.reservationId) {
+        try {
+          await serialPool.releaseReservation(serialReserve.reservationId);
+        } catch (rele) {
+          console.warn('serial pool rollback after line_items sanitize:', rele.message || rele);
+        }
+      }
+      return res.status(400).json({ error: sanitizeErr.message || 'Invalid checkout line items.' });
+    }
+
     let session;
     try {
       session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items,
+        line_items: safeLineItems,
         mode: 'payment',
         customer_email: String(email).trim().toLowerCase(),
         payment_intent_data: {
@@ -979,8 +1032,8 @@ const paymentStatusHandler = async (req, res) => {
     if (paid) {
       receiptUrl = await resolveChargeReceiptUrlFromCheckoutSession(session);
       if (orderId) {
+        let serialAllocations = undefined;
         try {
-          let serialAllocations = undefined;
           if (session.metadata && session.metadata.serialReservationId) {
             try {
               serialAllocations = await takeSerialAllocationsFromSession(session);
@@ -993,7 +1046,7 @@ const paymentStatusHandler = async (req, res) => {
           console.warn('shop order upsert (payment-status):', e.message || e);
         }
         try {
-          const ids = await collectMaxbitProductIdsWithLineItemsFallback(session);
+          const ids = await mergeMarkSoldProductIds(session, serialAllocations);
           await postMarkProductsSold(ids);
         } catch (e) {
           console.warn('mark products sold (payment-status):', e.message || e);
@@ -1195,5 +1248,12 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
+  console.log('[maxbit-stripe] Stripe API version:', stripeApiVersion);
   console.log('[maxbit-stripe] ADMIN_ORDERS_SECRET:', process.env.ADMIN_ORDERS_SECRET ? '(set)' : '(missing — /shop-orders returns 503)');
+  console.log(
+    '[maxbit-stripe] MARK_PRODUCTS_SOLD_SECRET:',
+    String(process.env.MARK_PRODUCTS_SOLD_SECRET || '').trim()
+      ? '(set — vitrine → Sold Out after pay)'
+      : '(missing — sold PCs stay "In Stock" until you set secret + PHP mark-products-sold.php)'
+  );
 });

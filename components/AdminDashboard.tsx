@@ -430,6 +430,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   /** Many hosts serve index.html with HTTP 200 for unknown routes — breaks response.json(). */
   const adminBodyLooksLikeHtml = (body: string) => /^\s*</.test(body || '');
 
+  /** Avoid dumping HTML error pages into alerts; 501 often means PATCH/DELETE blocked before Node. */
+  const summarizeAdminFetchError = (status: number, body: string): string => {
+    const raw = (body || '').trim();
+    if (adminBodyLooksLikeHtml(raw)) {
+      if (status === 501) {
+        return `HTTP ${status}: Not Implemented — the host often blocks PATCH/DELETE. Ensure /shop-orders is proxied to Node and allowed by Apache/LiteSpeed/nginx.`;
+      }
+      return `HTTP ${status}: HTML error page instead of JSON (check API URL and proxy).`;
+    }
+    if (raw.length > 400) return `${raw.slice(0, 400)}…`;
+    return raw || String(status);
+  };
+
   const getAdminApiBaseCandidates = (): string[] => {
     const primary = resolveAdminApiBaseUrl().replace(/\/+$/, '');
     const candidates: string[] = [];
@@ -506,12 +519,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       );
       if (!r.ok) {
         const t = await r.text();
-        let detail = t || String(r.status);
+        let detail = summarizeAdminFetchError(r.status, t);
         try {
           const j = JSON.parse(t) as { error?: string };
           if (j && typeof j.error === 'string' && j.error.trim()) detail = j.error.trim();
         } catch {
-          /* plain text */
+          /* keep summarized */
         }
         throw new Error(detail);
       }
@@ -538,12 +551,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       );
       if (!r.ok) {
         const t = await r.text();
-        let detail = t || String(r.status);
+        let detail = summarizeAdminFetchError(r.status, t);
         try {
           const j = JSON.parse(t) as { error?: string };
           if (j && typeof j.error === 'string' && j.error.trim()) detail = j.error.trim();
         } catch {
-          /* plain text */
+          /* keep summarized */
         }
         throw new Error(detail);
       }
@@ -808,7 +821,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                   });
                   const body = await nodeRes.text().catch(() => '');
                   if (!nodeRes.ok) {
-                    stripeErr = `Stripe orders API (${b}${ordersPath}): HTTP ${nodeRes.status}${body ? ` — ${body.slice(0, 200)}` : ''}`;
+                    stripeErr = `Stripe orders API (${b}${ordersPath}): ${summarizeAdminFetchError(nodeRes.status, body)}`;
                     if (nodeRes.status === 404) continue;
                     continue;
                   }
@@ -1933,11 +1946,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-[10px] text-slate-500">
-                      API: <span className="font-mono text-slate-400">{resolveAdminApiBaseUrl()}/shop-orders</span>
-                    </p>
-                  )}
+                  ) : null}
                   {shopOrdersStripeError ? (
                     <p className="text-xs text-rose-400 font-mono break-all">{shopOrdersStripeError}</p>
                   ) : null}
