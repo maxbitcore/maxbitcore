@@ -975,15 +975,18 @@ const resolveCustomerOrderForEmail = (store, email, requestedId) => {
   const resolvedKey = resolveShopOrderStoreKey(store, requestedId);
   if (resolvedKey) {
     const o = ordersMap[resolvedKey];
-    if (o && String(o.customerEmail || '').trim().toLowerCase() === email) {
-      return { resolvedKey, o };
+    if (o) {
+      const cust = String(o.customerEmail || '').trim().toLowerCase();
+      /** Stripe checkout email may differ from login email — empty record still matched by id below. */
+      if (!cust || cust === email) return { resolvedKey, o };
     }
   }
   let q = cleanText(String(requestedId || '')).slice(0, 120);
   let ql = q.toLowerCase().replace(/^order\s+/i, '').trim();
   if (!ql) return null;
   for (const [k, o] of Object.entries(ordersMap)) {
-    if (String(o.customerEmail || '').trim().toLowerCase() !== email) continue;
+    const cust = String(o.customerEmail || '').trim().toLowerCase();
+    if (cust && cust !== email) continue;
     const hay = [k, o.id, o.orderNumber, o.stripeSessionId]
       .filter(Boolean)
       .map((x) => String(x).toLowerCase());
@@ -991,7 +994,8 @@ const resolveCustomerOrderForEmail = (store, email, requestedId) => {
   }
   /** Loose match: prefixes / minor spelling differences between PHP id and metadata orderId (long ids only). */
   for (const [k, o] of Object.entries(ordersMap)) {
-    if (String(o.customerEmail || '').trim().toLowerCase() !== email) continue;
+    const cust = String(o.customerEmail || '').trim().toLowerCase();
+    if (cust && cust !== email) continue;
     const candidates = [k, o.id, o.orderNumber, o.stripeSessionId].filter(Boolean).map((x) => String(x));
     for (const c of candidates) {
       const cl = c.toLowerCase();

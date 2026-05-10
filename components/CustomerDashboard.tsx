@@ -66,7 +66,55 @@ function fulfillmentFromMatches(
   return undefined;
 }
 
-async function fetchFulfillmentFromNode(
+/** Login email can differ from Stripe Checkout email — Node filters by customerEmail, so try every known address. */
+const FULFILLMENT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeEmailsForFulfillmentLookup(accountEmail: string, extraEmails?: string[]): string[] {
+  const out = new Set<string>();
+  const add = (raw: string | undefined | null) => {
+    const e = String(raw || '').trim().toLowerCase();
+    if (e && FULFILLMENT_EMAIL_RE.test(e)) out.add(e);
+  };
+  add(accountEmail);
+  if (extraEmails) {
+    for (const x of extraEmails) add(x);
+  }
+  try {
+    add(localStorage.getItem('maxbit_email'));
+    const raw = localStorage.getItem('maxbit_currentUser');
+    if (raw) {
+      const u = JSON.parse(raw) as { email?: string };
+      add(u?.email);
+    }
+  } catch {
+    /* ignore */
+  }
+  return [...out];
+}
+
+/** Emails from analytics `customer.email` (Stripe checkout) for orders currently shown — may differ from login email. */
+function checkoutEmailsForPurchases(rows: Iterable<UserPurchaseLog>): string[] {
+  const want = new Set<string>();
+  for (const r of rows) {
+    want.add(String(r.id || '').trim().toLowerCase());
+    want.add(stripOrderLabelPrefix(String(r.orderNumber || r.id)).toLowerCase());
+  }
+  const found: string[] = [];
+  try {
+    const data = getAnalytics();
+    for (const o of data.orders || []) {
+      const oid = String(o.id || '').trim().toLowerCase();
+      if (!want.has(oid)) continue;
+      const ce = String(o.customer?.email || '').trim();
+      if (ce) found.push(ce);
+    }
+  } catch {
+    /* ignore */
+  }
+  return found;
+}
+
+async function fetchFulfillmentFromNodeSingle(
   email: string,
   orderIds: string[]
 ): Promise<Record<string, { fulfillmentStatus: string }>> {
@@ -99,6 +147,21 @@ async function fetchFulfillmentFromNode(
     }
   }
   return {};
+}
+
+async function fetchFulfillmentFromNode(
+  emails: string[],
+  orderIds: string[]
+): Promise<Record<string, { fulfillmentStatus: string }>> {
+  const merged: Record<string, { fulfillmentStatus: string }> = {};
+  const uniq = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
+  for (const em of uniq) {
+    const part = await fetchFulfillmentFromNodeSingle(em, orderIds);
+    for (const [k, v] of Object.entries(part)) {
+      merged[k] = v;
+    }
+  }
+  return merged;
 }
 
 function formatOrderMoney(amount: number, currency = 'usd'): string {
@@ -362,7 +425,11 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       try {
         const orderIdList = expandIdsForFulfillmentLookup(byId.values());
         if (orderIdList.length > 0) {
-          const matches = await fetchFulfillmentFromNode(em, orderIdList);
+          const emailsForFulfillment = normalizeEmailsForFulfillmentLookup(
+            email,
+            checkoutEmailsForPurchases(byId.values())
+          );
+          const matches = await fetchFulfillmentFromNode(emailsForFulfillment, orderIdList);
           for (const row of byId.values()) {
             const fs = fulfillmentFromMatches(matches, row);
             if (fs) row.status = fs;
