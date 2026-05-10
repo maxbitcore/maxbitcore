@@ -100,6 +100,10 @@ type AdminMergedOrder = {
   currency?: string;
   /** Allocated unit serials ({ productId, serial }) when serial pool was used. */
   serialAllocations?: { productId: string; serial: string }[];
+  /** Stripe Checkout session id — matches PHP row when order numbers differ. */
+  stripeSessionId?: string;
+  /** Node `updatedAt` (ms) — reconcile fulfillment prefs vs server. */
+  fulfillmentUpdatedAt?: number;
 };
 
 function resolveAdminApiBaseUrl(): string {
@@ -122,6 +126,15 @@ function normalizePhpShopOrder(ord: any): AdminMergedOrder {
   const id = (primary || fallbackKey).slice(0, 120);
   const ts = Number(ord.timestamp);
   const created = ord.created_at ? Date.parse(String(ord.created_at)) : NaN;
+  const stripeSessionId = String(
+    ord.stripeSessionId ??
+      ord.stripe_session_id ??
+      ord.sessionId ??
+      ord.session_id ??
+      ord.checkout_session_id ??
+      ord.checkoutSessionId ??
+      ''
+  ).trim();
   return {
     key: id,
     orderNumber: String(ord.orderNumber ?? ord.order_id ?? ord.id ?? id),
@@ -131,6 +144,7 @@ function normalizePhpShopOrder(ord: any): AdminMergedOrder {
     paymentStatus: String(ord.status ?? 'PAID'),
     fulfillmentStatus: ord.fulfillment_status,
     managedByNode: false,
+    ...(stripeSessionId ? { stripeSessionId } : {}),
   };
 }
 
@@ -140,6 +154,7 @@ function normalizeNodeShopOrder(o: any): AdminMergedOrder | null {
   const paidMs = Date.parse(String(o.paidAt || ''));
   const updatedMs = Date.parse(String(o.updatedAt || ''));
   const ts = Number.isFinite(paidMs) ? paidMs : Number.isFinite(updatedMs) ? updatedMs : Date.now();
+  const stripeSessionId = String(o.stripeSessionId || '').trim();
   return {
     key,
     orderNumber: String(o.orderNumber || key),
@@ -152,6 +167,8 @@ function normalizeNodeShopOrder(o: any): AdminMergedOrder | null {
     lineItems: Array.isArray(o.lineItems) ? o.lineItems : undefined,
     currency: o.currency,
     serialAllocations: Array.isArray(o.serialAllocations) ? o.serialAllocations : undefined,
+    ...(stripeSessionId ? { stripeSessionId } : {}),
+    ...(Number.isFinite(updatedMs) ? { fulfillmentUpdatedAt: updatedMs } : {}),
   };
 }
 
@@ -195,6 +212,109 @@ function normShopOrderNum(s: string | undefined): string {
   return String(s ?? '').trim().toLowerCase();
 }
 
+/** After successful fulfillment POST — survives PHP/get-orders duplicates that reuse stale fulfillment_status. */
+const FULFILLMENT_PREFS_LS_KEY = 'maxbit_admin_fulfillment_prefs_v2';
+
+type FulfillmentPrefEntry = { status: string; at: number };
+
+type FulfillmentPrefsStore = {
+  byKey: Record<string, FulfillmentPrefEntry>;
+  byOrderNum: Record<string, FulfillmentPrefEntry>;
+  byStripeSession: Record<string, FulfillmentPrefEntry>;
+};
+
+function emptyFulfillmentPrefs(): FulfillmentPrefsStore {
+  return { byKey: {}, byOrderNum: {}, byStripeSession: {} };
+}
+
+function loadFulfillmentPrefs(): FulfillmentPrefsStore {
+  try {
+    const raw = localStorage.getItem(FULFILLMENT_PREFS_LS_KEY);
+    if (!raw) return emptyFulfillmentPrefs();
+    const j = JSON.parse(raw) as FulfillmentPrefsStore;
+    return {
+      byKey: typeof j.byKey === 'object' && j.byKey ? j.byKey : {},
+      byOrderNum: typeof j.byOrderNum === 'object' && j.byOrderNum ? j.byOrderNum : {},
+      byStripeSession: typeof j.byStripeSession === 'object' && j.byStripeSession ? j.byStripeSession : {},
+    };
+  } catch {
+    return emptyFulfillmentPrefs();
+  }
+}
+
+function saveFulfillmentPrefs(s: FulfillmentPrefsStore) {
+  try {
+    localStorage.setItem(FULFILLMENT_PREFS_LS_KEY, JSON.stringify(s));
+  } catch {
+    /* quota */
+  }
+}
+
+function rememberAdminFulfillmentChoice(
+  orderKey: string,
+  orderNumber: string | undefined,
+  stripeSessionId: string | undefined,
+  status: string
+) {
+  const at = Date.now();
+  const e: FulfillmentPrefEntry = { status, at };
+  const s = loadFulfillmentPrefs();
+  const k = String(orderKey || '').trim();
+  if (k) s.byKey[k] = e;
+  const n = normShopOrderNum(orderNumber);
+  if (n) s.byOrderNum[n] = e;
+  const sid = stripeSessionId ? normShopOrderNum(stripeSessionId) : '';
+  if (sid) s.byStripeSession[sid] = e;
+  saveFulfillmentPrefs(s);
+}
+
+function pickNewerFulfillmentPref(a: FulfillmentPrefEntry, b: FulfillmentPrefEntry): FulfillmentPrefEntry {
+  return a.at >= b.at ? a : b;
+}
+
+function matchingFulfillmentPrefForOrder(o: AdminMergedOrder, prefs: FulfillmentPrefsStore): FulfillmentPrefEntry | null {
+  const found: FulfillmentPrefEntry[] = [];
+  const k = o.key;
+  if (prefs.byKey[k]) found.push(prefs.byKey[k]);
+  for (const [bk, pe] of Object.entries(prefs.byKey)) {
+    if (bk.toLowerCase() === k.toLowerCase()) found.push(pe);
+  }
+  const num = normShopOrderNum(o.orderNumber);
+  if (num && prefs.byOrderNum[num]) found.push(prefs.byOrderNum[num]);
+  if (o.stripeSessionId) {
+    const sid = normShopOrderNum(o.stripeSessionId);
+    if (sid && prefs.byStripeSession[sid]) found.push(prefs.byStripeSession[sid]);
+  }
+  if (!found.length) return null;
+  return found.reduce((a, b) => pickNewerFulfillmentPref(a, b));
+}
+
+function reconcileFulfillmentWithPrefs(orders: AdminMergedOrder[]): AdminMergedOrder[] {
+  const prefs = loadFulfillmentPrefs();
+  if (
+    !Object.keys(prefs.byKey).length &&
+    !Object.keys(prefs.byOrderNum).length &&
+    !Object.keys(prefs.byStripeSession).length
+  ) {
+    return orders;
+  }
+
+  return orders.map((o) => {
+    const pref = matchingFulfillmentPrefForOrder(o, prefs);
+    if (!pref) return o;
+
+    if (!o.managedByNode) {
+      return pref.status !== o.fulfillmentStatus ? { ...o, fulfillmentStatus: pref.status } : o;
+    }
+
+    const serverT = typeof o.fulfillmentUpdatedAt === 'number' ? o.fulfillmentUpdatedAt : o.timestamp;
+    if (pref.at >= serverT - 3000) {
+      return pref.status !== o.fulfillmentStatus ? { ...o, fulfillmentStatus: pref.status } : o;
+    }
+    return o;
+  });
+}
+
 function mergeAdminShopOrders(
   phpRows: any[],
   nodeRows: any[],
@@ -205,6 +325,7 @@ function mergeAdminShopOrders(
   const nodeOrders: AdminMergedOrder[] = [];
   const nodeIds = new Set<string>();
   const nodeOrderNums = new Set<string>();
+  const nodeStripeSessionIds = new Set<string>();
 
   for (const row of nodeRows) {
     const n = normalizeNodeShopOrder(row);
@@ -213,6 +334,10 @@ function mergeAdminShopOrders(
     nodeIds.add(n.key);
     const on = normShopOrderNum(n.orderNumber);
     if (on) nodeOrderNums.add(on);
+    if (n.stripeSessionId) {
+      const sid = normShopOrderNum(n.stripeSessionId);
+      if (sid) nodeStripeSessionIds.add(sid);
+    }
   }
 
   const map = new Map<string, AdminMergedOrder>();
@@ -225,6 +350,10 @@ function mergeAdminShopOrders(
     const pKeyAsNum = normShopOrderNum(p.key);
     if (pNum && nodeOrderNums.has(pNum)) continue;
     if (pKeyAsNum && nodeOrderNums.has(pKeyAsNum)) continue;
+    if (p.stripeSessionId) {
+      const ps = normShopOrderNum(p.stripeSessionId);
+      if (ps && nodeStripeSessionIds.has(ps)) continue;
+    }
     map.set(p.key, p);
   }
 
@@ -571,7 +700,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     throw (lastError instanceof Error ? lastError : new Error('Could not reach Node orders API.'));
   };
 
-  const updateNodeOrderFulfillment = async (orderKey: string, status: FulfillmentStatus) => {
+  const updateNodeOrderFulfillment = async (
+    orderKey: string,
+    status: FulfillmentStatus,
+    meta?: { orderNumber?: string; stripeSessionId?: string }
+  ) => {
     const adminSecret = getAdminOrdersSecret();
     if (!adminSecret) return;
     try {
@@ -595,8 +728,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         }
         throw new Error(detail);
       }
+      rememberAdminFulfillmentChoice(orderKey, meta?.orderNumber, meta?.stripeSessionId, status);
       setShopOrders((prev) =>
-        prev.map((o) => (o.key === orderKey ? { ...o, fulfillmentStatus: status } : o))
+        reconcileFulfillmentWithPrefs(
+          prev.map((o) => (o.key === orderKey ? { ...o, fulfillmentStatus: status } : o))
+        )
       );
     } catch (err) {
       console.error('Fulfillment update failed:', err);
@@ -925,7 +1061,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           }
           setShopOrdersStripeError(adminSecret ? stripeErr : null);
 
-          setShopOrders(mergeAdminShopOrders(phpOrders, nodeOrders, getDeletedShopOrderTombstones()));
+          setShopOrders(
+            reconcileFulfillmentWithPrefs(
+              mergeAdminShopOrders(phpOrders, nodeOrders, getDeletedShopOrderTombstones())
+            )
+          );
         } catch (e) {
           console.error("Orders Sync Failed:", e);
         }
@@ -2134,7 +2274,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                                   : 'Processing'
                               }
                               onChange={(e) =>
-                                updateNodeOrderFulfillment(order.key, e.target.value as FulfillmentStatus)
+                                updateNodeOrderFulfillment(order.key, e.target.value as FulfillmentStatus, {
+                                  orderNumber: order.orderNumber,
+                                  stripeSessionId: order.stripeSessionId,
+                                })
                               }
                               className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-white uppercase tracking-tight focus:border-cyan-500/50 focus:outline-none"
                             >
