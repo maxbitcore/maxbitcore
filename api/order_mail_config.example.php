@@ -63,9 +63,12 @@ define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
  *   A) В cPanel → Forwarders создайте orders@maxbitcore.com → forward на info@ и задайте ниже MAXBIT_SHOP_ORDER_TO = orders@...
  *   B) MAXBIT_SHOP_ORDER_BCC — скрытая копия на личный Gmail.
  *   C) MAXBIT_SHOP_ORDER_BACKUP_EMAIL — второе отдельное письмо на внешний ящик (самый надёжный вариант).
+ *   D) Скрипт при To === From сам шлёт BCC на max@ (MAXBIT_SHOP_SAME_INBOX_BCC) — смените адрес при необходимости.
  */
-/** По умолчанию в коде — max@maxbitcore.com (другой получатель, чем From info@ — письма стабильнее во входящих). */
-// define('MAXBIT_SHOP_ORDER_TO', 'max@maxbitcore.com');
+/** Куда уходит «оповещение магазину»; в notify-order-paid.php по умолчанию info@maxbitcore.com */
+// define('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
+/** Пустая строка = отключить авто-BCC при одном и том же From/To */
+// define('MAXBIT_SHOP_SAME_INBOX_BCC', 'max@maxbitcore.com');
 
 /** Скрытая копия того же письма магазину (несколько адресов через запятую). */
 // define('MAXBIT_SHOP_ORDER_BCC', 'your@gmail.com');

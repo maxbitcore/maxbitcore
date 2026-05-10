@@ -30,6 +30,38 @@ app.disable('x-powered-by');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const cleanText = (value = '') => String(value).replace(/<[^>]*>?/gm, '').trim();
+
+/** Stripe Checkout Session metadata: each value ≤500 chars — split comma-separated product ids across keys. */
+const STRIPE_SESSION_META_VALUE_MAX = 500;
+const packProductIdsStripeMetadata = (items) => {
+  const ids = [];
+  for (const item of items || []) {
+    const id = cleanText(String(item.id || '')).slice(0, 120);
+    if (id) ids.push(id);
+  }
+  const uniq = [...new Set(ids)];
+  if (!uniq.length) return {};
+  const meta = {};
+  let chunk = [];
+  let chunkLen = 0;
+  let idx = 0;
+  const flush = () => {
+    if (!chunk.length) return;
+    const key = idx === 0 ? 'maxbit_product_ids' : `maxbit_product_ids_${idx}`;
+    meta[key] = chunk.join(',').slice(0, STRIPE_SESSION_META_VALUE_MAX);
+    idx += 1;
+    chunk = [];
+    chunkLen = 0;
+  };
+  for (const id of uniq) {
+    const need = chunk.length ? 1 + id.length : id.length;
+    if (chunkLen + need > STRIPE_SESSION_META_VALUE_MAX && chunk.length) flush();
+    chunk.push(id);
+    chunkLen += need;
+  }
+  flush();
+  return meta;
+};
 const safeImageUrl = (value = '') => {
   const url = String(value || '').trim();
   return /^https?:\/\//i.test(url) ? url : undefined;
@@ -194,11 +226,11 @@ const upsertShopOrderFromPaidSession = (session, opts = {}) => {
 
 const collectMaxbitProductIdsFromPaidSession = (session) => {
   const ids = [];
-  const metaRaw =
-    session && session.metadata && typeof session.metadata.maxbit_product_ids === 'string'
-      ? session.metadata.maxbit_product_ids
-      : '';
-  if (metaRaw.trim()) {
+  const metaObj = session && session.metadata && typeof session.metadata === 'object' ? session.metadata : {};
+  for (const [key, rawVal] of Object.entries(metaObj)) {
+    if (key !== 'maxbit_product_ids' && !/^maxbit_product_ids_\d+$/.test(key)) continue;
+    const metaRaw = typeof rawVal === 'string' ? rawVal : '';
+    if (!metaRaw.trim()) continue;
     for (const part of metaRaw.split(',')) {
       const id = cleanText(String(part || '')).slice(0, 120);
       if (id) ids.push(id);
@@ -273,48 +305,247 @@ const mergeMarkSoldProductIds = async (session, serialAllocations) => {
   return merged;
 };
 
+const DEFAULT_MARK_PRODUCTS_SOLD_URL = 'https://www.maxbitcore.com/api/mark-products-sold.php';
+
+/** Try www and non-www — Node on same host sometimes resolves only one variant. */
+const markSoldUrlVariants = (urlStr) => {
+  const out = [];
+  const s = String(urlStr || '').trim();
+  if (s) out.push(s);
+  try {
+    const u = new URL(s || DEFAULT_MARK_PRODUCTS_SOLD_URL);
+    const host = u.hostname;
+    const alt = host.startsWith('www.') ? host.slice(4) : `www.${host}`;
+    const clone = new URL(u.href);
+    clone.hostname = alt;
+    out.push(clone.href);
+  } catch {
+    /* ignore */
+  }
+  return [...new Set(out.filter(Boolean))];
+};
+
 const postMarkProductsSold = async (productIds) => {
   const secret = String(process.env.MARK_PRODUCTS_SOLD_SECRET || '').trim();
-  const url = String(process.env.MARK_PRODUCTS_SOLD_URL || '').trim() ||
-    'https://www.maxbitcore.com/api/mark-products-sold.php';
+  const configured = String(process.env.MARK_PRODUCTS_SOLD_URL || '').trim();
   if (!secret) {
     console.warn('mark-products-sold: skipped — set MARK_PRODUCTS_SOLD_SECRET in server/.env');
     return;
   }
   if (!Array.isArray(productIds) || productIds.length === 0) {
     console.warn(
-      'mark-products-sold: skipped — no product IDs (new checkouts store them on the session; redeploy Node and try a new payment)'
+      'mark-products-sold: skipped — no product IDs (check Stripe metadata maxbit_product_ids* after deploy)'
     );
     return;
   }
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Maxbit-Mark-Products-Sold-Secret': secret,
-      },
-      body: JSON.stringify({ productIds }),
-    });
-    const text = await r.text();
-    if (!r.ok) {
-      console.warn('mark-products-sold: HTTP', r.status, text.slice(0, 500));
-    } else {
+  const urlQueue = [
+    ...new Set([
+      ...markSoldUrlVariants(configured),
+      ...markSoldUrlVariants(DEFAULT_MARK_PRODUCTS_SOLD_URL),
+    ]),
+  ];
+  let lastNote = '';
+  for (const url of urlQueue) {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Maxbit-Mark-Products-Sold-Secret': secret,
+        },
+        body: JSON.stringify({ productIds }),
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        lastNote = `HTTP ${r.status} ${text.slice(0, 300)}`;
+        console.warn('[mark-products-sold]', url, lastNote);
+        continue;
+      }
       try {
         const j = JSON.parse(text);
+        console.log(
+          '[mark-products-sold] ok',
+          j.updated,
+          'product(s) → Sold Out via',
+          url,
+          'ids:',
+          Array.isArray(j.ids) ? j.ids.join(',') : productIds.join(',')
+        );
         if (j.updated === 0 && Array.isArray(j.ids) && j.ids.length) {
           console.warn(
-            'mark-products-sold: 0 rows updated — product id(s) not found in products.json:',
+            'mark-products-sold: 0 rows in products.json — id mismatch (cart id vs products.json `id`):',
             j.ids.join(', ')
           );
         }
       } catch {
-        /* ignore */
+        console.log('[mark-products-sold] ok (non-JSON body)', url);
       }
+      return;
+    } catch (e) {
+      lastNote = e.message || String(e);
+      console.warn('[mark-products-sold] fetch failed', url, lastNote);
     }
-  } catch (e) {
-    console.warn('mark-products-sold request failed:', e.message || e);
   }
+  console.warn('[mark-products-sold] all URLs failed — last:', lastNote);
+};
+
+const DEFAULT_ORDER_NOTIFY_PAID_URL = 'https://www.maxbitcore.com/api/notify-order-paid.php';
+
+const formatMoneyNotify = (amountMajor, currency) => {
+  const cur = String(currency || 'usd').toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(amountMajor);
+  } catch {
+    return `${Number(amountMajor).toFixed(2)} ${cur}`;
+  }
+};
+
+const buildShopOrderBodyFromStripeSession = (session) => {
+  const orderId = cleanText((session.metadata && session.metadata.orderId) || '');
+  const sid = session.id || '';
+  const live = session.livemode ? 'live' : 'test';
+  const email = String(
+    (session.customer_details && session.customer_details.email) || session.customer_email || ''
+  )
+    .trim()
+    .toLowerCase();
+  const name = String((session.customer_details && session.customer_details.name) || '').trim() || '—';
+  const lines = [];
+  lines.push(
+    'New paid order (MaxBit checkout)',
+    '',
+    `Order ID: ${orderId}`,
+    `Stripe session: ${sid}`,
+    `Stripe mode: ${live}`,
+    '',
+    'Customer',
+    `  Name: ${name}`,
+    `  Email: ${email}`,
+    ''
+  );
+  const addr = session.customer_details && session.customer_details.address;
+  if (addr && typeof addr === 'object') {
+    const line1 = [addr.line1, addr.line2].filter(Boolean).join(', ');
+    const csz = [addr.city, addr.state, addr.postal_code].filter(Boolean).join(' ');
+    lines.push('Shipping address', `  ${line1}`, `  ${csz}`, `  ${addr.country || ''}`, '');
+  }
+  lines.push('Items');
+  const liData = session.line_items && session.line_items.data;
+  const cur = session.currency || 'usd';
+  if (Array.isArray(liData)) {
+    for (const line of liData) {
+      const qty = Math.max(1, Number(line.quantity) || 1);
+      const desc = cleanText(line.description || 'Item').slice(0, 220);
+      const totalMinor = Number(line.amount_total || 0);
+      const unitMajor = stripeMinorToMajorUnits(totalMinor / qty, cur);
+      lines.push(`  — ${desc}  (${qty}×)  ${formatMoneyNotify(unitMajor, cur)} ea`);
+    }
+  }
+  const td = session.total_details || {};
+  const taxMajor = stripeMinorToMajorUnits(Number(td.amount_tax || 0), cur);
+  const totalMajor = stripeMinorToMajorUnits(Number(session.amount_total || 0), cur);
+  lines.push(
+    '',
+    'Totals at checkout',
+    `Amount tax: ${formatMoneyNotify(taxMajor, cur)}`,
+    `Amount total: ${formatMoneyNotify(totalMajor, cur)}`,
+    ''
+  );
+  return lines.join('\n');
+};
+
+const buildCustomerOrderBodyFromStripeSession = (session) => {
+  const orderId = cleanText((session.metadata && session.metadata.orderId) || '');
+  const email = String(
+    (session.customer_details && session.customer_details.email) || session.customer_email || ''
+  )
+    .trim()
+    .toLowerCase();
+  const name = String((session.customer_details && session.customer_details.name) || '').trim() || 'Customer';
+  const lines = ['Order confirmed (MaxBit)', '', `Order ID: ${orderId}`, '', 'Customer', `  Name: ${name}`, `  Email: ${email}`, ''];
+  const addr = session.customer_details && session.customer_details.address;
+  if (addr && typeof addr === 'object') {
+    const line1 = [addr.line1, addr.line2].filter(Boolean).join(', ');
+    const csz = [addr.city, addr.state, addr.postal_code].filter(Boolean).join(' ');
+    lines.push('Shipping address', `  ${line1}`, `  ${csz}`, `  ${addr.country || ''}`, '');
+  }
+  lines.push('Items');
+  const liData = session.line_items && session.line_items.data;
+  const cur = session.currency || 'usd';
+  if (Array.isArray(liData)) {
+    for (const line of liData) {
+      const qty = Math.max(1, Number(line.quantity) || 1);
+      const desc = cleanText(line.description || 'Item').slice(0, 220);
+      const totalMinor = Number(line.amount_total || 0);
+      const unitMajor = stripeMinorToMajorUnits(totalMinor / qty, cur);
+      lines.push(`  — ${desc}  (${qty}×)  ${formatMoneyNotify(unitMajor, cur)} ea`);
+    }
+  }
+  const td = session.total_details || {};
+  const taxMajor = stripeMinorToMajorUnits(Number(td.amount_tax || 0), cur);
+  const totalMajor = stripeMinorToMajorUnits(Number(session.amount_total || 0), cur);
+  lines.push(
+    '',
+    'Totals at checkout',
+    `Amount tax: ${formatMoneyNotify(taxMajor, cur)}`,
+    `Amount total: ${formatMoneyNotify(totalMajor, cur)}`,
+    ''
+  );
+  return lines.join('\n');
+};
+
+/** Backup path when the browser never POSTs notify-order-paid.php (tab closed). Set ORDER_NOTIFY_FROM_WEBHOOK=false to disable. */
+const postPaidOrderNotifyFromWebhookSession = async (session) => {
+  if (String(process.env.ORDER_NOTIFY_FROM_WEBHOOK || '').trim().toLowerCase() === 'false') {
+    return;
+  }
+  const secret = String(process.env.MAXBIT_ORDER_NOTIFY_SECRET || process.env.ORDER_NOTIFY_SECRET || '').trim();
+  const baseUrl = String(process.env.ORDER_NOTIFY_PAID_URL || '').trim() || DEFAULT_ORDER_NOTIFY_PAID_URL;
+  const urlQueue = [...new Set([...markSoldUrlVariants(baseUrl)])];
+
+  const orderId = cleanText((session.metadata && session.metadata.orderId) || '');
+  const customerEmail = String(
+    (session.customer_details && session.customer_details.email) || session.customer_email || ''
+  )
+    .trim()
+    .toLowerCase();
+  if (!orderId || !customerEmail || !EMAIL_RE.test(customerEmail)) {
+    console.warn('[order-notify-webhook] skip — missing orderId or customer email');
+    return;
+  }
+
+  const shopBody = buildShopOrderBodyFromStripeSession(session);
+  const custBody = buildCustomerOrderBodyFromStripeSession(session);
+  const payload = {
+    orderId,
+    stripeSessionId: session.id,
+    customerName: String((session.customer_details && session.customer_details.name) || '').trim() || 'Customer',
+    customerEmail,
+    order_body: shopBody,
+    customer_order_body: custBody,
+  };
+
+  for (const url of urlQueue) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (secret) headers['X-Maxbit-Order-Notify-Secret'] = secret;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const t = await r.text().catch(() => '');
+      if (!r.ok) {
+        console.warn('[order-notify-webhook]', url, r.status, t.slice(0, 400));
+        continue;
+      }
+      console.log('[order-notify-webhook] ok', orderId, 'via', url);
+      return;
+    } catch (e) {
+      console.warn('[order-notify-webhook] fetch failed', url, e.message || e);
+    }
+  }
+  console.warn('[order-notify-webhook] all notify URLs failed for', orderId);
 };
 
 const adminOrdersSecret = process.env.ADMIN_ORDERS_SECRET;
@@ -668,6 +899,11 @@ const webhookHandler = async (req, res) => {
           } catch (e) {
             console.warn('mark products sold (webhook):', e.message || e);
           }
+          try {
+            await postPaidOrderNotifyFromWebhookSession(fullSession);
+          } catch (e) {
+            console.warn('order notify webhook:', e.message || e);
+          }
         } catch (e) {
           console.warn('shop order upsert (webhook):', e.message || e);
         }
@@ -837,13 +1073,6 @@ const createCheckoutSession = async (req, res) => {
         quantity: 1,
       });
     }
-    /** Redundant with product_data.metadata — Stripe sometimes omits product metadata on line_items; session meta is reliable. */
-    const maxbitProductIdsMeta = items
-      .map((item) => cleanText(String(item.id || '')).slice(0, 80))
-      .filter(Boolean)
-      .join(',')
-      .slice(0, 500);
-
     await serialPool.expireStaleReservations();
 
     let serialReserve = null;
@@ -931,7 +1160,7 @@ const createCheckoutSession = async (req, res) => {
         cancel_url: `${allowedOrigins[0]}/checkout`,
         metadata: {
           orderId: safeOrderId,
-          ...(maxbitProductIdsMeta ? { maxbit_product_ids: maxbitProductIdsMeta } : {}),
+          ...packProductIdsStripeMetadata(items),
           ...(serialReserve && serialReserve.reservationId
             ? { serialReservationId: serialReserve.reservationId }
             : {}),
@@ -1228,6 +1457,9 @@ const shopOrdersDeleteHandler = (req, res) => {
   app.get(base, requireAdminOrders, shopOrdersListHandler);
   app.patch(`${base}/:id`, requireAdminOrders, shopOrdersPatchHandler);
   app.delete(`${base}/:id`, requireAdminOrders, shopOrdersDeleteHandler);
+  /** POST aliases — many hosts return 501 for PATCH/DELETE before Node; POST is allowed. */
+  app.post(`${base}/:id/fulfillment`, requireAdminOrders, shopOrdersPatchHandler);
+  app.post(`${base}/:id/delete`, requireAdminOrders, shopOrdersDeleteHandler);
 });
 console.log('[maxbit-stripe] Shop orders API:', ['/shop-orders', '/server/shop-orders'].join(', '));
 
@@ -1255,5 +1487,14 @@ app.listen(PORT, () => {
     String(process.env.MARK_PRODUCTS_SOLD_SECRET || '').trim()
       ? '(set — vitrine → Sold Out after pay)'
       : '(missing — sold PCs stay "In Stock" until you set secret + PHP mark-products-sold.php)'
+  );
+  const orderSecret = String(process.env.MAXBIT_ORDER_NOTIFY_SECRET || process.env.ORDER_NOTIFY_SECRET || '').trim();
+  console.log(
+    '[maxbit-stripe] Order emails (webhook → notify-order-paid.php):',
+    String(process.env.ORDER_NOTIFY_FROM_WEBHOOK || '').trim().toLowerCase() === 'false'
+      ? 'disabled (ORDER_NOTIFY_FROM_WEBHOOK=false)'
+      : orderSecret
+        ? 'webhook backup ON; secret (set) — must match PHP MAXBIT_ORDER_NOTIFY_SECRET'
+        : 'webhook backup ON; secret (empty) — ok if PHP secret also empty; else POST returns 403'
   );
 });

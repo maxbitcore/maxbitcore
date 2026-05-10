@@ -430,12 +430,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   /** Many hosts serve index.html with HTTP 200 for unknown routes — breaks response.json(). */
   const adminBodyLooksLikeHtml = (body: string) => /^\s*</.test(body || '');
 
-  /** Avoid dumping HTML error pages into alerts; 501 often means PATCH/DELETE blocked before Node. */
+  /** Avoid dumping HTML error pages into alerts; 501 = web server blocked method before Node (admin uses POST …/fulfillment|delete). */
   const summarizeAdminFetchError = (status: number, body: string): string => {
     const raw = (body || '').trim();
     if (adminBodyLooksLikeHtml(raw)) {
       if (status === 501) {
-        return `HTTP ${status}: Not Implemented — the host often blocks PATCH/DELETE. Ensure /shop-orders is proxied to Node and allowed by Apache/LiteSpeed/nginx.`;
+        return `HTTP ${status}: Not Implemented — proxy may block POST to Node. Deploy latest server/index.js and confirm requests reach Node (/shop-orders/…/fulfillment or /delete).`;
       }
       return `HTTP ${status}: HTML error page instead of JSON (check API URL and proxy).`;
     }
@@ -509,9 +509,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     if (!adminSecret) return;
     try {
       const { response: r } = await fetchNodeOrdersApi(
-        `/shop-orders/${encodeURIComponent(orderKey)}`,
+        `/shop-orders/${encodeURIComponent(orderKey)}/fulfillment`,
         {
-          method: 'PATCH',
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fulfillmentStatus: status }),
         },
@@ -545,8 +545,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     if (!adminSecret) return;
     try {
       const { response: r } = await fetchNodeOrdersApi(
-        `/shop-orders/${encodeURIComponent(orderKey)}`,
-        { method: 'DELETE' },
+        `/shop-orders/${encodeURIComponent(orderKey)}/delete`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        },
         adminSecret
       );
       if (!r.ok) {

@@ -58,6 +58,17 @@ if ($orderId === '') {
     exit;
 }
 
+$dedupeDir = __DIR__ . '/data';
+$dedupeFile = $dedupeDir . '/order-notify-' . md5($orderId) . '.done';
+if (!is_dir($dedupeDir)) {
+    @mkdir($dedupeDir, 0755, true);
+}
+if (is_readable($dedupeFile)) {
+    http_response_code(200);
+    echo json_encode(['ok' => true, 'deduplicated' => true, 'customer_notified' => null]);
+    exit;
+}
+
 $body = isset($data['order_body']) && is_string($data['order_body']) && $data['order_body'] !== ''
     ? $data['order_body']
     : json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -67,7 +78,7 @@ $customerBodyDetail = isset($data['customer_order_body']) && is_string($data['cu
     ? $data['customer_order_body']
     : $body;
 
-$to = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'max@maxbitcore.com');
+$to = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_TO', 'info@maxbitcore.com');
 $shopBcc = maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BCC', '');
 $subject = '[MaxBit] Paid order ' . $orderId;
 $customerEmail = isset($data['customerEmail']) ? trim((string) $data['customerEmail']) : '';
@@ -76,15 +87,23 @@ $shopFromName = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 
 $replyShop = ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) ? $customerEmail : null;
 
+/**
+ * When shop To and From are the same mailbox (e.g. info@), many SMTP setups do not show the message in Inbox.
+ * Auto-BCC a second domain address so a copy always lands (override with MAXBIT_SHOP_ORDER_SAME_INBOX_BCC='' to disable).
+ */
 if (
     strcasecmp($to, $shopFrom) === 0
     && trim($shopBcc) === ''
     && trim(maxbit_order_mail_cfg('MAXBIT_SHOP_ORDER_BACKUP_EMAIL', '')) === ''
 ) {
-    error_log(
-        'maxbit notify-order-paid: shop mail uses To === From (same mailbox) without BCC or BACKUP_EMAIL — '
-        . 'inbox copy often missing; set MAXBIT_SHOP_ORDER_BCC or MAXBIT_SHOP_ORDER_BACKUP_EMAIL in order_mail_config.php'
-    );
+    $autoBcc = trim(maxbit_order_mail_cfg('MAXBIT_SHOP_SAME_INBOX_BCC', 'max@maxbitcore.com'));
+    if ($autoBcc !== '' && strcasecmp($autoBcc, $to) !== 0 && filter_var($autoBcc, FILTER_VALIDATE_EMAIL)) {
+        $shopBcc = $autoBcc;
+    } elseif ($autoBcc === '') {
+        error_log(
+            'maxbit notify-order-paid: shop To === From and no BCC — set MAXBIT_SHOP_ORDER_BCC or MAXBIT_SHOP_ORDER_BACKUP_EMAIL in order_mail_config.php'
+        );
+    }
 }
 
 if (maxbit_order_mail_smtp_ready() && maxbit_order_mail_use_phpmailer()) {
@@ -185,4 +204,5 @@ if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) 
     }
 }
 
+@file_put_contents($dedupeFile, date('c'));
 echo json_encode(['ok' => true, 'customer_notified' => $customer_notified]);
