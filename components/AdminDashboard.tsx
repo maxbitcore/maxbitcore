@@ -642,8 +642,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const getAdminApiBaseCandidates = (): string[] => {
     const primary = resolveAdminApiBaseUrl().replace(/\/+$/, '');
     const candidates: string[] = [];
+
+    /**
+     * Always try the host you actually opened the admin on first (www vs apex).
+     * Otherwise VITE_API_URL may point at maxbitcore.com while you use www — requests hit the wrong vhost and return SPA HTML.
+     */
+    if (typeof window !== 'undefined' && import.meta.env.PROD) {
+      const here = window.location.origin.replace(/\/+$/, '');
+      candidates.push(`${here}/server`);
+      candidates.push(here);
+    }
+
     if (/\/server$/i.test(primary)) {
-      // Prefer non-/server first in production (common reverse-proxy setup).
       candidates.push(primary.replace(/\/server$/i, ''));
       candidates.push(primary);
     } else {
@@ -656,7 +666,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const shopOrdersPathCandidatesForBase = (base: string): string[] => {
     const b = base.replace(/\/+$/, '');
     if (/\/server$/i.test(b)) return ['/shop-orders'];
-    return ['/shop-orders', '/server/shop-orders'];
+    /** Root host: `/shop-orders` is often the React app; `/server/shop-orders` is the Node mount. */
+    return ['/server/shop-orders', '/shop-orders'];
   };
 
   const shopOrdersPathVariantsForFetch = (base: string, path: string): string[] => {
@@ -686,6 +697,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
           if (response.status === 404) {
             lastResponse = response;
             continue;
+          }
+          if (response.ok) {
+            const peek = await response.clone().text().catch(() => '');
+            if (adminBodyLooksLikeHtml(peek)) {
+              lastResponse = response;
+              continue;
+            }
           }
           return { response, base: b };
         } catch (e) {
