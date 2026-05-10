@@ -38,13 +38,15 @@ function resolveNodeApiBaseCandidates(): string[] {
 
 function fulfillmentFromMatches(
   matches: Record<string, { fulfillmentStatus: string }>,
-  row: { id: string; orderNumber?: string }
+  row: { id: string; orderNumber?: string; stripeSessionId?: string }
 ): string | undefined {
   const keys = [
     row.id,
     typeof row.orderNumber === 'string' ? row.orderNumber : '',
+    typeof row.stripeSessionId === 'string' ? row.stripeSessionId : '',
     row.id?.toLowerCase?.(),
     typeof row.orderNumber === 'string' ? row.orderNumber.toLowerCase() : '',
+    typeof row.stripeSessionId === 'string' ? row.stripeSessionId.toLowerCase() : '',
   ].filter(Boolean) as string[];
   for (const k of keys) {
     const fs = matches[k]?.fulfillmentStatus;
@@ -117,6 +119,8 @@ function mergePurchaseRow(prev: UserPurchaseLog, next: UserPurchaseLog): UserPur
 interface UserPurchaseLog {
   id: string;
   orderNumber?: string;
+  /** Same field as Node shop order — used for fulfillment lookup when PHP id differs from metadata orderId. */
+  stripeSessionId?: string;
   total: number;
   subtotal?: number;
   tax?: number;
@@ -238,9 +242,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
                     imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : undefined,
                   }))
                 : [];
+              const stripeSid = String(
+                ord.stripeSessionId ??
+                  ord.stripe_session_id ??
+                  ord.sessionId ??
+                  ord.session_id ??
+                  ord.checkout_session_id ??
+                  ''
+              ).trim();
               const apiRow: UserPurchaseLog = {
                 id,
                 orderNumber: ord.orderNumber || id,
+                ...(stripeSid ? { stripeSessionId: stripeSid } : {}),
                 total: amount,
                 subtotal: ord.subtotal != null ? Number(ord.subtotal) : undefined,
                 tax:
@@ -269,7 +282,11 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
         const orderIdList = [
           ...new Set([
             ...Array.from(byId.keys()),
-            ...Array.from(byId.values()).flatMap((r) => [r.id, r.orderNumber ? String(r.orderNumber) : ''].filter(Boolean)),
+            ...Array.from(byId.values()).flatMap((r) =>
+              [r.id, r.orderNumber ? String(r.orderNumber) : '', r.stripeSessionId ? String(r.stripeSessionId) : ''].filter(
+                Boolean
+              )
+            ),
           ]),
         ].slice(0, 50);
         if (orderIdList.length > 0) {
@@ -313,7 +330,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
     if (!currentUser?.email) return;
     const id = window.setInterval(() => {
       window.dispatchEvent(new CustomEvent('maxbit-update'));
-    }, 90_000);
+    }, 30_000);
     return () => window.clearInterval(id);
   }, [currentUser?.email]);
 

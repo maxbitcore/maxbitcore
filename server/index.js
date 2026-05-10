@@ -969,6 +969,41 @@ const resolveShopOrderStoreKey = (store, requestedId) => {
   return null;
 };
 
+/** PHP get-orders often uses a different id than Node store key — match by email + orderNumber / Stripe session. */
+const resolveCustomerOrderForEmail = (store, email, requestedId) => {
+  const ordersMap = store.orders || {};
+  const resolvedKey = resolveShopOrderStoreKey(store, requestedId);
+  if (resolvedKey) {
+    const o = ordersMap[resolvedKey];
+    if (o && String(o.customerEmail || '').trim().toLowerCase() === email) {
+      return { resolvedKey, o };
+    }
+  }
+  const q = cleanText(String(requestedId || '')).slice(0, 120);
+  const ql = q.toLowerCase();
+  if (!ql) return null;
+  for (const [k, o] of Object.entries(ordersMap)) {
+    if (String(o.customerEmail || '').trim().toLowerCase() !== email) continue;
+    const hay = [k, o.id, o.orderNumber, o.stripeSessionId]
+      .filter(Boolean)
+      .map((x) => String(x).toLowerCase());
+    if (hay.some((h) => h === ql)) return { resolvedKey: k, o };
+  }
+  return null;
+};
+
+const assignFulfillmentMatchAliases = (matches, payload, aliases) => {
+  const added = new Set();
+  for (const raw of aliases) {
+    const a = cleanText(String(raw || '')).slice(0, 120);
+    if (!a || added.has(a)) continue;
+    added.add(a);
+    matches[a] = payload;
+    const lo = a.toLowerCase();
+    if (lo && lo !== a && !matches[lo]) matches[lo] = payload;
+  }
+};
+
 const customerOrdersLookupHandler = (req, res) => {
   try {
     const email = cleanText(String((req.body && req.body.email) || '')).toLowerCase();
@@ -988,19 +1023,19 @@ const customerOrdersLookupHandler = (req, res) => {
     const store = readShopOrdersStore();
     const matches = {};
     for (const oid of ids) {
-      const resolvedKey = resolveShopOrderStoreKey(store, oid);
-      if (!resolvedKey) continue;
-      const o = store.orders[resolvedKey];
-      if (!o) continue;
-      const em = String(o.customerEmail || '')
-        .trim()
-        .toLowerCase();
-      if (em !== email) continue;
+      const hit = resolveCustomerOrderForEmail(store, email, oid);
+      if (!hit) continue;
+      const { resolvedKey, o } = hit;
       const payload = {
         fulfillmentStatus: cleanText(String(o.fulfillmentStatus || 'Processing')),
       };
-      matches[oid] = payload;
-      if (resolvedKey !== oid) matches[resolvedKey] = payload;
+      assignFulfillmentMatchAliases(matches, payload, [
+        oid,
+        resolvedKey,
+        o.id,
+        o.orderNumber,
+        o.stripeSessionId,
+      ]);
     }
     return res.json({ matches });
   } catch (e) {
