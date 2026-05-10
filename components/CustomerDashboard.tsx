@@ -116,6 +116,69 @@ function mergePurchaseRow(prev: UserPurchaseLog, next: UserPurchaseLog): UserPur
   };
 }
 
+/** UI shows "Order MAX-…"; PHP may use numeric id — same purchase must merge before Node fulfillment lookup. */
+function stripOrderLabelPrefix(s: string): string {
+  return String(s || '').trim().replace(/^ORDER\s+/i, '').trim();
+}
+
+function dedupePurchasesByOrderKey(map: Map<string, UserPurchaseLog>): Map<string, UserPurchaseLog> {
+  const groups = new Map<string, UserPurchaseLog[]>();
+  const ungrouped: UserPurchaseLog[] = [];
+
+  for (const row of map.values()) {
+    const canon =
+      stripOrderLabelPrefix(row.orderNumber || row.id).toLowerCase() ||
+      String(row.id || '').toLowerCase();
+    if (!canon) {
+      ungrouped.push(row);
+      continue;
+    }
+    if (!groups.has(canon)) groups.set(canon, []);
+    groups.get(canon)!.push(row);
+  }
+
+  const out = new Map<string, UserPurchaseLog>();
+  for (const row of ungrouped) {
+    const k = String(row.id || '').toLowerCase();
+    if (k) out.set(k, row);
+  }
+
+  for (const rows of groups.values()) {
+    const sorted = [...rows].sort((a, b) => {
+      if (a.source === b.source) return 0;
+      return a.source === 'api' ? 1 : -1;
+    });
+    let merged = sorted[0];
+    for (let i = 1; i < sorted.length; i++) {
+      merged = mergePurchaseRow(merged, sorted[i]);
+    }
+    const mapKey = String(merged.id || merged.orderNumber || '').toLowerCase();
+    if (mapKey) out.set(mapKey, merged);
+  }
+
+  return out;
+}
+
+/** analytics `trackOrder` uses metadata order id; ensure Node lookup gets every spelling (prefix, case). */
+function expandIdsForFulfillmentLookup(rows: Iterable<UserPurchaseLog>): string[] {
+  const out = new Set<string>();
+  for (const r of rows) {
+    for (const raw of [r.id, r.orderNumber, r.stripeSessionId]) {
+      if (raw == null || raw === '') continue;
+      const s = String(raw).trim();
+      if (!s) continue;
+      out.add(s);
+      out.add(s.toLowerCase());
+      const stripped = stripOrderLabelPrefix(s);
+      if (stripped && stripped !== s) {
+        out.add(stripped);
+        out.add(stripped.toLowerCase());
+      }
+    }
+  }
+  return [...out].slice(0, 80);
+}
+
 interface UserPurchaseLog {
   id: string;
   orderNumber?: string;
@@ -186,7 +249,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
 
     const loadPurchases = async () => {
       const em = email.toLowerCase().trim();
-      const byId = new Map<string, UserPurchaseLog>();
+      let byId = new Map<string, UserPurchaseLog>();
 
       try {
         const data = getAnalytics();
@@ -277,18 +340,10 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
         /* ignore */
       }
 
+      byId = dedupePurchasesByOrderKey(byId);
+
       try {
-        /** Keys are lowercased for Map; Node store uses checkout orderId casing — send unique raw ids too. */
-        const orderIdList = [
-          ...new Set([
-            ...Array.from(byId.keys()),
-            ...Array.from(byId.values()).flatMap((r) =>
-              [r.id, r.orderNumber ? String(r.orderNumber) : '', r.stripeSessionId ? String(r.stripeSessionId) : ''].filter(
-                Boolean
-              )
-            ),
-          ]),
-        ].slice(0, 50);
+        const orderIdList = expandIdsForFulfillmentLookup(byId.values());
         if (orderIdList.length > 0) {
           const matches = await fetchFulfillmentFromNode(em, orderIdList);
           for (const row of byId.values()) {
