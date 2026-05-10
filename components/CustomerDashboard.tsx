@@ -36,6 +36,23 @@ function resolveNodeApiBaseCandidates(): string[] {
   return [...new Set(candidates.filter(Boolean))];
 }
 
+function fulfillmentFromMatches(
+  matches: Record<string, { fulfillmentStatus: string }>,
+  row: { id: string; orderNumber?: string }
+): string | undefined {
+  const keys = [
+    row.id,
+    typeof row.orderNumber === 'string' ? row.orderNumber : '',
+    row.id?.toLowerCase?.(),
+    typeof row.orderNumber === 'string' ? row.orderNumber.toLowerCase() : '',
+  ].filter(Boolean) as string[];
+  for (const k of keys) {
+    const fs = matches[k]?.fulfillmentStatus;
+    if (fs) return fs;
+  }
+  return undefined;
+}
+
 async function fetchFulfillmentFromNode(
   email: string,
   orderIds: string[]
@@ -248,13 +265,17 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       }
 
       try {
-        const orderIdList = Array.from(byId.keys());
+        /** Keys are lowercased for Map; Node store uses checkout orderId casing — send unique raw ids too. */
+        const orderIdList = [
+          ...new Set([
+            ...Array.from(byId.keys()),
+            ...Array.from(byId.values()).flatMap((r) => [r.id, r.orderNumber ? String(r.orderNumber) : ''].filter(Boolean)),
+          ]),
+        ].slice(0, 50);
         if (orderIdList.length > 0) {
           const matches = await fetchFulfillmentFromNode(em, orderIdList);
           for (const row of byId.values()) {
-            const fs =
-              matches[row.id]?.fulfillmentStatus ||
-              (row.orderNumber && matches[String(row.orderNumber)]?.fulfillmentStatus);
+            const fs = fulfillmentFromMatches(matches, row);
             if (fs) row.status = fs;
           }
         }

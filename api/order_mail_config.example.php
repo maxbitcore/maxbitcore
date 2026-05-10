@@ -84,3 +84,10 @@ define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
  * Удобно, если основное письмо магазину не видно, а клиенту пришло: так вы всё равно получите копию их письма.
  */
 // define('MAXBIT_CUSTOMER_ORDER_BCC', 'max@maxbitcore.com');
+
+/**
+ * Опционально: защита notify-order-paid.php и notify-fulfillment-status.php от чужих POST.
+ * Тот же текст, что VITE_ORDER_NOTIFY_SECRET (сборка фронта) и MAXBIT_ORDER_NOTIFY_SECRET в Node server/.env.
+ * Не копируйте реальный ключ в этот example-файл в репозиторий — только в order_mail_config.php на сервере.
+ */
+// define('MAXBIT_ORDER_NOTIFY_SECRET', 'paste_same_random_string_as_frontend_and_node');

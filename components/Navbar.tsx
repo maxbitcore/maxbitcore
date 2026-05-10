@@ -651,6 +651,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                 <input 
                                     type="text" 
                                     placeholder="ENTER USERNAME" 
+                                    autoComplete="username"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold  tracking-wider"
@@ -665,6 +666,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                   <input 
                                       type="email" 
                                       placeholder="ENTER EMAIL" 
+                                      autoComplete="email"
                                       value={email}
                                       onChange={(e) => setEmail(e.target.value)}
                                       className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold  tracking-wider"
@@ -681,6 +683,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                                         <input 
                                             type={showPassword ? "text" : "password"}
                                             placeholder="ENTER PASSWORD" 
+                                            autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-white placeholder-slate-700 outline-none focus:border-cyan-500 transition-all text-xs font-bold  tracking-wider"
@@ -722,6 +725,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange, cartCount, onOp
                              <input 
                                 type="password" 
                                 placeholder="ENTER ADMIN CODE" 
+                                autoComplete="off"
                                 value={adminCode}
                                 onChange={(e) => setAdminCode(e.target.value)}
                                 autoFocus

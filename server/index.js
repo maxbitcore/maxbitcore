@@ -956,6 +956,19 @@ const customerOrdersLookupLimiter = rateLimit({
   message: { error: 'Too many requests. Try again later.' },
 });
 
+/** Resolve order row key: exact id or case-insensitive (Stripe metadata orderId casing varies). */
+const resolveShopOrderStoreKey = (store, requestedId) => {
+  const q = cleanText(String(requestedId || '')).slice(0, 120);
+  if (!q) return null;
+  const orders = store && store.orders ? store.orders : {};
+  if (orders[q]) return q;
+  const ql = q.toLowerCase();
+  for (const k of Object.keys(orders)) {
+    if (String(k).toLowerCase() === ql) return k;
+  }
+  return null;
+};
+
 const customerOrdersLookupHandler = (req, res) => {
   try {
     const email = cleanText(String((req.body && req.body.email) || '')).toLowerCase();
@@ -975,15 +988,19 @@ const customerOrdersLookupHandler = (req, res) => {
     const store = readShopOrdersStore();
     const matches = {};
     for (const oid of ids) {
-      const o = store.orders[oid];
+      const resolvedKey = resolveShopOrderStoreKey(store, oid);
+      if (!resolvedKey) continue;
+      const o = store.orders[resolvedKey];
       if (!o) continue;
       const em = String(o.customerEmail || '')
         .trim()
         .toLowerCase();
       if (em !== email) continue;
-      matches[oid] = {
+      const payload = {
         fulfillmentStatus: cleanText(String(o.fulfillmentStatus || 'Processing')),
       };
+      matches[oid] = payload;
+      if (resolvedKey !== oid) matches[resolvedKey] = payload;
     }
     return res.json({ matches });
   } catch (e) {

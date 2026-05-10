@@ -698,6 +698,7 @@ function App() {
                     required 
                     type="text"
                     placeholder="ENTER FIRST NAME" 
+                    autoComplete="given-name"
                     value={firstName} 
                     onChange={e => setFirstName(e.target.value)} 
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
@@ -711,6 +712,7 @@ function App() {
                    required 
                    type="text"
                    placeholder="ENTER LAST NAME" 
+                   autoComplete="family-name"
                    value={lastName} 
                    onChange={e => setLastName(e.target.value)} 
                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
@@ -727,6 +729,7 @@ function App() {
                   required 
                   type="email" 
                   placeholder="EXAMPLE@MAXBITCORE.COM" 
+                  autoComplete="email"
                   value={email} 
                   onChange={e => setEmail(e.target.value)} 
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
@@ -769,6 +772,7 @@ function App() {
                 <input 
                   type="tel" 
                   placeholder="ENTER PHONE NUMBER" 
+                  autoComplete="tel"
                   value={phone} 
                   onChange={e => setPhone(e.target.value)} 
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 transition-all" 
@@ -785,6 +789,7 @@ function App() {
                       required 
                       type={showRegPassword ? "text" : "password"}
                       placeholder="••••••••" 
+                      autoComplete="new-password"
                       value={password} 
                       onChange={e => setPassword(e.target.value)} 
                       className={`w-full bg-slate-950 border rounded-xl px-4 py-3 pr-10 text-white text-[10px] font-black outline-none transition-all ${
@@ -815,6 +820,7 @@ function App() {
                     required 
                     type="password" 
                     placeholder="••••••••" 
+                    autoComplete="new-password"
                     value={confirmPassword} 
                     onChange={e => setConfirmPassword(e.target.value)} 
                     className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none transition-all ${
@@ -834,6 +840,7 @@ function App() {
                  required 
                  type="password" 
                  placeholder="ENTER KEY" 
+                 autoComplete="off"
                  value={securityKey} 
                  onChange={e => setSecurityKey(e.target.value)} 
                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-[10px] font-black outline-none focus:border-cyan-500 placeholder:text-rose-500/30"
