@@ -11,10 +11,18 @@ const serialPool = require('./serialPool');
 
 const app = express();
 app.set('trust proxy', 1);
+
+/** Strip trailing slash so CLIENT_URL=https://site.com/ matches browser Origin. */
+const normalizeOrigin = (o) => String(o || '').trim().replace(/\/+$/, '');
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
   .split(',')
-  .map((origin) => origin.trim())
+  .map((origin) => normalizeOrigin(origin))
   .filter(Boolean);
+try {
+  console.log('[maxbit-stripe] CORS allowed origins:', allowedOrigins.join(', ') || '(none)');
+} catch {
+  /* ignore */
+}
 
 app.disable('x-powered-by');
 
@@ -363,6 +371,28 @@ const buildStripeInvoiceCustomFields = (bodyRaw, envRaw) => {
   return out.length ? out : undefined;
 };
 
+/** Stripe allows long line descriptions on Checkout + Invoice; keeps full SN list off tiny custom_fields. */
+const STRIPE_CHECKOUT_LINE_DESCRIPTION_MAX = 4500;
+
+/**
+ * Put allocated pool serials under each product line (invoice Description column), not invoice header custom_fields.
+ */
+const applySerialPoolLinesToCheckoutLineItems = (line_items, cartItems, flatLines) => {
+  if (!Array.isArray(line_items) || !Array.isArray(cartItems) || !Array.isArray(flatLines)) return;
+  const n = Math.min(cartItems.length, line_items.length);
+  for (let i = 0; i < n; i++) {
+    const pid = cleanText(String(cartItems[i].id || '')).slice(0, 120);
+    if (!pid) continue;
+    const parts = flatLines
+      .filter((l) => cleanText(String(l.productId || '')).slice(0, 120) === pid)
+      .map((l) => cleanText(String(l.serial || '')))
+      .filter(Boolean);
+    if (!parts.length) continue;
+    const block = parts.join('\n').slice(0, STRIPE_CHECKOUT_LINE_DESCRIPTION_MAX);
+    line_items[i].description = block;
+  }
+};
+
 /** Pool-generated serial rows first (invoice), then body/env custom fields. Max 4 total. */
 const mergeInvoiceCustomFieldsWithSerials = (bodyRaw, envRaw, serialFieldRows) => {
   const serial =
@@ -598,8 +628,10 @@ const webhookHandler = async (req, res) => {
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-      console.warn('CORS blocked Origin:', origin, 'allowed:', allowedOrigins.join(', ') || '(none)');
+      if (!origin) return callback(null, true);
+      const n = normalizeOrigin(origin);
+      if (allowedOrigins.includes(n)) return callback(null, true);
+      console.warn('CORS blocked Origin:', origin, 'normalized:', n, 'allowed:', allowedOrigins.join(', ') || '(none)');
       return callback(null, false);
     },
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -613,6 +645,55 @@ const checkoutSessionLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many checkout attempts. Try again later.' },
+});
+
+/** Public: merge Stripe fulfillment into customer dashboard (email + known order ids only). */
+const customerOrdersLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.CUSTOMER_ORDER_LOOKUP_MAX || 120),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Try again later.' },
+});
+
+const customerOrdersLookupHandler = (req, res) => {
+  try {
+    const email = cleanText(String((req.body && req.body.email) || '')).toLowerCase();
+    const rawIds = req.body && req.body.orderIds;
+    if (!EMAIL_RE.test(email)) {
+      return res.status(400).json({ error: 'Invalid email.' });
+    }
+    const orderIds = Array.isArray(rawIds) ? rawIds : [];
+    const ids = [
+      ...new Set(
+        orderIds.map((x) => cleanText(String(x || '')).slice(0, 120)).filter(Boolean)
+      ),
+    ].slice(0, 50);
+    if (!ids.length) {
+      return res.json({ matches: {} });
+    }
+    const store = readShopOrdersStore();
+    const matches = {};
+    for (const oid of ids) {
+      const o = store.orders[oid];
+      if (!o) continue;
+      const em = String(o.customerEmail || '')
+        .trim()
+        .toLowerCase();
+      if (em !== email) continue;
+      matches[oid] = {
+        fulfillmentStatus: cleanText(String(o.fulfillmentStatus || 'Processing')),
+      };
+    }
+    return res.json({ matches });
+  } catch (e) {
+    console.error('customer-orders-lookup:', e);
+    return res.status(500).json({ error: 'Lookup failed.' });
+  }
+};
+
+['/public/customer-orders-lookup', '/server/public/customer-orders-lookup'].forEach((path) => {
+  app.post(path, customerOrdersLookupLimiter, customerOrdersLookupHandler);
 });
 
 const createCheckoutSession = async (req, res) => {
@@ -717,13 +798,16 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
+    if (serialReserve && serialReserve.lines && serialReserve.lines.length) {
+      applySerialPoolLinesToCheckoutLineItems(line_items, items, serialReserve.lines);
+    }
+
     /** After successful payment, Stripe generates a real Invoice (PDF + hosted page). Set STRIPE_CHECKOUT_INVOICE=false to disable. */
+    /** Pool serials go on line item `description` (see above), not invoice custom_fields — avoids header + 140-char chunks. */
     const invoiceCustomFieldsMerged = mergeInvoiceCustomFieldsWithSerials(
       invoiceCustomFields ?? invoice_custom_fields,
       process.env.STRIPE_INVOICE_CUSTOM_FIELDS,
-      serialReserve && serialReserve.customFields && serialReserve.customFields.length
-        ? serialReserve.customFields
-        : null
+      null
     );
     const checkoutInvoiceCreation =
       String(process.env.STRIPE_CHECKOUT_INVOICE || '')
@@ -965,7 +1049,57 @@ const shopOrdersListHandler = (req, res) => {
   }
 };
 
-const shopOrdersPatchHandler = (req, res) => {
+async function notifyCustomerFulfillmentChange(prevRow, nextRow) {
+  const prevStatus = cleanText(String(prevRow.fulfillmentStatus || 'Processing'));
+  const newStatus = cleanText(String(nextRow.fulfillmentStatus || ''));
+  if (!newStatus || prevStatus === newStatus) return;
+  const to = String(nextRow.customerEmail || '')
+    .trim()
+    .toLowerCase();
+  if (!to || !EMAIL_RE.test(to)) return;
+
+  const notifySecret = cleanText(
+    process.env.MAXBIT_ORDER_NOTIFY_SECRET || process.env.ORDER_NOTIFY_SECRET || ''
+  );
+  const notifyUrl = cleanText(
+    process.env.FULFILLMENT_NOTIFY_URL ||
+      'https://www.maxbitcore.com/api/notify-fulfillment-status.php'
+  );
+  if (!notifySecret) {
+    console.warn('[fulfillment-email] MAXBIT_ORDER_NOTIFY_SECRET not set — skip customer email.');
+    return;
+  }
+  const orderId = cleanText(String(nextRow.orderNumber || nextRow.id || ''));
+  if (!orderId) return;
+
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 15000);
+    const r = await fetch(notifyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Maxbit-Order-Notify-Secret': notifySecret,
+      },
+      body: JSON.stringify({
+        orderId,
+        customerEmail: to,
+        previousStatus: prevStatus,
+        newStatus,
+      }),
+      signal: ac.signal,
+    });
+    clearTimeout(timer);
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      console.warn('[fulfillment-email] notify URL returned', r.status, txt.slice(0, 240));
+    }
+  } catch (e) {
+    console.warn('[fulfillment-email]', e.message || e);
+  }
+}
+
+const shopOrdersPatchHandler = async (req, res) => {
   const id = cleanText((req.params && req.params.id) || '');
   if (!id) return res.status(400).json({ error: 'Missing order id.' });
   const status = cleanText((req.body && req.body.fulfillmentStatus) || '');
@@ -974,13 +1108,27 @@ const shopOrdersPatchHandler = (req, res) => {
     return res.status(400).json({ error: 'Invalid fulfillment status.' });
   }
   const store = readShopOrdersStore();
-  if (!store.orders[id]) return res.status(404).json({ error: 'Order not found.' });
+  if (!store.orders[id]) {
+    console.warn(
+      '[shop-orders PATCH] Order not in store:',
+      id,
+      'have keys:',
+      Object.keys(store.orders || {}).length
+    );
+    return res.status(404).json({ error: 'Order not found.' });
+  }
+  const prevRow = { ...store.orders[id] };
   store.orders[id] = {
     ...store.orders[id],
     fulfillmentStatus: status,
     updatedAt: new Date().toISOString(),
   };
   writeShopOrdersStore(store);
+  try {
+    await notifyCustomerFulfillmentChange(prevRow, store.orders[id]);
+  } catch (e) {
+    console.warn('notifyCustomerFulfillmentChange:', e.message || e);
+  }
   return res.json(store.orders[id]);
 };
 

@@ -22,6 +22,54 @@ function resolvePurchaseLineImageUrl(
   return resolveSiteAssetUrl(img);
 }
 
+/** Match Checkout / Admin: Node API base for Stripe pool + fulfillment lookup. */
+function resolveNodeApiBaseCandidates(): string[] {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  const candidates: string[] = [];
+  if (typeof fromEnv === 'string' && fromEnv.trim()) {
+    candidates.push(fromEnv.trim().replace(/\/+$/, ''));
+  }
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    candidates.push(`${window.location.origin.replace(/\/+$/, '')}/server`);
+  }
+  candidates.push('http://localhost:4242');
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+async function fetchFulfillmentFromNode(
+  email: string,
+  orderIds: string[]
+): Promise<Record<string, { fulfillmentStatus: string }>> {
+  const em = email.toLowerCase().trim();
+  const body = JSON.stringify({ email: em, orderIds });
+  const bases = resolveNodeApiBaseCandidates();
+  for (const base of bases) {
+    const b = base.replace(/\/+$/, '');
+    const urls = /\/server$/i.test(b)
+      ? [`${b}/public/customer-orders-lookup`]
+      : [`${b}/public/customer-orders-lookup`, `${b}/server/public/customer-orders-lookup`];
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        });
+        if (!r.ok) continue;
+        const text = await r.text();
+        if (/^\s*</.test(text)) continue;
+        const data = JSON.parse(text) as {
+          matches?: Record<string, { fulfillmentStatus: string }>;
+        };
+        if (data.matches && typeof data.matches === 'object') return data.matches;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return {};
+}
+
 function formatOrderMoney(amount: number, currency = 'usd'): string {
   const cur = (currency || 'usd').toUpperCase();
   try {
@@ -199,6 +247,21 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
         /* ignore */
       }
 
+      try {
+        const orderIdList = Array.from(byId.keys());
+        if (orderIdList.length > 0) {
+          const matches = await fetchFulfillmentFromNode(em, orderIdList);
+          for (const row of byId.values()) {
+            const fs =
+              matches[row.id]?.fulfillmentStatus ||
+              (row.orderNumber && matches[String(row.orderNumber)]?.fulfillmentStatus);
+            if (fs) row.status = fs;
+          }
+        }
+      } catch {
+        /* Node lookup optional */
+      }
+
       setUserPurchases(Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp));
     };
 
@@ -222,6 +285,15 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ currentUse
       window.removeEventListener('maxbit-submissions-updated', refreshLog);
       window.removeEventListener('maxbit-update', refreshLog);
     };
+  }, [currentUser?.email]);
+
+  /** Refresh purchases periodically so fulfillment matches admin updates without full reload. */
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    const id = window.setInterval(() => {
+      window.dispatchEvent(new CustomEvent('maxbit-update'));
+    }, 90_000);
+    return () => window.clearInterval(id);
   }, [currentUser?.email]);
 
   const operationalLogItems = useMemo(() => {

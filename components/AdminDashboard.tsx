@@ -506,14 +506,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       );
       if (!r.ok) {
         const t = await r.text();
-        throw new Error(t || String(r.status));
+        let detail = t || String(r.status);
+        try {
+          const j = JSON.parse(t) as { error?: string };
+          if (j && typeof j.error === 'string' && j.error.trim()) detail = j.error.trim();
+        } catch {
+          /* plain text */
+        }
+        throw new Error(detail);
       }
       setShopOrders((prev) =>
         prev.map((o) => (o.key === orderKey ? { ...o, fulfillmentStatus: status } : o))
       );
     } catch (err) {
       console.error('Fulfillment update failed:', err);
-      alert('Could not update order status.');
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(
+        `Could not update order status.\n\n${msg}\n\nIf this says "blocked by CORS" or "Failed to fetch", add your site URL to CLIENT_URL on the Node server (comma-separated), e.g. https://www.maxbitcore.com`
+      );
     }
   };
 
@@ -528,12 +538,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       );
       if (!r.ok) {
         const t = await r.text();
-        throw new Error(t || String(r.status));
+        let detail = t || String(r.status);
+        try {
+          const j = JSON.parse(t) as { error?: string };
+          if (j && typeof j.error === 'string' && j.error.trim()) detail = j.error.trim();
+        } catch {
+          /* plain text */
+        }
+        throw new Error(detail);
       }
       setShopOrders((prev) => prev.filter((o) => o.key !== orderKey));
     } catch (err) {
       console.error('Order delete failed:', err);
-      alert('Could not delete order.');
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Could not delete order.\n\n${msg}`);
     }
   };
 
