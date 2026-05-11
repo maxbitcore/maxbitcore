@@ -45,6 +45,27 @@ function mergeBuildSubmissionsForAdmin(server: BuildSubmission[]): BuildSubmissi
   return Array.from(byId.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 
+function looksLikeHtmlResponse(body: string): boolean {
+  return /^\s*</.test(body || '');
+}
+
+/** When the server has no row (older flow / failed persist), still mark complete in this browser. */
+function patchLocalBuildSubmissionStatus(id: string, status: string): void {
+  try {
+    const raw = localStorage.getItem('maxbit_submissions');
+    if (!raw) return;
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return;
+    const next = arr.map((s) => {
+      const row = s as BuildSubmission;
+      return row?.id === id ? { ...row, status } : row;
+    });
+    localStorage.setItem('maxbit_submissions', JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
 const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
   { color: '#94a3b8', name: 'Phantom Slate' },
@@ -1360,17 +1381,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: newStatus })
       });
-
-      if (response.ok) {
-        setSubmissions(prev => prev.map(sub => 
-          sub.id === id ? { ...sub, status: newStatus } : sub
-        ));
-        notifyUpdate();
-      } else {
-        alert("Server communication failed.");
+      const raw = await response.text();
+      if (looksLikeHtmlResponse(raw)) {
+        alert(
+          'Сервер вернул страницу вместо JSON — скорее всего нет файла api/update_status.php на хостинге или неверный путь. Загрузите PHP из репозитория в папку api/.'
+        );
+        return;
       }
+      let data: { success?: boolean; message?: string } = {};
+      try {
+        data = JSON.parse(raw) as { success?: boolean; message?: string };
+      } catch {
+        alert('Некорректный ответ сервера при смене статуса.');
+        return;
+      }
+
+      if (response.ok && data.success === true) {
+        setSubmissions((prev) => prev.map((sub) => (sub.id === id ? { ...sub, status: newStatus } : sub)));
+        notifyUpdate();
+        window.dispatchEvent(new CustomEvent('maxbit-submissions-updated'));
+        return;
+      }
+
+      const notOnServer = response.status === 404 && data.message === 'submission not found';
+      if (notOnServer) {
+        patchLocalBuildSubmissionStatus(id, newStatus);
+        setSubmissions((prev) => prev.map((sub) => (sub.id === id ? { ...sub, status: newStatus } : sub)));
+        notifyUpdate();
+        window.dispatchEvent(new CustomEvent('maxbit-submissions-updated'));
+        alert(
+          'На сервере нет этой заявки (она могла остаться только в браузере или запись в api/data/build-submissions.json не создалась). Статус обновлён локально; проверьте деплой submit-build.php и права на запись в api/data/.'
+        );
+        return;
+      }
+
+      alert(data.message || `Ошибка сервера (${response.status}).`);
     } catch (error) {
-      console.error("Status Update Error:", error);
+      console.error('Status Update Error:', error);
+      alert('Сеть: не удалось связаться с сервером.');
     }
   };
 
