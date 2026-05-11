@@ -18,6 +18,33 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
 
+function submissionsApiOrigin(): string {
+  if (typeof window === 'undefined') return 'https://www.maxbitcore.com';
+  return window.location.origin.replace(/\/+$/, '');
+}
+
+/** Server list (get-submissions.php) + same-browser localStorage drafts not yet synced. */
+function mergeBuildSubmissionsForAdmin(server: BuildSubmission[]): BuildSubmission[] {
+  let local: BuildSubmission[] = [];
+  try {
+    const raw = localStorage.getItem('maxbit_submissions');
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (Array.isArray(p)) local = p;
+    }
+  } catch {
+    /* ignore */
+  }
+  const byId = new Map<string, BuildSubmission>();
+  for (const s of server) {
+    if (s?.id) byId.set(String(s.id), s);
+  }
+  for (const s of local) {
+    if (s?.id && !byId.has(String(s.id))) byId.set(String(s.id), s);
+  }
+  return Array.from(byId.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
+
 const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
   { color: '#94a3b8', name: 'Phantom Slate' },
@@ -558,7 +585,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const [newProductGallery, setNewProductGallery] = useState<string[]>([]);
   const [newProductComponents, setNewProductComponents] = useState('');
   const [newProductDesc, setNewProductDesc] = useState('');
-  const [newProductStripePriceId, setNewProductStripePriceId] = useState('');
 
   // Configurator Assets State
   const [config, setConfig] = useState<Record<string, string[]>>(() => ({
@@ -957,7 +983,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setEditingId(null);
     setNewProductName('');
     setNewProductPrice('');
-    setNewProductStripePriceId('');
     setNewProductImage('');
     setNewProductGallery([]);
     setNewProductComponents('');
@@ -1025,18 +1050,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
         }
 
         try {
-          const subRes = await fetch(`/api/get-submissions.php?v=${Date.now()}`);
-          const text = await subRes.text(); 
-          if (text && text.trim().startsWith('[')) { 
+          const base = submissionsApiOrigin();
+          const subRes = await fetch(`${base}/api/get-submissions.php?v=${Date.now()}`);
+          const text = await subRes.text();
+          let serverList: BuildSubmission[] = [];
+          if (text && text.trim().startsWith('[')) {
             const subData = JSON.parse(text);
-            setSubmissions(subData);
-          } else {
-            console.warn("RADAR: Received empty or invalid response for submissions.");
-            setSubmissions([]);
+            if (Array.isArray(subData)) serverList = subData;
+          } else if (text && text.trim() !== '[]') {
+            console.warn('RADAR: Received empty or invalid response for submissions.');
           }
+          setSubmissions(mergeBuildSubmissionsForAdmin(serverList));
         } catch (e) {
-          console.error("Submissions channel offline:", e);
-          setSubmissions([]);
+          console.error('Submissions channel offline:', e);
+          setSubmissions(mergeBuildSubmissionsForAdmin([]));
         }
 
         try {
@@ -1163,6 +1190,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     return () => window.removeEventListener('maxbit-update', loadAllData);
   }, []);
 
+  useEffect(() => {
+    const reloadSubmissions = async () => {
+      const { token, role } = getStoredAuth();
+      if (!token || role !== 'admin') return;
+      try {
+        const base = submissionsApiOrigin();
+        const subRes = await fetch(`${base}/api/get-submissions.php?v=${Date.now()}`);
+        const text = await subRes.text();
+        let serverList: BuildSubmission[] = [];
+        if (text && text.trim().startsWith('[')) {
+          const subData = JSON.parse(text);
+          if (Array.isArray(subData)) serverList = subData;
+        }
+        setSubmissions(mergeBuildSubmissionsForAdmin(serverList));
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('maxbit-submissions-updated', reloadSubmissions);
+    return () => window.removeEventListener('maxbit-submissions-updated', reloadSubmissions);
+  }, []);
+
   const allComments = useMemo(() => {
     const list: { productId: string; productName: string; productImage: string; review: Review }[] = [];
     publishedProducts.forEach(p => {
@@ -1191,12 +1240,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     const now = Date.now();
     const existing = publishedProducts.find(p => p.id === editingId);
 
-    const stripePid = newProductStripePriceId.trim();
     const productData: Product = {
       id: editingId || `PUB-${now}`,
       name: newProductName,
       price: parseFloat(newProductPrice),
-      ...(stripePid ? { stripePriceId: stripePid } : {}),
       category: newProductCategory,
       status: newProductStatus,
       imageUrl: newProductImage || (newProductGallery.length > 0 ? newProductGallery[0] : ''),
@@ -1296,7 +1343,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setEditingId(p.id); 
     setNewProductName(p.name); 
     setNewProductPrice(p.price.toString());
-    setNewProductStripePriceId(p.stripePriceId?.trim() || '');
     setNewProductImage(p.imageUrl); 
     setNewProductGallery(p.gallery || []);
     setNewProductComponents(p.components || ''); 
@@ -1309,7 +1355,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
-      const response = await fetch('https://www.maxbitcore.com/api/update_status.php', {
+      const response = await fetch(`${submissionsApiOrigin()}/api/update_status.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: newStatus })
@@ -1331,7 +1377,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
   const handleDeleteSubmission = async (id: string) => {
     if (!window.confirm('PROTOCOL WARNING: Confirm permanent removal of this mission?')) return;
     try {
-      const response = await fetch('https://www.maxbitcore.com/api/delete-submission.php', {
+      const response = await fetch(`${submissionsApiOrigin()}/api/delete-submission.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }) 
@@ -1667,26 +1713,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Credits (Price)</label>
                               <input required value={newProductPrice} onChange={e => setNewProductPrice(e.target.value)} type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 font-mono" />
                             </div>
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">
-                                Stripe Price id (optional)
-                              </label>
-                              <input
-                                value={newProductStripePriceId}
-                                onChange={(e) => setNewProductStripePriceId(e.target.value)}
-                                type="text"
-                                placeholder="price_..."
-                                autoComplete="off"
-                                spellCheck={false}
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500 font-mono text-xs"
-                              />
-                              <p className="text-[9px] text-slate-500 leading-relaxed">
-                                From Stripe Dashboard → Product → Pricing → copy <span className="font-mono text-slate-400">price_…</span>.
-                                Checkout charges this Price; site price stays for display. Put the same{' '}
-                                <span className="font-mono text-slate-400">maxbit_product_id</span> in the Stripe Product metadata as your site product <span className="font-mono text-slate-400">id</span> so fulfillment stays in sync.
-                                Serial numbers are not stored on the Product in Stripe — use Payment metadata when fulfilling or extend order records.
-                              </p>
-                            </div>
                             <div className="space-y-4">
                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block ml-1">Visual Evidence</label>
                               <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-4 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:border-cyan-500 hover:text-cyan-500 transition-all uppercase font-black text-[10px] bg-slate-950/50">{isProcessing ? 'SCANNING...' : 'Upload Assets (Multi)'}</button>
@@ -1728,11 +1754,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
                               <div>
                                 <h3 className="font-black text-white text-sm uppercase leading-tight mb-2 italic tracking-tighter h-10 overflow-hidden line-clamp-2">{(p.name || '').replace(/<[^>]*>/g, '')}</h3>
                                 <div className="text-sm font-black text-cyan-400 font-mono tracking-tighter">${p.price}</div>
-                                {p.stripePriceId ? (
-                                  <div className="text-[9px] font-mono text-emerald-500/90 truncate mt-0.5" title={p.stripePriceId}>
-                                    {p.stripePriceId}
-                                  </div>
-                                ) : null}
                                 <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">{(p as any).isPublished ? 'DEPLOYED' : 'IN ARMORY'}</div>
                               </div>
                               <div className="flex gap-4">

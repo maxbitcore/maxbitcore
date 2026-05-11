@@ -5,6 +5,7 @@
 ini_set('display_errors', '0');
 
 require_once __DIR__ . '/maxbit_mail_helper.php';
+require_once __DIR__ . '/build_submissions_store.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -35,6 +36,12 @@ if ($userEmail === '' || !filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'invalid_email']);
     exit;
+}
+
+try {
+    maxbit_build_submissions_append($data);
+} catch (Throwable $e) {
+    error_log('submit-build append: ' . $e->getMessage());
 }
 
 $id = isset($data['id']) ? trim((string) $data['id']) : 'unknown';

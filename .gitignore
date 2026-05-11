@@ -32,3 +32,4 @@ dist/
 api/order_mail_config.php
 api/mark_products_sold.local.php
 api/vendor.zip
+api/data/build-submissions.json
