@@ -66,6 +66,19 @@ function patchLocalBuildSubmissionStatus(id: string, status: string): void {
   }
 }
 
+function removeLocalBuildSubmission(id: string): void {
+  try {
+    const raw = localStorage.getItem('maxbit_submissions');
+    if (!raw) return;
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return;
+    const next = arr.filter((s) => String((s as BuildSubmission)?.id ?? '') !== String(id));
+    localStorage.setItem('maxbit_submissions', JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
 const TACTICAL_PALETTE = [
   { color: '#ffffff', name: 'Tactical White' },
   { color: '#94a3b8', name: 'Phantom Slate' },
@@ -1428,27 +1441,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       const response = await fetch(`${submissionsApiOrigin()}/api/delete-submission.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }) 
+        body: JSON.stringify({ id })
       });
       const rawDelete = await response.text();
-      if (adminBodyLooksLikeHtml(rawDelete)) {
-        alert('Server returned HTML instead of JSON. Check API URL.');
+      if (looksLikeHtmlResponse(rawDelete)) {
+        alert(
+          'Сервер вернул HTML вместо JSON — проверьте, что на хостинге есть api/delete-submission.php и путь совпадает с админкой.'
+        );
         return;
       }
-      let result: { status?: string };
+      let result: { status?: string; message?: string };
       try {
-        result = JSON.parse(rawDelete);
+        result = JSON.parse(rawDelete) as { status?: string; message?: string };
       } catch {
-        alert('Invalid server response.');
+        alert('Некорректный ответ сервера при удалении.');
         return;
       }
-      if (result.status === 'success') {
-        setSubmissions(prev => prev.filter(s => s.id !== id));
+
+      const serverRemoved = response.ok && result.status === 'success';
+      const notOnServer =
+        response.status === 404 ||
+        (result.status === 'error' && (result.message || '').toLowerCase().includes('not found'));
+
+      if (serverRemoved || notOnServer) {
+        removeLocalBuildSubmission(id);
+        setSubmissions((prev) => prev.filter((s) => String(s.id) !== String(id)));
         notifyUpdate();
-        alert("Mission Terminated.");
+        window.dispatchEvent(new CustomEvent('maxbit-submissions-updated'));
+        if (serverRemoved) {
+          alert('Mission Terminated.');
+        } else {
+          alert(
+            'Запись удалена из списка и из localStorage. На сервере её не было (или уже удалили) — заявка могла быть только в браузере.'
+          );
+        }
+        return;
       }
+
+      alert(result.message || `Удаление не выполнено (HTTP ${response.status}).`);
     } catch (e) {
-      alert("Network error.");
+      console.error(e);
+      alert('Сеть: не удалось связаться с сервером.');
     }
   };
 

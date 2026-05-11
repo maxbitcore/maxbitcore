@@ -58,13 +58,14 @@ function maxbit_build_submissions_append(array $submission): void
 
 function maxbit_build_submissions_set_status(string $id, string $status): bool
 {
+    $id = trim($id);
     $list = maxbit_build_submissions_read();
     $found = false;
     foreach ($list as $i => $row) {
         if (!is_array($row)) {
             continue;
         }
-        if ((string) ($row['id'] ?? '') === $id) {
+        if (trim((string) ($row['id'] ?? '')) === $id) {
             $list[$i]['status'] = $status;
             $found = true;
             break;
@@ -78,10 +79,11 @@ function maxbit_build_submissions_set_status(string $id, string $status): bool
 
 function maxbit_build_submissions_delete(string $id): bool
 {
+    $id = trim($id);
     $list = maxbit_build_submissions_read();
     $before = count($list);
     $new = array_values(array_filter($list, function ($row) use ($id) {
-        return !is_array($row) || (string) ($row['id'] ?? '') !== $id;
+        return !is_array($row) || trim((string) ($row['id'] ?? '')) !== $id;
     }));
     if (count($new) === $before) {
         return false;
