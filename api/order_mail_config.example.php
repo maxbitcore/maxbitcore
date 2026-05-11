@@ -57,6 +57,12 @@ define('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
 define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 
 /**
+ * Публичный URL фронта (без слэша в конце) — ссылки «сброс пароля» в forgot_password.php.
+ * Пример: https://www.maxbitcore.com
+ */
+// define('MAXBIT_PUBLIC_SITE_URL', 'https://www.maxbitcore.com');
+
+/**
  * Куда слать уведомление магазину (первое письмо с деталями заказа).
  * Если From и To оба info@ — часть хостингов НЕ кладёт такое письмо во входящие (SMTP принимает, ящик пустой).
  * Решения (любое одно или несколько):
@@ -86,8 +92,14 @@ define('MAXBIT_MAIL_FROM_NAME', 'MaxBit Orders');
 // define('MAXBIT_CUSTOMER_ORDER_BCC', 'max@maxbitcore.com');
 
 /**
- * Опционально: защита notify-order-paid.php и notify-fulfillment-status.php от чужих POST.
+ * Опционально: защита notify-order-paid.php, notify-fulfillment-status.php и notify-admin-deploy.php от чужих POST.
  * Тот же текст, что VITE_ORDER_NOTIFY_SECRET (сборка фронта) и MAXBIT_ORDER_NOTIFY_SECRET в Node server/.env.
  * Не копируйте реальный ключ в этот example-файл в репозиторий — только в order_mail_config.php на сервере.
  */
 // define('MAXBIT_ORDER_NOTIFY_SECRET', 'paste_same_random_string_as_frontend_and_node');
+
+/**
+ * Регистрация / сброс пароля / заявка конфигуратора: api/register.php, forgot_password.php, reset_password.php,
+ * submit-build.php, notify-admin-deploy.php, maxbit_mail_helper.php — заливайте рядом с notify-order-paid.php.
+ * Таблица maxbit_password_resets создаётся автоматически при первом запросе forgot_password.php.
+ */

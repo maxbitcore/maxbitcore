@@ -14,7 +14,6 @@ import {
 } from '../services/configuratorOptions';
 import { resolveSiteAssetUrl } from '../constants';
 import { loginUser, registerUser, getStoredAuth } from '../services/authService';
-import emailjs from '@emailjs/browser';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer} from 'recharts';
 
 const DEFAULT_LOGO = localStorage.getItem('maxbit_logo') || "";
@@ -617,6 +616,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     }
   };
 
+  const orderNotifySecret =
+    typeof import.meta.env.VITE_ORDER_NOTIFY_SECRET === 'string'
+      ? import.meta.env.VITE_ORDER_NOTIFY_SECRET.trim()
+      : '';
+
+  /** Same SMTP path as orders — optional; set VITE_ORDER_NOTIFY_SECRET + MAXBIT_ORDER_NOTIFY_SECRET in PHP config. */
+  const notifyCatalogDeploy = (action: string, label: string) => {
+    if (!orderNotifySecret) return;
+    void fetch('/api/notify-admin-deploy.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Maxbit-Order-Notify-Secret': orderNotifySecret,
+      },
+      body: JSON.stringify({ action, label }),
+    }).catch(() => {});
+  };
+
   const notifyUpdate = () => {
     window.dispatchEvent(new CustomEvent('maxbit-update'));
     window.dispatchEvent(new CustomEvent('storage'));
@@ -1167,29 +1184,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     return list.sort((a, b) => new Date(b.review.date).getTime() - new Date(a.review.date).getTime());
   }, [publishedProducts]);
 
-  const sendRegistrationEmail = async (userData: any) => {
-    try {
-      await emailjs.send(
-        'service_2bhrbcn', 
-        'template_vxdzhk8', 
-        {
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          user_email: userData.email,
-          phone: userData.phone || 'Not provided',
-          gender: userData.gender,
-          birth_date: userData.birthDate,
-          business_name: "MaxBit LLC",
-        },
-        'ewqLULf0b6_PZy8W5'
-      );
-      console.log("Email sent successfully");
-    } catch (error) {
-      console.error("Email error:", error);
-      throw error;
-    }
-  };
-
   const saveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -1223,6 +1217,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(newList));
     
     await syncWithServer(newList);
+    notifyCatalogDeploy('save_product', `${productData.name} (${productData.id})`);
 
     setIsProcessing(false);
     resetProductForm();
@@ -1276,6 +1271,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
 
     await syncWithServer(updatedList);
+    notifyCatalogDeploy('toggle_publish', productId);
     notifyUpdate();
   };
 
@@ -1286,7 +1282,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setPublishedProducts(updatedList);
     localStorage.setItem('maxbit_published_products_v2', JSON.stringify(updatedList));
     try {
-      await syncWithServer(updatedList); 
+      await syncWithServer(updatedList);
+      notifyCatalogDeploy('delete_product', productId);
       console.log("SERVER SYNC COMPLETE");
     } catch (e) {
        alert("SERVER ERROR: Unit may return after refresh.");

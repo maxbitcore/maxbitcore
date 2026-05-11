@@ -9,6 +9,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once 'db_config.php';
+require_once __DIR__ . '/maxbit_mail_helper.php';
+
+/**
+ * Same SMTP path as notify-order-paid.php. Failures are logged only.
+ */
+function maxbit_try_send_registration_welcome(string $toEmail, string $firstName, string $lastName, string $username): void
+{
+    $toEmail = trim($toEmail);
+    if ($toEmail === '' || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $shopFrom = maxbit_order_mail_cfg('MAXBIT_MAIL_FROM', 'info@maxbitcore.com');
+    $fn = trim($firstName) !== '' ? trim($firstName) : 'there';
+    $ln = trim($lastName);
+    $greet = $ln !== '' ? $fn . ' ' . $ln : $fn;
+
+    $subject = '[MaxBit] Your account is ready';
+    $body = 'Hello ' . $greet . ",\r\n\r\n";
+    $body .= "Welcome to MaxBit. Your registration was successful.\r\n\r\n";
+    $body .= 'Username: ' . $username . "\r\n";
+    $body .= "Sign in on the site with this username and the password you chose.\r\n\r\n";
+    $body .= "If you did not create this account, contact max@maxbitcore.com.\r\n\r\n";
+    $body .= "— The MaxBit team\r\n";
+
+    if (!maxbit_mail_transactional($toEmail, $subject, $body, $shopFrom)) {
+        error_log('MaxBit registration welcome email failed');
+    }
+}
 
 /**
  * Для поля joined в ответе добавь колонку (один раз в MySQL):
@@ -99,6 +128,13 @@ try {
         if ($joinedIso !== null) {
             $payload['joined'] = $joinedIso;
         }
+
+        maxbit_try_send_registration_welcome(
+            (string) ($payload['email'] ?? $email),
+            (string) ($payload['firstName'] ?? $firstName),
+            (string) ($payload['lastName'] ?? $lastName),
+            (string) ($payload['username'] ?? $username)
+        );
 
         echo json_encode($payload);
         exit;

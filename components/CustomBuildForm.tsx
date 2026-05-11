@@ -366,7 +366,11 @@ const CustomBuildForm: React.FC<CustomBuildFormProps> = ({ currentUser }) => {
         const tid = window.setTimeout(() => controller.abort(), timeoutMs);
         void (async () => {
           try {
-            const response = await fetch('https://www.maxbitcore.com/api/submit-build.php', {
+            const submitBuildUrl =
+              import.meta.env.PROD && typeof window !== 'undefined'
+                ? `${window.location.origin}/api/submit-build.php`
+                : 'https://www.maxbitcore.com/api/submit-build.php';
+            const response = await fetch(submitBuildUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(newSubmission),

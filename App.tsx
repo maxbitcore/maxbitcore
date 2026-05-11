@@ -13,6 +13,7 @@ import Privacy from './components/Privacy';
 import Terms from './components/Terms';
 import Returns from './components/Returns';
 import CustomBuildForm from './components/CustomBuildForm';
+import { ResetPasswordPage } from './components/ResetPasswordPage';
 import AdminDashboard from './components/AdminDashboard';
 import ProductGrid from './components/ProductGrid';
 import ProductDetail from './components/ProductDetail';
@@ -21,7 +22,6 @@ import NewInStockBanner from './components/NewInStockBanner';
 import { trackVisit, trackProductView, trackPageNav, trackSearch } from './services/analyticsService';
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
-import { sendRegistrationEmail } from './services/emailService';
 import {
   pickJoinedFromAuthPayload,
   logoutUser,
@@ -529,6 +529,8 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/returns" element={<Returns />} />
+
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
             
             <Route path="/admin" element={
               <AdminDashboard 
@@ -625,10 +627,6 @@ function App() {
                     clearCart();
                     setCurrentUser(userWithJoined);
 
-                sendRegistrationEmail(userWithJoined)
-                    .then(() => console.log("Email sent via EmailJS")) 
-                    .catch(err => console.error("Email delay", err));    
-    
                 const users = JSON.parse(localStorage.getItem('maxbit_customers') || '[]');
                 localStorage.setItem('maxbit_customers', JSON.stringify([...users, userWithJoined]));
                 localStorage.setItem('maxbit_user', JSON.stringify(userWithJoined));
