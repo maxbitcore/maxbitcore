@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { trackCartAddition, trackProductView, logAction } from '../services/analyticsService';
+import { trackMetaViewContent } from '../services/metaPixelService';
 import { Product, Review } from '../types';
 import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
@@ -140,7 +141,12 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   useEffect(() => {
     if (!product?.id) return;
     trackProductView(product.id, String(product.name || 'Product'));
-  }, [product?.id]);
+    trackMetaViewContent({
+      id: String(product.id),
+      name: String(product.name || 'Product'),
+      price: Number(product.price) || 0,
+    });
+  }, [product?.id, product?.name, product?.price]);
 
   useEffect(() => {
     const registered = hasRegisteredSession(currentUserProp, authCtx?.currentUser);

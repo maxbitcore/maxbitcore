@@ -7,6 +7,7 @@ import { US_STATES } from '../data/usStates';
 import { searchPhotonCities, type CitySuggestion } from '../services/addressSearch';
 import { CoverImage } from './CoverImage';
 import { trackOrder } from '../services/analyticsService';
+import { trackMetaPurchase } from '../services/metaPixelService';
 import { useAuth } from '../contexts/AuthContext';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
@@ -429,6 +430,12 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
                 },
                 sessionId
               );
+              trackMetaPurchase({
+                contentIds: lines.map((l) => String(l.id)),
+                value: stripeChargedTotal,
+                currency: payCurrency,
+                orderId: oid,
+              });
             }
             try {
               if (sessionId.startsWith('cs_') && oid) {

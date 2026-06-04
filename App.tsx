@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -20,6 +20,10 @@ import ProductDetail from './components/ProductDetail';
 import ProductCard from './components/ProductCard';
 import NewInStockBanner from './components/NewInStockBanner';
 import { trackVisit, trackProductView, trackPageNav, trackSearch } from './services/analyticsService';
+import {
+  parseMetaCheckoutProducts,
+  trackMetaAddToCart,
+} from './services/metaPixelService';
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import {
@@ -101,6 +105,7 @@ function App() {
   
   const navigate = useNavigate();
   const location = useLocation();
+  const metaCheckoutHandledRef = useRef('');
   /** Navbar is in document flow on all breakpoints; no top offset needed. */
   const mainTopClass = 'pt-0';
 
@@ -319,6 +324,52 @@ function App() {
     };
   }, []);
 
+  /** Meta Commerce checkout URL: ?products=id:qty,id:qty — replace cart, then /checkout (no coupon). */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const productsParam = params.get('products');
+    if (!productsParam) return;
+    if (!publishedProducts.length) return;
+
+    const sig = `${location.pathname}|${productsParam}`;
+    if (metaCheckoutHandledRef.current === sig) return;
+
+    const lines = parseMetaCheckoutProducts(productsParam);
+    metaCheckoutHandledRef.current = sig;
+
+    if (!lines.length) {
+      navigate('/checkout', { replace: true });
+      return;
+    }
+
+    const newCart: Product[] = [];
+    const missing: string[] = [];
+
+    for (const line of lines) {
+      const product = publishedProducts.find((p) => String(p.id) === String(line.id));
+      if (!product || product.status === 'Sold Out') {
+        missing.push(line.id);
+        continue;
+      }
+      for (let i = 0; i < line.quantity; i++) {
+        newCart.push({ ...product });
+      }
+    }
+
+    setCartItems(newCart);
+    setIsCartOpen(false);
+
+    if (missing.length > 0 && newCart.length === 0) {
+      alert(
+        'Items from Facebook could not be added. Check that catalog product IDs match your store product IDs.'
+      );
+    } else if (missing.length > 0) {
+      console.warn('Meta checkout: some product IDs were not found or sold out:', missing);
+    }
+
+    navigate('/checkout', { replace: true });
+  }, [location.search, location.pathname, publishedProducts, navigate]);
+
   const newProducts = useMemo(() => {
     if (!publishedProducts || !Array.isArray(publishedProducts)) return [];
     const now = Date.now();
@@ -365,6 +416,11 @@ function App() {
   };
 
   const addToCart = (product: Product) => {
+    trackMetaAddToCart({
+      id: String(product.id),
+      name: String(product.name || 'Product'),
+      price: Number(product.price) || 0,
+    });
     setCartItems(prev => [...prev, product]);
     setIsCartOpen(true);
   };
