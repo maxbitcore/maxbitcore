@@ -609,6 +609,7 @@ function App() {
             <Checkout 
               items={cartItems} 
               currentUser={currentUser}
+              onRemoveItem={removeFromCart}
               onBack={() => {
                 setView({ type: 'tab', activeTab: 'home' }); 
                 navigate('/');            

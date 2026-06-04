@@ -8,9 +8,9 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
-import { initMetaPixel } from './services/metaPixelService';
+import { ensureMetaPixelLoaded } from './services/metaPixelService';
 
-initMetaPixel();
+ensureMetaPixelLoaded();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

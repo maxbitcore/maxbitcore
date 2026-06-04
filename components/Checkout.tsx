@@ -7,7 +7,7 @@ import { US_STATES } from '../data/usStates';
 import { searchPhotonCities, type CitySuggestion } from '../services/addressSearch';
 import { CoverImage } from './CoverImage';
 import { trackOrder } from '../services/analyticsService';
-import { trackMetaPurchase } from '../services/metaPixelService';
+import { trackMetaPurchase, trackMetaInitiateCheckout } from '../services/metaPixelService';
 import { useAuth } from '../contexts/AuthContext';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
@@ -140,12 +140,13 @@ function pickCheckoutFirstLast(u: Record<string, unknown>): { first: string; las
 interface CheckoutProps {
   items: Product[];
   onBack: () => void;
+  onRemoveItem?: (index: number) => void;
   currentUser?: any;
 }
 
 type CheckoutStep = 'details' | 'processing' | 'verifying' | 'success';
 
-const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
+const Checkout: React.FC<CheckoutProps> = ({ items, onBack, onRemoveItem, currentUser }) => {
   const navigate = useNavigate();
   const authCtx = useAuth();
   const [step, setStep] = useState<CheckoutStep>('details');
@@ -274,6 +275,26 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, currentUser }) => {
   const shippingCost = 0;
   const estimatedTax = subtotal * TAX_RATE; 
   const total = subtotal + estimatedTax;
+
+  const metaInitiateCheckoutSent = useRef(false);
+
+  useEffect(() => {
+    if (step !== 'details' || checkoutItems.length === 0) return;
+    if (metaInitiateCheckoutSent.current) return;
+    metaInitiateCheckoutSent.current = true;
+    trackMetaInitiateCheckout(
+      checkoutItems.map((item) => ({
+        id: String(item.id),
+        name: item.name,
+        price: item.price,
+      }))
+    );
+  }, [step, items, checkoutItems.length]);
+
+  useEffect(() => {
+    if (step !== 'details' || items.length > 0) return;
+    onBack();
+  }, [step, items.length, onBack]);
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -1081,22 +1102,31 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
   
             <div className="space-y-6 mb-10">
               {items.map((item, idx) => (
-                <div key={item.id} className="flex justify-between items-start gap-4">
-                  <div className="flex gap-4">
+                <div key={`${item.id}-${idx}`} className="flex justify-between items-start gap-4">
+                  <div className="flex gap-4 min-w-0 flex-1">
                     <CoverImage
                       src={item.imageUrl}
                       alt=""
                       className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-slate-800 shrink-0"
                     />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div 
                         className="text-sm font-black uppercase tracking-tighter text-white"
                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }} 
                       />
                       <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
+                      {onRemoveItem && step === 'details' && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveItem(idx)}
+                          className="mt-3 text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="text-sm font-black text-white font-mono">${item.price}</div>
+                  <div className="text-sm font-black text-white font-mono shrink-0">${item.price}</div>
                 </div>
               ))}
             </div>
