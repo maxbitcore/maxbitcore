@@ -9,7 +9,14 @@ import { CoverImage } from './CoverImage';
 import { trackOrder } from '../services/analyticsService';
 import { trackMetaPurchase, trackMetaInitiateCheckout } from '../services/metaPixelService';
 import { useAuth } from '../contexts/AuthContext';
-import { groupCartItemsForDisplay } from '../services/windowsLicenseOptions';
+import {
+  groupCartItemsForDisplay,
+  isGamingPcProduct,
+  windowsLicenseChoiceFromCart,
+  WINDOWS_LICENSE_HOME_PRICE,
+  WINDOWS_LICENSE_PRO_PRICE,
+  type WindowsLicenseChoice,
+} from '../services/windowsLicenseOptions';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
@@ -142,12 +149,19 @@ interface CheckoutProps {
   items: Product[];
   onBack: () => void;
   onRemoveItem?: (index: number) => void;
+  onSetWindowsLicense?: (productId: string, choice: WindowsLicenseChoice) => void;
   currentUser?: any;
 }
 
 type CheckoutStep = 'details' | 'processing' | 'verifying' | 'success';
 
-const Checkout: React.FC<CheckoutProps> = ({ items, onBack, onRemoveItem, currentUser }) => {
+const Checkout: React.FC<CheckoutProps> = ({
+  items,
+  onBack,
+  onRemoveItem,
+  onSetWindowsLicense,
+  currentUser,
+}) => {
   const navigate = useNavigate();
   const authCtx = useAuth();
   const [step, setStep] = useState<CheckoutStep>('details');
@@ -273,6 +287,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, onRemoveItem, curren
     (item) => item && Number.isFinite(Number(item.price)) && Number(item.price) > 0
   );
   const displayRows = groupCartItemsForDisplay(items);
+  const [windowsPanelOpen, setWindowsPanelOpen] = useState<Record<string, boolean>>({});
   const subtotal = checkoutItems.reduce((sum, item) => sum + item.price, 0);
   const shippingCost = 0;
   const estimatedTax = subtotal * TAX_RATE; 
@@ -1103,62 +1118,149 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] mb-10">Order Summary</h2>
   
             <div className="space-y-6 mb-10">
-              {displayRows.map(({ item, index: idx, isAddon, parentName }) => (
-                <div
-                  key={`${item.id}-${idx}`}
-                  className={`flex justify-between items-start gap-4 ${isAddon ? 'ml-6 border-l-2 border-cyan-500/30 pl-4' : ''}`}
-                >
-                  <div className="flex gap-4 min-w-0 flex-1">
-                    {!isAddon ? (
-                      <CoverImage
-                        src={item.imageUrl}
-                        alt=""
-                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-slate-800 shrink-0"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 shrink-0 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={`font-black uppercase tracking-tighter text-white ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }}
-                      />
-                      {isAddon && parentName ? (
-                        <p className="text-[9px] text-slate-500 mt-1 uppercase font-bold tracking-widest">
-                          Add-on for {parentName}
-                        </p>
+              {displayRows.map(({ item, index: idx, isAddon, parentName }) => {
+                const row = (
+                  <div
+                    className={`flex justify-between items-start gap-4 ${isAddon ? 'ml-6 border-l-2 border-cyan-500/30 pl-4' : ''}`}
+                  >
+                    <div className="flex gap-4 min-w-0 flex-1">
+                      {!isAddon ? (
+                        <CoverImage
+                          src={item.imageUrl}
+                          alt=""
+                          className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-slate-800 shrink-0"
+                        />
                       ) : (
-                        <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
+                        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 shrink-0 flex items-center justify-center">
+                          <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                          </svg>
+                        </div>
                       )}
-                      {onRemoveItem && step === 'details' && !isAddon && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveItem(idx)}
-                          className="mt-3 text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-colors"
-                        >
-                          Remove
-                        </button>
-                      )}
-                      {onRemoveItem && step === 'details' && isAddon && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveItem(idx)}
-                          className="mt-3 text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-colors"
-                        >
-                          Remove Windows
-                        </button>
-                      )}
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className={`font-black uppercase tracking-tighter text-white ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }}
+                        />
+                        {isAddon && parentName ? (
+                          <p className="text-[9px] text-slate-500 mt-1 uppercase font-bold tracking-widest">
+                            Add-on for {parentName}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
+                        )}
+                        {onRemoveItem && step === 'details' && !isAddon && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveItem(idx)}
+                            className="mt-3 text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-colors"
+                          >
+                            Remove
+                          </button>
+                        )}
+                        {onRemoveItem && step === 'details' && isAddon && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveItem(idx)}
+                            className="mt-3 text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-colors"
+                          >
+                            Remove Windows
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`font-black text-white font-mono shrink-0 ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}>
+                      {isAddon ? `+$${item.price}` : `$${item.price}`}
                     </div>
                   </div>
-                  <div className={`font-black text-white font-mono shrink-0 ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}>
-                    {isAddon ? `+$${item.price}` : `$${item.price}`}
+                );
+
+                if (isAddon) {
+                  return <div key={`${item.id}-${idx}`}>{row}</div>;
+                }
+
+                const isGamingPc = isGamingPcProduct(item);
+                const licenseChoice = windowsLicenseChoiceFromCart(items, item.id);
+                const panelExpanded =
+                  windowsPanelOpen[item.id] ?? licenseChoice === 'none';
+                const showWindowsPanel =
+                  isGamingPc && step === 'details' && Boolean(onSetWindowsLicense);
+
+                return (
+                  <div key={`${item.id}-${idx}`} className="space-y-3">
+                    {row}
+                    {showWindowsPanel && (
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setWindowsPanelOpen((prev) => ({
+                              ...prev,
+                              [item.id]: !(prev[item.id] ?? licenseChoice === 'none'),
+                            }))
+                          }
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/40"
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500">
+                            Optional Windows license
+                          </span>
+                          <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            {licenseChoice === 'home'
+                              ? 'Home selected'
+                              : licenseChoice === 'pro'
+                                ? 'Pro selected'
+                                : 'Choose'}
+                            <svg
+                              className={`h-4 w-4 transition-transform ${panelExpanded ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </span>
+                        </button>
+                        {panelExpanded && (
+                          <div className="space-y-2 border-t border-slate-800 p-3">
+                            {(
+                              [
+                                { value: 'none' as const, label: 'No license', price: 0 },
+                                { value: 'home' as const, label: 'Windows 11 Home', price: WINDOWS_LICENSE_HOME_PRICE },
+                                { value: 'pro' as const, label: 'Windows 11 Pro', price: WINDOWS_LICENSE_PRO_PRICE },
+                              ] as const
+                            ).map((opt) => (
+                              <label
+                                key={opt.value}
+                                className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+                                  licenseChoice === opt.value
+                                    ? 'border-cyan-500/60 bg-cyan-500/10'
+                                    : 'border-slate-800 hover:border-slate-700'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <input
+                                    type="radio"
+                                    name={`checkout-windows-${item.id}`}
+                                    checked={licenseChoice === opt.value}
+                                    onChange={() => onSetWindowsLicense!(String(item.id), opt.value)}
+                                    className="h-3.5 w-3.5 border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+                                  />
+                                  <span className="text-[11px] font-bold text-white uppercase tracking-tight">
+                                    {opt.label}
+                                  </span>
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-400 shrink-0">
+                                  {opt.price > 0 ? `+$${opt.price}` : '—'}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 md:p-6 space-y-4">

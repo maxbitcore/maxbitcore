@@ -11,7 +11,9 @@ import { sanitizeHtml, sanitizeProductComponentsHtml } from '../services/sanitiz
 import {
   buildWindowsLicenseProduct,
   isGamingPcProduct,
+  isProductInCart,
   windowsLicenseAddonPrice,
+  windowsLicenseChoiceFromCart,
   WINDOWS_LICENSE_HOME_PRICE,
   WINDOWS_LICENSE_PRO_PRICE,
   type WindowsLicenseChoice,
@@ -75,6 +77,7 @@ function CoreComponentsBody({ rawHtml }: { rawHtml: string }) {
 
 interface ProductDetailProps {
   product: Product;
+  cartItems?: Product[];
   currentUser?: any;
   onBack: () => void;
   onAddToCart: (product: Product) => void;
@@ -83,6 +86,7 @@ interface ProductDetailProps {
 
 const ProductDetail: React.FC<ProductDetailProps> = ({
   product,
+  cartItems = [],
   currentUser: currentUserProp,
   onBack,
   onAddToCart,
@@ -181,6 +185,17 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
   useEffect(() => {
     setWindowsLicense('none');
   }, [product.id]);
+
+  useEffect(() => {
+    const fromCart = windowsLicenseChoiceFromCart(cartItems, product.id);
+    if (fromCart !== 'none') {
+      setWindowsLicense(fromCart);
+      return;
+    }
+    if (isProductInCart(cartItems, product.id)) {
+      setWindowsLicense('none');
+    }
+  }, [cartItems, product.id]);
 
   const handleAddToCart = () => {
     trackCartAddition(product.id);
@@ -383,6 +398,20 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                  <span className="text-6xl font-black text-white font-mono tracking-tighter">${product.price}</span>
               </div>
 
+             {product.components && (
+               <div className="mb-8">
+                  <h3 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-4">Core Components</h3>
+                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
+                    <CoreComponentsBody rawHtml={product.components} />
+                  </div>
+               </div>
+             )}
+             
+             <div 
+               className="text-slate-400 leading-relaxed font-bold text-xl mb-12 border-b border-slate-800/50 pb-12 max-w-xl uppercase tracking-wide prose prose-invert max-w-none"
+               dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
+             />
+
              {showWindowsOptions && !isSoldOut && (
                <div className="mb-10 max-w-md">
                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-500 mb-3">
@@ -424,20 +453,6 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                  </div>
                </div>
              )}
-
-             {product.components && (
-               <div className="mb-8">
-                  <h3 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-4">Core Components</h3>
-                  <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
-                    <CoreComponentsBody rawHtml={product.components} />
-                  </div>
-               </div>
-             )}
-             
-             <div 
-               className="text-slate-400 leading-relaxed font-bold text-xl mb-12 border-b border-slate-800/50 pb-12 max-w-xl uppercase tracking-wide prose prose-invert max-w-none"
-               dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
-             />
 
              <button 
                onClick={handleAddToCart}

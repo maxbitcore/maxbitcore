@@ -24,7 +24,11 @@ import {
   parseMetaCheckoutProducts,
   trackMetaAddToCart,
 } from './services/metaPixelService';
-import { isWindowsLicenseProductId } from './services/windowsLicenseOptions';
+import {
+  isWindowsLicenseProductId,
+  buildWindowsLicenseProduct,
+  type WindowsLicenseChoice,
+} from './services/windowsLicenseOptions';
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import {
@@ -41,12 +45,14 @@ import { enUS } from 'date-fns/locale';
 
 const ProductDetailRoute = ({
   publishedProducts,
+  cartItems,
   addToCart,
   setView,
   navigate,
   currentUser,
 }: {
   publishedProducts: any[];
+  cartItems: Product[];
   addToCart: (p: any) => void;
   setView: (v: any) => void;
   navigate: any;
@@ -69,6 +75,7 @@ const ProductDetailRoute = ({
   return (
     <ProductDetail
       product={product}
+      cartItems={cartItems}
       currentUser={currentUser}
       onBack={() => {
         navigate(-1);
@@ -438,6 +445,22 @@ function App() {
     });
   };
 
+  const setWindowsLicenseForProduct = (productId: string, choice: WindowsLicenseChoice) => {
+    const pid = String(productId || '').trim();
+    if (!pid) return;
+    setCartItems((prev) => {
+      const without = prev.filter(
+        (item) =>
+          !(
+            isWindowsLicenseProductId(String(item.id)) &&
+            String(item.bundleParentId || '').trim() === pid
+          )
+      );
+      if (choice !== 'home' && choice !== 'pro') return without;
+      return [...without, buildWindowsLicenseProduct(choice, pid)];
+    });
+  };
+
   const currentTab = view.type === 'tab' ? view.activeTab : null;
 
   const HomePage = () => (
@@ -603,6 +626,7 @@ function App() {
           <Route path="/product/:id" element={
             <ProductDetailRoute
               publishedProducts={publishedProducts}
+              cartItems={cartItems}
               addToCart={addToCart}
               setView={setView}
               navigate={navigate}
@@ -615,6 +639,7 @@ function App() {
               items={cartItems} 
               currentUser={currentUser}
               onRemoveItem={removeFromCart}
+              onSetWindowsLicense={setWindowsLicenseForProduct}
               onBack={() => {
                 setView({ type: 'tab', activeTab: 'home' }); 
                 navigate('/');            

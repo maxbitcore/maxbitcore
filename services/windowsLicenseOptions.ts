@@ -62,6 +62,30 @@ export function windowsLicenseAddonPrice(choice: WindowsLicenseChoice): number {
   return 0;
 }
 
+/** Read linked Windows add-on for a gaming PC already in cart. */
+export function windowsLicenseChoiceFromCart(
+  items: Product[],
+  productId: string
+): WindowsLicenseChoice {
+  const pid = String(productId || '').trim();
+  if (!pid) return 'none';
+  for (const item of items || []) {
+    if (!isWindowsLicenseProductId(item.id)) continue;
+    if (String(item.bundleParentId || '').trim() !== pid) continue;
+    if (item.id === WINDOWS_LICENSE_HOME_ID) return 'home';
+    if (item.id === WINDOWS_LICENSE_PRO_ID) return 'pro';
+  }
+  return 'none';
+}
+
+export function isProductInCart(items: Product[], productId: string): boolean {
+  const pid = String(productId || '').trim();
+  if (!pid) return false;
+  return (items || []).some(
+    (item) => !isWindowsLicenseProductId(item.id) && String(item.id).trim() === pid
+  );
+}
+
 export function stripHtmlName(name: string): string {
   return String(name || '').replace(/<[^>]*>/g, '').trim();
 }
