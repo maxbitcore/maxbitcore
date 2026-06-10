@@ -6,6 +6,7 @@ import { Product, Review } from '../types';
 import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 import { useAuth } from '../contexts/AuthContext';
+import { CoverImage } from './CoverImage';
 import { sanitizeHtml, sanitizeProductComponentsHtml } from '../services/sanitizeHtml';
 import {
   buildWindowsLicenseProduct,
