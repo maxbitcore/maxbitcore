@@ -31,6 +31,8 @@ export interface Product {
   isPublished?: boolean;
   /** Optional override for Meta/Facebook catalog CSV (google_product_category). */
   googleProductCategory?: string;
+  /** Windows license line linked to a gaming PC in cart (checkout display / remove together). */
+  bundleParentId?: string;
 }
 
 export interface BuildSubmission {

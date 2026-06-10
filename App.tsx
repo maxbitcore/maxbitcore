@@ -24,6 +24,7 @@ import {
   parseMetaCheckoutProducts,
   trackMetaAddToCart,
 } from './services/metaPixelService';
+import { isWindowsLicenseProductId } from './services/windowsLicenseOptions';
 import { Product, ViewState, MainTab } from './types';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import {
@@ -427,9 +428,13 @@ function App() {
 
   const removeFromCart = (index: number) => {
     setCartItems(prev => {
-      const newItems = [...prev];
-      newItems.splice(index, 1);
-      return newItems;
+      const removed = prev[index];
+      if (!removed) return prev;
+      let next = prev.filter((_, i) => i !== index);
+      if (!isWindowsLicenseProductId(String(removed.id))) {
+        next = next.filter((item) => String(item.bundleParentId || '') !== String(removed.id));
+      }
+      return next;
     });
   };
 

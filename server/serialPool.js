@@ -139,6 +139,8 @@ const reserveForCheckout = ({ orderId, items, strict }) =>
     for (const item of items || []) {
       const pid = cleanPid(item.id);
       if (!pid) continue;
+      /** Windows license line items — no SN in pool (strict checkout still allowed). */
+      if (pid === 'WIN11-HOME' || pid === 'WIN11-PRO') continue;
       const pool = state.pools[pid];
       if (!pool || pool.length === 0) {
         if (strict) {

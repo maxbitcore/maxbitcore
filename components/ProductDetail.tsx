@@ -7,7 +7,14 @@ import { getStoredAuth } from '../services/authService';
 import { toggleWishlist, checkIsWishlisted } from '../services/wishlistUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { sanitizeHtml, sanitizeProductComponentsHtml } from '../services/sanitizeHtml';
-import { CoverImage } from './CoverImage';
+import {
+  buildWindowsLicenseProduct,
+  isGamingPcProduct,
+  windowsLicenseAddonPrice,
+  WINDOWS_LICENSE_HOME_PRICE,
+  WINDOWS_LICENSE_PRO_PRICE,
+  type WindowsLicenseChoice,
+} from '../services/windowsLicenseOptions';
 
 /** Shown in the review "Your login" field for logged-in shoppers. */
 function pickReviewerDisplayName(propUser: any, ctxUser: any): string {
@@ -167,10 +174,24 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     authCtx?.currentUser?.username,
   ]);
 
+  const [windowsLicense, setWindowsLicense] = useState<WindowsLicenseChoice>('none');
+  const showWindowsOptions = isGamingPcProduct(product);
+
+  useEffect(() => {
+    setWindowsLicense('none');
+  }, [product.id]);
+
   const handleAddToCart = () => {
     trackCartAddition(product.id);
     onAddToCart(product);
+    if (windowsLicense === 'home' || windowsLicense === 'pro') {
+      const licenseProduct = buildWindowsLicenseProduct(windowsLicense, String(product.id));
+      trackCartAddition(licenseProduct.id);
+      onAddToCart(licenseProduct);
+    }
   };
+
+  const addToCartTotal = Number(product.price) + windowsLicenseAddonPrice(windowsLicense);
 
   const persistReviews = async (nextReviews: Review[]) => {
     const res = await fetch('https://www.maxbitcore.com/api/products.php', { cache: 'no-store' });
@@ -361,6 +382,48 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                  <span className="text-6xl font-black text-white font-mono tracking-tighter">${product.price}</span>
               </div>
 
+             {showWindowsOptions && !isSoldOut && (
+               <div className="mb-10 max-w-md">
+                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-500 mb-3">
+                   Optional Windows license
+                 </p>
+                 <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
+                   {(
+                     [
+                       { value: 'none' as const, label: 'No license', price: 0 },
+                       { value: 'home' as const, label: 'Windows 11 Home', price: WINDOWS_LICENSE_HOME_PRICE },
+                       { value: 'pro' as const, label: 'Windows 11 Pro', price: WINDOWS_LICENSE_PRO_PRICE },
+                     ] as const
+                   ).map((opt) => (
+                     <label
+                       key={opt.value}
+                       className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                         windowsLicense === opt.value
+                           ? 'border-cyan-500/60 bg-cyan-500/10'
+                           : 'border-slate-800 hover:border-slate-700'
+                       }`}
+                     >
+                       <span className="flex items-center gap-3 min-w-0">
+                         <input
+                           type="radio"
+                           name={`windows-${product.id}`}
+                           checked={windowsLicense === opt.value}
+                           onChange={() => setWindowsLicense(opt.value)}
+                           className="h-4 w-4 border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+                         />
+                         <span className="text-sm font-bold text-white uppercase tracking-tight">
+                           {opt.label}
+                         </span>
+                       </span>
+                       <span className="text-sm font-mono text-slate-400 shrink-0">
+                         {opt.price > 0 ? `+$${opt.price}` : '—'}
+                       </span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+             )}
+
              {product.components && (
                <div className="mb-8">
                   <h3 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-4">Core Components</h3>
@@ -382,7 +445,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                  isSoldOut ? 'bg-slate-800 text-slate-500' : 'maxbit-gradient text-slate-900'
                }`}
              >
-               {isSoldOut ? 'Out of stock' : `Add to cart — $${product.price}`}
+               {isSoldOut
+                 ? 'Out of stock'
+                 : `Add to cart — $${addToCartTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
              </button>
              <button
                  type="button"

@@ -9,6 +9,7 @@ import { CoverImage } from './CoverImage';
 import { trackOrder } from '../services/analyticsService';
 import { trackMetaPurchase, trackMetaInitiateCheckout } from '../services/metaPixelService';
 import { useAuth } from '../contexts/AuthContext';
+import { groupCartItemsForDisplay } from '../services/windowsLicenseOptions';
 
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
@@ -271,6 +272,7 @@ const Checkout: React.FC<CheckoutProps> = ({ items, onBack, onRemoveItem, curren
   const checkoutItems = items.filter(
     (item) => item && Number.isFinite(Number(item.price)) && Number(item.price) > 0
   );
+  const displayRows = groupCartItemsForDisplay(items);
   const subtotal = checkoutItems.reduce((sum, item) => sum + item.price, 0);
   const shippingCost = 0;
   const estimatedTax = subtotal * TAX_RATE; 
@@ -1101,21 +1103,38 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] mb-10">Order Summary</h2>
   
             <div className="space-y-6 mb-10">
-              {items.map((item, idx) => (
-                <div key={`${item.id}-${idx}`} className="flex justify-between items-start gap-4">
+              {displayRows.map(({ item, index: idx, isAddon, parentName }) => (
+                <div
+                  key={`${item.id}-${idx}`}
+                  className={`flex justify-between items-start gap-4 ${isAddon ? 'ml-6 border-l-2 border-cyan-500/30 pl-4' : ''}`}
+                >
                   <div className="flex gap-4 min-w-0 flex-1">
-                    <CoverImage
-                      src={item.imageUrl}
-                      alt=""
-                      className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-slate-800 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div 
-                        className="text-sm font-black uppercase tracking-tighter text-white"
-                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }} 
+                    {!isAddon ? (
+                      <CoverImage
+                        src={item.imageUrl}
+                        alt=""
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-slate-800 shrink-0"
                       />
-                      <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
-                      {onRemoveItem && step === 'details' && (
+                    ) : (
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 shrink-0 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className={`font-black uppercase tracking-tighter text-white ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }}
+                      />
+                      {isAddon && parentName ? (
+                        <p className="text-[9px] text-slate-500 mt-1 uppercase font-bold tracking-widest">
+                          Add-on for {parentName}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-widest">{item.category}</p>
+                      )}
+                      {onRemoveItem && step === 'details' && !isAddon && (
                         <button
                           type="button"
                           onClick={() => onRemoveItem(idx)}
@@ -1124,9 +1143,20 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
                           Remove
                         </button>
                       )}
+                      {onRemoveItem && step === 'details' && isAddon && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveItem(idx)}
+                          className="mt-3 text-[10px] font-bold text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-colors"
+                        >
+                          Remove Windows
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="text-sm font-black text-white font-mono shrink-0">${item.price}</div>
+                  <div className={`font-black text-white font-mono shrink-0 ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}>
+                    {isAddon ? `+$${item.price}` : `$${item.price}`}
+                  </div>
                 </div>
               ))}
             </div>

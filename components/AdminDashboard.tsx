@@ -1287,7 +1287,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
       reviews: existing?.reviews || [],
       isApproved: true,
       isPublished: editingId ? (existing?.isPublished ?? true) : true,
-      createdAt: existing?.createdAt || now
+      createdAt: existing?.createdAt || now,
     };
 
     const newList = editingId 
@@ -1381,7 +1381,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
     setNewProductGallery(p.gallery || []);
     setNewProductComponents(p.components || ''); 
     setNewProductDesc(p.description);
-    setNewProductCategory(p.category as any); 
+    setNewProductCategory(p.category as any);
     setNewProductStatus(p.status);
     setCatalogMode('products');
     window.scrollTo({ top: 0, behavior: 'smooth' });

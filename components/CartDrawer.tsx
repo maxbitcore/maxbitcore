@@ -7,6 +7,7 @@
 import React from 'react';
 import { Product } from '../types';
 import { CoverImage } from './CoverImage';
+import { groupCartItemsForDisplay } from '../services/windowsLicenseOptions';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface CartDrawerProps {
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onRemoveItem, onCheckout }) => {
   const total = items.reduce((sum, item) => sum + item.price, 0);
+  const displayRows = groupCartItemsForDisplay(items);
 
   return (
     <>
@@ -68,29 +70,48 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onRemov
               <p className="font-bold text-slate-500 uppercase tracking-widest text-xs">Inventory empty.</p>
             </div>
           ) : (
-            items.map((item, idx) => (
-              <div key={`${item.id}-${idx}`} className="flex gap-4 animate-fade-in-up">
-                <div className="w-20 h-24 bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex-shrink-0">
-                  <CoverImage
-                    src={item.imageUrl}
-                    alt={item.name.replace(/<[^>]*>/g, '')}
-                    className="w-full h-full"
-                  />
-                </div>
+            displayRows.map(({ item, index: idx, isAddon, parentName }) => (
+              <div
+                key={`${item.id}-${idx}`}
+                className={`flex gap-4 animate-fade-in-up ${isAddon ? 'ml-4 border-l-2 border-cyan-500/30 pl-3' : ''}`}
+              >
+                {!isAddon ? (
+                  <div className="w-20 h-24 bg-slate-800 rounded-lg overflow-hidden border border-slate-700 flex-shrink-0">
+                    <CoverImage
+                      src={item.imageUrl}
+                      alt={item.name.replace(/<[^>]*>/g, '')}
+                      className="w-full h-full"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-20 h-24 bg-cyan-500/5 rounded-lg border border-cyan-500/20 flex-shrink-0 flex items-center justify-center">
+                    <span className="text-[9px] font-black text-cyan-400 uppercase text-center px-1">Win</span>
+                  </div>
+                )}
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-white text-sm">{item.name.replace(/<[^>]*>/g, '')}</h3>
-                        <span className="text-sm font-black text-cyan-400">${item.price}</span>
+                        <h3 className={`font-bold text-white ${isAddon ? 'text-xs text-cyan-300' : 'text-sm'}`}>
+                          {item.name.replace(/<[^>]*>/g, '')}
+                        </h3>
+                        <span className={`font-black text-cyan-400 ${isAddon ? 'text-xs' : 'text-sm'}`}>
+                          {isAddon ? `+$${item.price}` : `$${item.price}`}
+                        </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-1">{item.category}</p>
+                    {isAddon && parentName ? (
+                      <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">
+                        For {parentName}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-1">{item.category}</p>
+                    )}
                   </div>
                   <button 
                     type="button"
                     onClick={() => onRemoveItem(idx)}
                     className="text-[10px] font-bold text-rose-500 hover:text-rose-400 self-start uppercase tracking-widest transition-colors py-1"
                   >
-                    Delete
+                    {isAddon ? 'Remove Windows' : 'Delete'}
                   </button>
                 </div>
               </div>
