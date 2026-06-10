@@ -31,5 +31,6 @@ dist/
 # PHP: SMTP secrets (vendor/ is committed so hosting works without composer)
 api/order_mail_config.php
 api/mark_products_sold.local.php
+api/meta_catalog_feed.local.php
 api/vendor.zip
 api/data/build-submissions.json

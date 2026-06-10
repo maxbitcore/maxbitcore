@@ -28,7 +28,9 @@ export interface Product {
   reviews?: any[];
   isApproved?: boolean;
   createdAt?: number;
-  isPublished?: boolean; 
+  isPublished?: boolean;
+  /** Optional override for Meta/Facebook catalog CSV (google_product_category). */
+  googleProductCategory?: string;
 }
 
 export interface BuildSubmission {
