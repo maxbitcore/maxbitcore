@@ -248,6 +248,15 @@ function App() {
     trackVisit();
   }, []);
 
+  /** SPA: reset scroll when opening product or checkout (mobile kept list scroll depth otherwise). */
+  useEffect(() => {
+    const path = location.pathname;
+    if (!path.startsWith('/product/') && path !== '/checkout') return;
+    window.scrollTo(0, 0);
+    const t = window.setTimeout(() => window.scrollTo(0, 0), 0);
+    return () => window.clearTimeout(t);
+  }, [location.pathname, location.key]);
+
   useEffect(() => {
     const tick = () => {
       if (document.visibilityState === 'visible' && localStorage.getItem('maxbit_token')) {

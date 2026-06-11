@@ -315,6 +315,10 @@ const Checkout: React.FC<CheckoutProps> = ({
   }, [step, items.length, onBack]);
 
   useEffect(() => {
+    if (step === 'details') window.scrollTo(0, 0);
+  }, [step]);
+
+  useEffect(() => {
     const q = new URLSearchParams(window.location.search);
 
     const verifyReturn = async () => {
@@ -883,7 +887,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
 
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
           
-          <div className="space-y-12">
+          <div className="order-2 space-y-12 lg:order-1">
             <div>
               <h1 className="text-4xl font-black italic tracking-tighter text-white mb-2 uppercase">Checkout</h1>
               <p className="text-[10px] text-cyan-500/70 font-bold uppercase tracking-[0.2em]">Secure checkout — your details are encrypted</p>
@@ -1115,7 +1119,7 @@ const handlePlaceOrder = async (e: React.FormEvent) => {
             </div>
           </div>
             
-          <div className="lg:pl-12 lg:border-l border-slate-800">
+          <div className="order-1 border-b border-slate-800 pb-10 mb-2 lg:order-2 lg:mb-0 lg:border-b-0 lg:pb-0 lg:pl-12 lg:border-l lg:border-slate-800">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-[0.3em] mb-10">Order Summary</h2>
   
             <div className="space-y-6 mb-10">

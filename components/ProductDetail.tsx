@@ -152,6 +152,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
 
   useEffect(() => {
     if (!product?.id) return;
+    window.scrollTo(0, 0);
     trackProductView(product.id, String(product.name || 'Product'));
     trackMetaViewContent({
       id: String(product.id),
