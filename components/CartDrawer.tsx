@@ -7,6 +7,7 @@
 import React from 'react';
 import { Product } from '../types';
 import { CoverImage } from './CoverImage';
+import { WindowsLicenseThumb } from './WindowsLicenseIcon';
 import { groupCartItemsForDisplay } from '../services/windowsLicenseOptions';
 
 interface CartDrawerProps {
@@ -84,9 +85,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({ isOpen, onClose, items, onRemov
                     />
                   </div>
                 ) : (
-                  <div className="w-20 h-24 bg-cyan-500/5 rounded-lg border border-cyan-500/20 flex-shrink-0 flex items-center justify-center">
-                    <span className="text-[9px] font-black text-cyan-400 uppercase text-center px-1">Win</span>
-                  </div>
+                  <WindowsLicenseThumb className="h-24 w-20 rounded-lg" iconClassName="h-10 w-10" />
                 )}
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
