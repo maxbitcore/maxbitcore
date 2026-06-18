@@ -1767,19 +1767,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ showRegister, closeRegi
 
                   {catalogMode === 'products' && (
                     <>
-                      <div className="mb-8 p-5 rounded-2xl border border-cyan-500/20 bg-cyan-500/5">
-                        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-400 mb-2">Meta / Facebook catalog feed</p>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-3">
-                          Deploy a unit here → it appears in the CSV feed (Systems, Components, Peripherals). In Commerce Manager add a{' '}
-                          <span className="text-slate-300">scheduled data feed</span> pointing to this URL. Product{' '}
-                          <span className="font-mono text-cyan-300/90">id</span> must match the catalog.
-                        </p>
-                        <code className="block text-[11px] text-emerald-300/90 font-mono break-all bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2">
-                          {typeof window !== 'undefined'
-                            ? `${window.location.origin.replace(/\/+$/, '')}/api/meta-catalog-feed.php`
-                            : 'https://www.maxbitcore.com/api/meta-catalog-feed.php'}
-                        </code>
-                      </div>
                       <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-3xl h-fit shadow-2xl">
                           <h2 className="text-xl font-black text-white italic uppercase mb-8">{editingId ? 'Modify Unit' : 'Create Unit'}</h2>
                           <form onSubmit={saveProduct} className="space-y-6">
